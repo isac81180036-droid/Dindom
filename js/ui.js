@@ -1,0 +1,130 @@
+// Utilitários de interface compartilhados pelas telas.
+(function () {
+  var UI = {};
+
+  UI.esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  };
+
+  UI.fmt = function (n) {
+    if (n == null || isNaN(n)) return '–';
+    return Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  };
+
+  UI.money = function (n) {
+    return Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  };
+
+  UI.greeting = function () {
+    var h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  UI.buzz = function (ms) {
+    try { if (navigator.vibrate) navigator.vibrate(ms || 10); } catch (e) {}
+  };
+
+  UI.toast = function (msg, opts) {
+    opts = opts || {};
+    var host = document.getElementById('toasts');
+    var el = document.createElement('div');
+    el.className = 'toast ' + (opts.tone || 'ok');
+    el.setAttribute('role', 'status');
+    el.innerHTML = icon(opts.icon || (opts.tone === 'crit' ? 'alert' : 'check')) +
+      '<span>' + UI.esc(msg) + '</span>' +
+      (opts.action ? '<button type="button">' + UI.esc(opts.action) + '</button>' : '');
+    if (opts.action) {
+      el.querySelector('button').addEventListener('click', function () { el.remove(); opts.onAction && opts.onAction(); });
+    }
+    host.appendChild(el);
+    setTimeout(function () { el.remove(); }, opts.ms || 2600);
+  };
+
+  // Painel inferior. Retorna a função que fecha o painel.
+  UI.sheet = function (html, mount, onClose) {
+    var wrap = document.createElement('div');
+    wrap.className = 'sheet-wrap';
+    wrap.innerHTML = '<div class="sheet" role="dialog" aria-modal="true"><div class="grabber"></div>' + html + '</div>';
+    document.body.appendChild(wrap);
+    document.body.style.overflow = 'hidden';
+    function close() {
+      if (!wrap.parentNode) return;
+      wrap.remove();
+      document.body.style.overflow = '';
+      if (onClose) onClose();
+    }
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) close(); });
+    wrap.querySelectorAll('[data-close]').forEach(function (b) { b.addEventListener('click', close); });
+    if (mount) mount(wrap.querySelector('.sheet'), close);
+    var f = wrap.querySelector('[autofocus]');
+    if (f) setTimeout(function () { f.focus(); }, 60);
+    return close;
+  };
+
+  // Confirmação antes de ações irreversíveis (o navegador do app não usa confirm()).
+  UI.confirm = function (o) {
+    UI.sheet(
+      '<h2>' + UI.esc(o.title) + '</h2>' +
+      (o.body ? '<p class="muted">' + o.body + '</p>' : '') +
+      '<div class="section">' +
+      '<button type="button" class="btn ' + (o.danger ? 'dark' : 'primary') + ' block" data-ok>' + UI.esc(o.ok || 'Confirmar') + '</button>' +
+      '<button type="button" class="btn block" data-close>Voltar</button>' +
+      '</div>',
+      function (sheet, close) {
+        sheet.querySelector('[data-ok]').addEventListener('click', function () { close(); o.onOk(); });
+      }
+    );
+  };
+
+  // Evita toque duplo durante envios: mostra carregamento e libera ao terminar.
+  UI.busy = function (btn, work) {
+    if (btn.classList.contains('busy')) return;
+    btn.classList.add('busy');
+    btn.disabled = true;
+    var label = btn.textContent;
+    setTimeout(function () {
+      btn.classList.remove('busy');
+      btn.disabled = false;
+      btn.textContent = label;
+      work();
+    }, 650);
+  };
+
+  UI.debounce = function (fn, ms) {
+    var t;
+    return function () {
+      var a = arguments, self = this;
+      clearTimeout(t);
+      t = setTimeout(function () { fn.apply(self, a); }, ms);
+    };
+  };
+
+  UI.bar = function (pct, cls) {
+    return '<div class="bar ' + (cls || '') + '" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(pct) + '"><i style="width:' + pct + '%"></i></div>';
+  };
+
+  UI.empty = function (ic, title, text, action) {
+    return '<div class="empty"><div class="tile">' + icon(ic, 'lg') + '</div><h3>' + UI.esc(title) + '</h3><p>' + UI.esc(text) + '</p>' + (action || '') + '</div>';
+  };
+
+  UI.topbar = function (title, opts) {
+    opts = opts || {};
+    return '<header class="topbar">' +
+      (opts.back ? '<a class="icon-btn plain" href="' + opts.back + '" aria-label="Voltar">' + icon('chevronLeft') + '</a>' : '') +
+      '<div style="flex:1;min-width:0"><h1>' + UI.esc(title) + '</h1>' + (opts.sub ? '<div class="sub">' + UI.esc(opts.sub) + '</div>' : '') + '</div>' +
+      (opts.right || '') + '</header>';
+  };
+
+  // Níveis de acesso: colaborador < gerente < admin. O admin tem tudo do gerente e mais a área de cadastro.
+  UI.ROLES = { colaborador: 'Colaborador', gerente: 'Gerente', admin: 'Administrador' };
+  UI.isManager = function () { var r = DB.get().user.role; return r === 'gerente' || r === 'admin'; };
+  UI.isAdmin = function () { return DB.get().user.role === 'admin'; };
+
+  window.UI = UI;
+  // Registro das telas; cada arquivo em js/screens/ adiciona a sua.
+  window.Screens = window.Screens || {};
+})();

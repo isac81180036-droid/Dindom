@@ -1,0 +1,43 @@
+# Blueprint do Render — https://render.com/docs/blueprint-spec
+#
+# Dindom: app interno da pizzaria. Fica no projeto "Dindom" do Render,
+# separado de qualquer outro projeto (ex.: Qualifica Food / capacita).
+# É um site estático (HTML, CSS e JS): não tem servidor nem banco, e o
+# plano de site estático do Render é gratuito.
+#
+# Para subir: no painel do Render, New > Blueprint, aponte para o
+# repositório do Dindom. Cada push na main publica de novo.
+
+projects:
+  - name: Dindom
+    environments:
+      - name: production
+        services:
+          - type: web
+            runtime: static
+            name: dindom
+            branch: main
+            autoDeployTrigger: commit
+
+            # Publica só o app: README, render.yaml e o servidor local (serve.ps1) ficam de fora.
+            buildCommand: rm -rf dist && mkdir dist && cp -r index.html manifest.webmanifest sw.js css js icons dist/
+            staticPublishPath: ./dist
+
+            headers:
+              # O service worker e a página principal sempre buscam a versão nova.
+              - path: /sw.js
+                name: Cache-Control
+                value: no-cache
+              - path: /index.html
+                name: Cache-Control
+                value: no-cache
+              - path: /*
+                name: X-Content-Type-Options
+                value: nosniff
+              - path: /*
+                name: Referrer-Policy
+                value: strict-origin-when-cross-origin
+              # Câmera liberada só para o próprio app (leitor de nota fiscal).
+              - path: /*
+                name: Permissions-Policy
+                value: camera=(self), geolocation=(self), microphone=()

@@ -1,0 +1,74 @@
+/* Layout responsivo: celular por padrão, menu lateral e grades a partir de 900px. */
+
+/* ---------- Padrões (celular) ---------- */
+.home-grid, .home-grid > .col, .card-grid { display: flex; flex-direction: column; gap: var(--sp-5); }
+.card-grid { gap: var(--sp-3); }
+.nav .brand, .nav .nav-foot { display: none; }
+/* Só esconde; nunca força um display, para não desfazer o layout próprio do elemento. */
+@media (max-width: 899.98px) { .desk-only { display: none !important; } }
+
+/* ---------- Computador ---------- */
+@media (min-width: 900px) {
+  .mobile-only { display: none !important; }
+
+  #app { margin-left: var(--side-w); }
+  body::before { display: none; }
+
+  /* Larguras de conteúdo: formulários e listas estreitos, painéis largos. */
+  .screen { max-width: 820px; padding-top: calc(var(--safe-t) + var(--sp-6)); gap: var(--sp-6); }
+  .screen.wide { max-width: 1200px; }
+  .screen.full { max-width: none; }
+  .screen.no-nav { padding-bottom: 140px; }
+  .topbar h1 { font-size: var(--fs-2xl); }
+
+  .home-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--sp-6); align-items: start; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--sp-4); }
+  .stat-grid { gap: var(--sp-4); }
+  .btn.cta { align-self: flex-start; width: auto; min-width: 260px; }
+
+  /* Menu lateral no lugar da barra inferior. */
+  .nav {
+    top: 0; right: auto; width: var(--side-w);
+    padding: calc(var(--safe-t) + var(--sp-5)) var(--sp-3) var(--sp-4) max(var(--sp-3), var(--safe-l));
+    border-top: 0; border-right: 1px solid var(--line);
+    background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none;
+    display: flex; flex-direction: column; gap: var(--sp-5);
+  }
+  .nav .brand { align-self: flex-start; display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+  .nav .nav-label { padding: var(--sp-4) var(--sp-3) var(--sp-1); font: 500 11px var(--font-display); letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); }
+  .nav ul { height: auto; max-width: none; margin: 0; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+  .nav a {
+    flex-direction: row; justify-content: flex-start; gap: var(--sp-3);
+    height: 46px; padding: 0 var(--sp-3); border-radius: var(--r-md);
+    font-size: var(--fs-md); color: var(--ink-2);
+  }
+  .nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+  .nav a[aria-current="page"]::before { display: none; }
+  .nav .badge { position: static; margin-left: auto; min-width: 22px; height: 22px; line-height: 22px; font-size: 11px; }
+  .nav .nav-foot { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-radius: var(--r-md); background: var(--surface-2); text-decoration: none; color: inherit; }
+  .nav .nav-foot .avatar { width: 38px; height: 38px; font-size: var(--fs-md); }
+  .nav .nav-foot .grow { min-width: 0; display: flex; flex-direction: column; font-size: var(--fs-sm); }
+
+  /* Barra de ação fixa acompanha a área de conteúdo. */
+  .dock, .dock.no-nav { left: var(--side-w); bottom: 0; padding-bottom: calc(var(--sp-3) + var(--safe-b)); }
+  .dock-inner { max-width: calc(820px - 2 * var(--gutter)); }
+  .screen.has-dock { padding-bottom: 140px; }
+
+  /* Painéis inferiores viram janelas centralizadas. */
+  .sheet-wrap { align-items: center; justify-content: center; padding: var(--sp-6); }
+  .sheet { max-width: 500px; max-height: 86vh; border-radius: var(--r-lg); padding: var(--sp-6); box-shadow: 0 24px 60px rgba(0, 0, 0, .25); }
+  .sheet .grabber { display: none; }
+
+  .toasts { top: auto; bottom: 24px; left: var(--side-w); }
+  .banner.offline { margin-left: var(--side-w); }
+}
+
+/* ---------- Mouse ---------- */
+@media (hover: hover) {
+  .card.tap:hover { box-shadow: 0 2px 4px rgba(16, 20, 30, .06), 0 10px 28px rgba(16, 20, 30, .09); }
+  a.row:hover, button.row:hover, .task-hit:hover { background: var(--surface-2); }
+  .chip:hover { border-color: var(--ink-3); }
+  .btn:hover { filter: brightness(1.05); }
+  .btn.ghost:hover, .icon-btn:hover { background: var(--surface-2); }
+  .nav a:hover:not([aria-current="page"]) { color: var(--ink); background: var(--surface-2); }
+}

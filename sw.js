@@ -1,0 +1,36 @@
+// Service worker: guarda a casca do app para abrir rápido e funcionar sem internet.
+var CACHE = 'dindom-v6';
+var SHELL = [
+  './', './index.html', './manifest.webmanifest',
+  './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
+  './icons/logo-white.png', './icons/wordmark-black.png',
+  './css/tokens.css', './css/app.css', './css/screens.css', './css/agenda.css', './css/desktop.css', './css/brand.css', './css/nota.css', './css/ponto.css',
+  './js/agenda/core.js', './js/agenda/views.js', './js/agenda/form.js', './js/agenda/drag.js', './js/screens/agenda.js', './js/screens/equipe.js',
+  './js/nfce.js', './js/scanner.js', './js/vendor/jsQR.js', './js/screens/nota-scan.js', './js/screens/nota.js', './js/screens/precos.js',
+  './js/ponto-core.js', './js/screens/ponto.js', './js/screens/ponto-equipe.js',
+  './js/icons.js', './js/data.js', './js/ui.js', './js/media.js', './js/app.js',
+  './js/screens/home.js', './js/screens/fechamento.js', './js/screens/estoque.js',
+  './js/screens/checklists.js', './js/screens/manutencao.js', './js/screens/perfil.js'
+];
+
+self.addEventListener('install', function (e) {
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
+});
+
+self.addEventListener('activate', function (e) {
+  e.waitUntil(caches.keys().then(function (keys) {
+    return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+  }).then(function () { return self.clients.claim(); }));
+});
+
+// Rede primeiro (para receber atualizações); se falhar, usa o cache.
+self.addEventListener('fetch', function (e) {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request).then(function (res) {
+      var copy = res.clone();
+      caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      return res;
+    }).catch(function () { return caches.match(e.request); })
+  );
+});

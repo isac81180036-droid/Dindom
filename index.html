@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Dindom</title>
+  <meta name="theme-color" content="#f4f4f3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-64.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Figtree:wght@400;500;550;600;650;700&display=swap">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/screens.css">
+  <link rel="stylesheet" href="css/agenda.css">
+  <link rel="stylesheet" href="css/nota.css">
+  <link rel="stylesheet" href="css/ponto.css">
+  <link rel="stylesheet" href="css/desktop.css">
+  <link rel="stylesheet" href="css/brand.css">
+</head>
+<body>
+  <!-- Abertura: só a logo aparecendo. Toque para pular. -->
+  <div id="splash" aria-hidden="true"><img src="icons/logo-white.png" alt=""></div>
+  <div id="offline" class="banner crit offline" role="status" hidden>
+    <svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 2l20 20"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
+    <div class="grow">Sem conexão. O que você fizer fica salvo e é enviado quando a internet voltar.</div>
+  </div>
+  <div id="app"></div>
+  <nav id="nav" class="nav" aria-label="Navegação principal"></nav>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/media.js"></script>
+  <script src="js/nfce.js"></script>
+  <script src="js/scanner.js"></script>
+  <script src="js/ponto-core.js"></script>
+  <script src="js/screens/home.js"></script>
+  <script src="js/screens/fechamento.js"></script>
+  <script src="js/screens/estoque.js"></script>
+  <script src="js/screens/nota-scan.js"></script>
+  <script src="js/screens/nota.js"></script>
+  <script src="js/screens/precos.js"></script>
+  <script src="js/screens/checklists.js"></script>
+  <script src="js/screens/manutencao.js"></script>
+  <script src="js/screens/perfil.js"></script>
+  <script src="js/agenda/core.js"></script>
+  <script src="js/agenda/views.js"></script>
+  <script src="js/agenda/form.js"></script>
+  <script src="js/agenda/drag.js"></script>
+  <script src="js/screens/agenda.js"></script>
+  <script src="js/screens/equipe.js"></script>
+  <script src="js/screens/ponto.js"></script>
+  <script src="js/screens/ponto-equipe.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+/* Identidade Dindom: preto e branco da marca, letreiro manuscrito como assinatura e Montserrat espaçada (como o "DESDE 2009").
+   Cor só para significado: ok, atenção, crítico, informação e as cores das agendas.
+   Layout: app de uma coluna, conteúdo rolável entre cabeçalho e barra inferior fixa; ações principais na metade de baixo da tela (uso com uma mão). */
+:root {
+  --bg: #f4f4f3;
+  --surface: #ffffff;
+  --surface-2: #ececeb;
+  --ink: #0a0a0a;
+  --ink-2: #5c5c5a;
+  --ink-3: #8f8f8c;
+  --line: #e3e3e1;
+  --accent: #0a0a0a;          /* o preto da marca */
+  --accent-ink: #ffffff;
+  --accent-soft: #ebebea;
+  --ok: #1f8a57;
+  --ok-soft: #e3f4ea;
+  --warn: #b86e00;
+  --warn-soft: #fff1d9;
+  --crit: #c62a2a;
+  --crit-soft: #fde4e4;
+  --info: #2a62c6;
+  --info-soft: #e4ecfb;
+  --scrim: rgba(0, 0, 0, .5);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 14px rgba(0, 0, 0, .05);
+  --logo-invert: 0;           /* a logo é preta; no tema escuro inverte para branco */
+
+  /* Cores das agendas (entregas, equipe, manutenção, reservas, financeiro) */
+  --cal-1: #c76a12;
+  --cal-2: #2a62c6;
+  --cal-3: #7a4fd1;
+  --cal-4: #1f8a57;
+  --cal-5: #c2386b;
+
+  --font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  --fs-xs: .75rem;
+  --fs-sm: .8125rem;
+  --fs-md: .9375rem;
+  --fs-lg: 1.0625rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 28px;
+
+  --tap: 48px;
+  --nav-h: 64px;
+  --side-w: 0px;     /* largura do menu lateral; só existe no computador */
+  --gutter: 16px;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000;
+    --surface: #121212;
+    --surface-2: #1f1f1f;
+    --ink: #f7f7f5;
+    --ink-2: #a8a8a5;
+    --ink-3: #72726f;
+    --line: #262626;
+    --accent: #f7f7f5;
+    --accent-ink: #0a0a0a;
+    --accent-soft: #262626;
+    --ok: #3ccf87;
+    --ok-soft: #10291b;
+    --warn: #f0a83a;
+    --warn-soft: #2e220d;
+    --crit: #ff6b6b;
+    --crit-soft: #351515;
+    --info: #79a6ff;
+    --info-soft: #141f38;
+    --scrim: rgba(0, 0, 0, .7);
+    --shadow: 0 0 0 1px #1c1c1c;
+    --logo-invert: 1;
+    --cal-1: #f0a050;
+    --cal-2: #79a6ff;
+    --cal-3: #b294ff;
+    --cal-4: #3ccf87;
+    --cal-5: #ff7eb0;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #121212;
+  --surface-2: #1f1f1f;
+  --ink: #f7f7f5;
+  --ink-2: #a8a8a5;
+  --ink-3: #72726f;
+  --line: #262626;
+  --accent: #f7f7f5;
+  --accent-ink: #0a0a0a;
+  --accent-soft: #262626;
+  --ok: #3ccf87;
+  --ok-soft: #10291b;
+  --warn: #f0a83a;
+  --warn-soft: #2e220d;
+  --crit: #ff6b6b;
+  --crit-soft: #351515;
+  --info: #79a6ff;
+  --info-soft: #141f38;
+  --scrim: rgba(0, 0, 0, .7);
+  --shadow: 0 0 0 1px #1c1c1c;
+  --logo-invert: 1;
+  --cal-1: #f0a050;
+  --cal-2: #79a6ff;
+  --cal-3: #b294ff;
+  --cal-4: #3ccf87;
+  --cal-5: #ff7eb0;
+  color-scheme: dark;
+}
+
+/* Computador: menu lateral e margens maiores. */
+@media (min-width: 900px) {
+  :root { --nav-h: 0px; --side-w: 248px; --gutter: 32px; }
+}

@@ -1,0 +1,50 @@
+/* Marca Dindom: logo, abertura e ajustes do destaque monocromático. */
+
+/* A logo é um PNG preto com fundo transparente; no tema escuro vira branca. */
+.logo-ink { filter: invert(var(--logo-invert)); display: block; height: auto; user-select: none; -webkit-user-drag: none; }
+
+/* Rótulos em caixa alta espaçada, como o "DESDE 2009" da logo. */
+.eyebrow { font-family: var(--font-display); font-weight: 500; letter-spacing: .16em; font-size: 11px; }
+h1, h2, h3 { font-weight: 700; letter-spacing: -.015em; }
+
+/* Card de destaque é preto (ou branco no tema escuro): o botão e o anel invertem para não sumir. */
+.card.hero .btn.primary { background: var(--bg); color: var(--ink); }
+.card.hero .ring { background: conic-gradient(var(--bg) calc(var(--p) * 1%), color-mix(in srgb, var(--bg) 18%, transparent) 0); }
+.card.hero .bar > i { background: var(--bg); }
+.toast button { color: var(--bg); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Início: assinatura no topo (no computador ela fica no menu lateral). */
+.home-brand { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--tap); }
+.home-brand .logo-ink { width: 104px; }
+.home-brand .grow { flex: 1; }
+
+/* Menu lateral do computador. */
+/* Assinatura compacta: letreiro pequeno e "DESDE 2009" centralizado logo abaixo, como na arte original. */
+.nav .brand .logo-ink { width: 92px; }
+.nav .brand .since { font: 500 7.5px/1 var(--font-display); letter-spacing: .32em; margin-right: -.32em; color: var(--ink-2); }
+
+/* ---------- Abertura: só a logo aparecendo ----------
+   Sempre a versão preta da marca (fundo preto, logo branca), nos dois temas. */
+#splash {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: #000;
+  /* Some sozinha mesmo se o JavaScript falhar. */
+  animation: splash-out .45s var(--ease) 1.55s forwards;
+}
+#splash img {
+  width: min(62vw, 340px);
+  /* Revela da esquerda para a direita, como a escrita do letreiro, com leve foco. */
+  animation: splash-logo 1.1s cubic-bezier(.65, 0, .35, 1) .15s both;
+}
+@keyframes splash-logo {
+  0%   { opacity: 0; clip-path: inset(0 100% 0 0); filter: blur(6px); transform: scale(.97); }
+  45%  { opacity: 1; }
+  100% { opacity: 1; clip-path: inset(0 0 0 0); filter: blur(0); transform: none; }
+}
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+#splash.skip { animation: splash-out .2s ease forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  #splash { animation: splash-out .3s ease 1s forwards; }
+  #splash img { animation: none; }
+}
