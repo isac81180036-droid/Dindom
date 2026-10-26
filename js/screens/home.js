@@ -152,7 +152,7 @@
   // Ponto: a ação mais frequente do dia, logo no topo do Início.
   function pontoCard() {
     var emp = Ponto.me();
-    if (!emp) return '';
+    if (!emp || emp.ponto === false) return '';
     var st = Ponto.state(emp.id);
     return '<section class="card ponto-mini"><div class="card-row"><div class="tile' + (st.status === 'trabalhando' ? ' ok' : st.status === 'intervalo' ? ' warn' : '') + '">' + icon('clock') + '</div>' +
       '<div class="grow"><div class="card-title">Ponto</div><div class="card-meta">' + PontoUI.statusLine(st, emp).replace(/<[^>]+>/g, '') + '</div></div>' +

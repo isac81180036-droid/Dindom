@@ -1,0 +1,123 @@
+/* Login: marca em verde-escuro com a logo branca; o formulário segue o tema do app. */
+
+.login {
+  --login-green: #1e6b4a;        /* verde da tela de entrada (o mesmo nos dois temas); logo branca com bom contraste */
+  --login-green-hi: #2a8560;     /* um tom acima, para hover, foco e profundidade */
+  position: fixed; inset: 0; z-index: 25; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; background: var(--login-green);
+}
+.login.leaving { animation: login-out .26s ease forwards; }
+@keyframes login-out { to { opacity: 0; transform: scale(.99); } }
+
+/* ---------- Marca: logo no canto superior direito, saudação embaixo à esquerda ---------- */
+.login-brand {
+  position: relative; flex: 1 0 auto; min-height: 34vh;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+  padding: calc(var(--safe-t) + 96px) max(24px, var(--safe-r)) 40px max(24px, var(--safe-l)); color: #fff;
+  /* leve profundidade no verde, sem virar gradiente chamativo */
+  background: radial-gradient(110% 80% at 85% 0%, var(--login-green-hi) 0%, var(--login-green) 65%);
+}
+.login-logo {
+  position: absolute; top: calc(var(--safe-t) + 22px); right: max(22px, var(--safe-r));
+  width: 124px; height: auto; user-select: none; -webkit-user-drag: none;
+  animation: login-logo .7s cubic-bezier(.2, .7, .2, 1) both;
+}
+.login-hello { display: flex; flex-direction: column; gap: 6px; max-width: 30ch; animation: login-fade .7s ease .2s both; }
+.login-hello h2 { font: 700 2.1rem/1.05 var(--font-display); letter-spacing: -.02em; color: #fff; }
+.login-hello p:last-child { color: rgba(255, 255, 255, .78); font-size: var(--fs-md); }
+.login-tag { font: 500 10.5px var(--font-display); letter-spacing: .3em; text-transform: uppercase; color: rgba(255, 255, 255, .7); }
+@keyframes login-logo { from { opacity: 0; transform: translateY(-6px); filter: blur(3px); } }
+@keyframes login-fade { from { opacity: 0; transform: translateY(8px); } }
+/* ---------- Formulário ---------- */
+.login-card {
+  background: var(--surface); color: var(--ink); border-radius: 28px 28px 0 0;
+  padding: 30px max(20px, var(--safe-r)) calc(24px + var(--safe-b)) max(20px, var(--safe-l));
+  animation: login-card .55s cubic-bezier(.2, .7, .2, 1) .08s both;
+}
+@keyframes login-card { from { transform: translateY(40px); opacity: 0; } }
+.login-form { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4); }
+.login-form h1 { font-size: 2rem; margin-top: -6px; }
+.login-form > .muted { margin-top: -8px; }
+
+.input-icon { position: relative; }
+.input-icon > .ico { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--ink-3); pointer-events: none; }
+.input-icon .input { padding-left: 46px; height: 56px; font-size: 1.0625rem; } /* 17px evita o zoom automático do iPhone */
+.pass-wrap .input { padding-right: 52px; }
+.pass-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; color: var(--ink-2); }
+.login .input:focus { border-color: var(--login-green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--login-green) 14%, transparent); }
+.login :focus-visible { outline-color: var(--login-green); }
+
+.login-err { margin: -4px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--crit-soft); color: var(--crit); font-size: var(--fs-sm); font-weight: 600; }
+.login-remember { display: flex; flex-direction: row-reverse; align-items: center; justify-content: space-between; gap: var(--sp-3); min-height: 44px; font-weight: 550; cursor: pointer; }
+.login .switch:checked { background: var(--login-green); }
+.login .btn.primary { background: var(--login-green); color: #fff; }
+.login .btn.primary:hover { background: var(--login-green-hi); filter: none; }
+.login-go { min-height: 58px; font-size: var(--fs-lg); }
+.login-forgot { align-self: center; color: var(--ink-2); }
+
+.pass-rules { list-style: none; margin: -8px 0 0; padding: 0; display: flex; gap: var(--sp-4); flex-wrap: wrap; font-size: var(--fs-xs); color: var(--ink-3); }
+.pass-rules li { display: flex; align-items: center; gap: 6px; }
+.pass-rules li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid currentColor; }
+.pass-rules li.ok { color: var(--ok); font-weight: 600; }
+.pass-rules li.ok::before { background: currentColor; }
+
+.login-demo { border-top: 1px solid var(--line); padding-top: var(--sp-3); color: var(--ink-2); font-size: var(--fs-sm); }
+.login-demo summary { display: flex; align-items: center; gap: 6px; min-height: 40px; cursor: pointer; list-style: none; font-weight: 600; }
+.login-demo summary::-webkit-details-marker { display: none; }
+.login-demo-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-2) 0; }
+
+/* ---------- Notebook flutuando (só no computador) ---------- */
+.login-device { display: none; }
+
+/* ---------- Computador: verde com o notebook à esquerda, login à direita ---------- */
+@media (min-width: 900px) {
+  .login { flex-direction: row; }
+  .login-brand {
+    order: 1; flex: 1.15; min-height: 0; padding: 44px 56px 36px;
+    display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr;
+    justify-content: stretch; align-content: stretch; justify-items: start; align-items: start;
+  }
+  .login-logo { top: 40px; right: 48px; width: 150px; }
+  .login-hello { max-width: min(30ch, calc(100% - 190px)); }
+  .login-hello h2 { font-size: 2.6rem; }
+  .login-hello p:last-child { font-size: var(--fs-lg); }
+  .login-tag { font-size: 12px; }
+  .login-card { order: 2; flex: 0 0 min(520px, 42vw); border-radius: 0; display: flex; align-items: center; padding: 56px 64px; animation-name: login-card-side; }
+  .login-form { width: 100%; }
+  @keyframes login-card-side { from { transform: translateX(30px); opacity: 0; } }
+
+  .login-device {
+    display: block; align-self: center; justify-self: center;
+    width: min(92%, 700px, calc((100vh - 290px) * 1.45)); margin-top: 8px;
+    perspective: 1800px; animation: login-fade .9s ease .2s both;
+  }
+  .ld-float { transform-style: preserve-3d; animation: ld-float 6s ease-in-out infinite; }
+  @keyframes ld-float {
+    0%, 100% { transform: rotateX(7deg) rotateY(-13deg) rotateZ(.6deg) translateY(0); }
+    50%      { transform: rotateX(7deg) rotateY(-13deg) rotateZ(.6deg) translateY(-16px); }
+  }
+  .ld-lid {
+    position: relative; padding: 2.4% 2.4% 3.2%; border-radius: 18px 18px 6px 6px; background: #121212;
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .09), 0 34px 70px rgba(0, 20, 10, .38);
+  }
+  .ld-cam { position: absolute; top: 1.05%; left: 50%; width: 6px; height: 6px; border-radius: 50%; background: #2c2c2c; transform: translateX(-50%); }
+  .ld-screen { position: relative; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 5px; background: #f4f4f3; }
+  .ld-screen img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top left; opacity: 0; transition: opacity .9s ease; }
+  .ld-screen img.on { opacity: 1; }
+  .ld-screen::after { /* reflexo discreto no vidro */
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255, 255, 255, .16) 0%, rgba(255, 255, 255, 0) 38%);
+  }
+  .ld-base {
+    position: relative; height: 15px; margin: 0 -7.5%; border-radius: 2px 2px 22px 22px;
+    background: linear-gradient(180deg, #e3e5e8 0%, #b6babf 70%, #9a9ea4 100%);
+    box-shadow: 0 12px 22px rgba(0, 20, 10, .28);
+  }
+  .ld-base i { position: absolute; top: 0; left: 50%; width: 15%; height: 5px; transform: translateX(-50%); border-radius: 0 0 8px 8px; background: #8f9398; }
+  .ld-shadow {
+    width: 72%; height: 26px; margin: 30px auto 0; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(0, 25, 12, .42), transparent);
+    animation: ld-shadow 6s ease-in-out infinite;
+  }
+  @keyframes ld-shadow { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.84); opacity: .6; } }
+}

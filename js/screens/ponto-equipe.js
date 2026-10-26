@@ -62,7 +62,7 @@
   Screens.ponto_equipe = function () {
     if (!UI.isManager()) return Screens.ponto([]);
     var d = DB.get();
-    var emps = d.employees.filter(function (e) { return e.active && (unitFilter === 'todas' || e.unit === unitFilter); });
+    var emps = d.employees.filter(function (e) { return e.active && e.ponto !== false && (unitFilter === 'todas' || e.unit === unitFilter); });
     var rows = emps.map(function (e) { return { e: e, t: today(e) }; });
     var count = function (k) { return rows.filter(function (r) { return r.t.key === k; }).length; };
     var order = { missing: 0, on: 1, pause: 2, later: 3, done: 4, off: 5 };
@@ -71,7 +71,7 @@
     var from = Cal.today().slice(0, 8) + '01', to = Cal.today();
 
     var html = '<main class="screen wide">' + UI.topbar('Ponto da equipe', { sub: 'Hoje, ' + new Date().toLocaleDateString('pt-BR') }) +
-      '<div class="seg" style="max-width:360px"><button type="button" data-mine aria-pressed="false">Meu ponto</button><button type="button" aria-pressed="true">Equipe</button></div>' +
+      (P.me() && P.me().ponto !== false ? '<div class="seg" style="max-width:360px"><button type="button" data-mine aria-pressed="false">Meu ponto</button><button type="button" aria-pressed="true">Equipe</button></div>' : '') +
       '<div class="stat-grid four">' +
       '<div class="card"><div class="stat num">' + count('on') + '</div><div class="card-meta">trabalhando agora</div></div>' +
       '<div class="card"><div class="stat num">' + count('pause') + '</div><div class="card-meta">em intervalo</div></div>' +

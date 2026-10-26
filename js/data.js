@@ -253,7 +253,7 @@
     var out = [], now = Date.now(), base = new Date(); base.setHours(0, 0, 0, 0);
     var types = ['entrada', 'intervalo', 'retorno', 'saida'];
     employees.forEach(function (e, ei) {
-      if (!e.active) return;
+      if (!e.active || e.ponto === false) return;
       for (var off = -13; off <= 0; off++) {
         var day = new Date(base); day.setDate(day.getDate() + off);
         var dow = day.getDay();
@@ -283,6 +283,19 @@
     return [{ id: 'aj1', emp: 'c2', date: iso(y), type: 'retorno', time: '20:35', reason: 'O celular descarregou na volta do intervalo.', status: 'pendente', at: Date.now() - 86400000 }];
   }
 
+  // Acesso dos cadastros de exemplo: e-mail e senha (guardada só como hash SHA-256 com sal, nunca em texto).
+  // Senhas de demonstração: admin Dindom2009, Juliana (gerente) Gerente123, demais Equipe123.
+  var demoAccess = {
+    c0: { email: 'admin@dindom.com.br', pass: { salt: 'dd-c0', hash: 'ae5bdcbd897db1adfbd0214ad6bd7e2b3880b229b6d05b965bcfdf693c339fcc' } },
+    c1: { email: 'marina@dindom.com.br', pass: { salt: 'dd-c1', hash: 'bc37c29a448f283c58942f0ceffba4a02abbcbdfe52b9a718b9b5a83f18c0c95' } },
+    c2: { email: 'rafael@dindom.com.br', pass: { salt: 'dd-c2', hash: 'dafa75dd481549b7593cb401bcc9d0541720cddaa575adb2a1a5ecce5f126d5d' } },
+    c3: { email: 'juliana@dindom.com.br', pass: { salt: 'dd-c3', hash: '5e04e15accf6411f0811ff62cfd0cbef14b54bd5e1a65202832e6648c2713db0' } },
+    c4: { email: 'carlos@dindom.com.br', pass: { salt: 'dd-c4', hash: '678d435cbeaa583f03cef037fb0037d463325af9d360471817132891eb98d827' } },
+    c5: { email: 'ana@dindom.com.br', pass: { salt: 'dd-c5', hash: 'e1874366290cdc9be32630258b5cc9a9532bf83f1a99f64fab0c38bdc8ab559e' } },
+    c6: { email: 'bruno@dindom.com.br', pass: { salt: 'dd-c6', hash: '6e3f5c9e424c33767db55dfd695525a93de37a2c39fd2580259b74f2c5402728' } },
+    c7: { email: 'pedro@dindom.com.br', pass: { salt: 'dd-c7', hash: '9c1f2b7e04f6575df1de83a35663eef71b45691d29833ccfa7bf2c145ed70b87' } }
+  };
+
   var mem = null;
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -294,7 +307,16 @@
     if (!d.prefs.hiddenCals) d.prefs.hiddenCals = {};
     if (!d.settings) d.settings = { staffCanJustify: true };
     if (!d.employees) d.employees = seedEmployees();
+    // Conta do administrador (dono/dona): entra no app mas não bate ponto.
+    if (!d.employees.some(function (e) { return e.role === 'admin'; })) {
+      d.employees.push({ id: 'c0', name: 'Administrador Dindom', phone: '11900002009', email: '', func: 'Gerente', role: 'admin', unit: 'u1',
+        shift: 'Tarde', admission: '2009-01-01', pin: '2009', active: true, ponto: false });
+    }
     if (!d.functions) d.functions = functions.slice();
+    d.employees.forEach(function (e) {
+      var a = demoAccess[e.id];
+      if (a && !e.pass) { e.email = a.email; e.pass = clone(a.pass); }
+    });
     if (!d.stores) d.stores = clone(stores);
     if (!d.prices) d.prices = seedPrices();
     if (!d.stock) d.stock = seedStock(d.products, d.closing.counts);

@@ -145,6 +145,7 @@
 
   function mine() {
     var d = DB.get(), emp = P.me();
+    if (emp && emp.ponto === false && UI.isManager()) return Screens.ponto_equipe();
     if (!emp) return { html: '<main class="screen">' + UI.topbar('Ponto') + '<div class="card">' + UI.empty('user', 'Sem cadastro de colaborador', 'Peça ao administrador para vincular seu usuário a um cadastro.') + '</div></main>', tab: 'ponto' };
     var st = P.state(emp.id), now = new Date(), c = clockParts(now);
     var month = Cal.today().slice(0, 8) + '01';

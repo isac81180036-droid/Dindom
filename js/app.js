@@ -56,6 +56,18 @@
 
   function render() {
     if (unmount) { try { unmount(); } catch (e) {} unmount = null; }
+    // Sem sessão, qualquer tela leva ao login (e volta para ela depois de entrar).
+    var logged = !!Auth.session();
+    if (!logged && current.split('/')[0] !== 'login') {
+      Auth.after = current;
+      current = 'login';
+      try { history.replaceState(null, '', '#login'); } catch (e) {}
+    } else if (logged && Auth.mustChange()) {
+      current = 'login/senha'; // senha provisória: primeiro cria a própria
+    } else if (logged && current.split('/')[0] === 'login' && current !== 'login/senha') {
+      current = 'inicio';
+      try { history.replaceState(null, '', '#inicio'); } catch (e) {}
+    }
     var parts = current.split('/');
     var screen = Screens[parts[0]] || Screens.inicio;
     var view = screen(parts.slice(1));

@@ -40,7 +40,8 @@
         '<div class="card-meta">Colaboradores podem justificar tarefas não feitas</div></div>' +
         '<input id="perm-justify" type="checkbox" class="switch"' + (d.settings.staffCanJustify ? ' checked' : '') + '></label></div></section>' : '') +
 
-      '<div class="list"><button type="button" class="row" data-reset><div class="tile">' + icon('refresh') + '</div><div class="grow card-title">Restaurar dados de exemplo</div></button>' +
+      '<div class="list"><a class="row" href="#login/senha" style="text-decoration:none;color:inherit"><div class="tile">' + icon('key') + '</div><div class="grow card-title">Alterar minha senha</div>' + icon('chevronRight', 'sm') + '</a>' +
+      '<button type="button" class="row" data-reset><div class="tile">' + icon('refresh') + '</div><div class="grow card-title">Restaurar dados de exemplo</div></button>' +
       '<button type="button" class="row" data-logout style="color:var(--crit)"><div class="tile crit">' + icon('logout') + '</div><div class="grow card-title">Sair</div></button></div>' +
       '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">Dindom · versão protótipo 0.1</p>' +
       '</main>';
@@ -67,7 +68,7 @@
         });
         root.querySelector('[data-logout]').addEventListener('click', function () {
           UI.confirm({ title: 'Sair do aplicativo?', body: 'O rascunho da contagem fica salvo neste aparelho.', ok: 'Sair', danger: true,
-            onOk: function () { UI.toast('O login entra na próxima etapa, junto com o banco de dados.', { icon: 'shield' }); } });
+            onOk: function () { Auth.logout(); UI.toast('Você saiu. Até a próxima!', { icon: 'logout' }); } });
         });
       }
     };

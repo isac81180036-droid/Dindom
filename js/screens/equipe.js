@@ -113,8 +113,8 @@
     var html = '<main class="screen no-nav">' +
       UI.topbar(e ? 'Editar colaborador' : 'Novo colaborador', { back: '#equipe', sub: e ? (e.active ? 'Ativo' : 'Inativo') + ' · ' + since(e.admission) : 'Os campos com * são obrigatórios' }) +
       '<div class="field" id="f-name"><label for="emp-name">Nome completo *</label><input id="emp-name" class="input" autocomplete="name" autocapitalize="words" maxlength="60" placeholder="Ex.: Rafael Souza" value="' + esc(v.name) + '"><span class="err" hidden></span></div>' +
-      '<div class="field" id="f-phone"><label for="emp-phone">Celular (WhatsApp) *</label><input id="emp-phone" class="input num" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="' + esc(fmtPhone(v.phone)) + '"><span class="hint">Usado para entrar no app e receber avisos.</span><span class="err" hidden></span></div>' +
-      '<div class="field" id="f-email"><label for="emp-email">E-mail <span class="faint">(opcional)</span></label><input id="emp-email" class="input" type="email" inputmode="email" autocomplete="email" placeholder="nome@email.com" value="' + esc(v.email) + '"><span class="err" hidden></span></div>' +
+      '<div class="field" id="f-phone"><label for="emp-phone">Celular (WhatsApp) *</label><input id="emp-phone" class="input num" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="' + esc(fmtPhone(v.phone)) + '"><span class="hint">Para avisos pelo WhatsApp.</span><span class="err" hidden></span></div>' +
+      '<div class="field" id="f-email"><label for="emp-email">E-mail *</label><input id="emp-email" class="input" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="nome@dindom.com.br" value="' + esc(v.email) + '"><span class="hint">É com ele que a pessoa entra no app.</span><span class="err" hidden></span></div>' +
       '<div class="field" id="f-func"><span class="label">Função *</span>' + chips('func', d.functions.map(function (f) { return [f, f]; }), v.func) + '<span class="err" hidden>Escolha a função.</span></div>' +
       '<div class="field"><span class="label">Unidade *</span>' + seg('unit', d.units.map(function (u) { return [u.id, u.name.replace('Unidade ', '')]; }), v.unit) + '</div>' +
       '<div class="field"><span class="label">Turno</span>' + seg('shift', [['Manhã', 'Manhã'], ['Tarde', 'Tarde'], ['Noite', 'Noite']], v.shift) + '</div>' +
@@ -122,12 +122,14 @@
       '<span class="hint" data-role-hint>' + ROLE_HINT[v.role] + '</span></div>' +
       '<div class="field"><label for="emp-adm">Data de admissão</label><input id="emp-adm" class="input" type="date" value="' + esc(v.admission) + '"></div>' +
       (e ? '<section class="section"><div class="eyebrow">Acesso</div><div class="list">' +
-        '<div class="row"><div class="tile">' + icon('key') + '</div><div class="grow"><div class="card-title">Código de acesso</div><div class="card-meta">Entra com o celular e este código</div></div>' +
+        '<div class="row"><div class="tile">' + icon('mail') + '</div><div class="grow"><div class="card-title">Entra com ' + esc(e.email || 'e-mail não cadastrado') + '</div><div class="card-meta">' + (e.mustChange ? 'Ainda com senha provisória' : e.pass ? 'Já criou a própria senha' : 'Sem senha: gere uma provisória') + '</div></div></div>' +
+        '<button type="button" class="row" data-temppass><div class="tile">' + icon('key') + '</div><div class="grow"><div class="card-title">Gerar senha provisória</div><div class="card-meta">Para quem esqueceu a senha</div></div></button>' +
+        '<div class="row"><div class="tile">' + icon('clock') + '</div><div class="grow"><div class="card-title">Código do ponto</div><div class="card-meta">Para bater o ponto no celular da loja</div></div>' +
         '<b class="pin num">' + esc(e.pin) + '</b></div>' +
-        '<button type="button" class="row" data-newpin><div class="tile">' + icon('refresh') + '</div><div class="grow card-title">Gerar novo código</div></button>' +
+        '<button type="button" class="row" data-newpin><div class="tile">' + icon('refresh') + '</div><div class="grow card-title">Gerar novo código do ponto</div></button>' +
         '<button type="button" class="row" data-toggle style="color:' + (e.active ? 'var(--crit)' : 'var(--ok)') + '"><div class="tile ' + (e.active ? 'crit' : 'ok') + '">' + icon(e.active ? 'logout' : 'check') + '</div>' +
         '<div class="grow"><div class="card-title">' + (e.active ? 'Desativar colaborador' : 'Reativar colaborador') + '</div><div class="card-meta" style="color:var(--ink-2)">' +
-        (e.active ? 'Perde o acesso ao app. O histórico continua salvo.' : 'Volta a ter acesso com o mesmo código.') + '</div></div></button>' +
+        (e.active ? 'Perde o acesso ao app. O histórico continua salvo.' : 'Volta a entrar com o mesmo e-mail e senha.') + '</div></div></button>' +
         '</div></section>' : '') +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner"><button type="button" class="btn primary block" data-save style="min-height:56px">' + (e ? 'Salvar alterações' : 'Cadastrar colaborador') + '</button></div></div>';
@@ -159,8 +161,19 @@
 
         var newpin = $('[data-newpin]');
         if (newpin) newpin.addEventListener('click', function () {
-          UI.confirm({ title: 'Gerar novo código?', body: 'O código atual deixa de funcionar. Envie o novo para ' + esc(e.name.split(' ')[0]) + '.', ok: 'Gerar novo código',
-            onOk: function () { var p = newPin(); DB.update(function () { find(id).pin = p; }); refresh(); UI.toast('Novo código: ' + p, { icon: 'key', ms: 4000 }); } });
+          UI.confirm({ title: 'Gerar novo código do ponto?', body: 'O código atual deixa de funcionar no celular da loja. Envie o novo para ' + esc(e.name.split(' ')[0]) + '.', ok: 'Gerar novo código',
+            onOk: function () { var p = newPin(); DB.update(function () { find(id).pin = p; }); refresh(); UI.toast('Novo código do ponto: ' + p, { icon: 'key', ms: 4000 }); } });
+        });
+        var temp = $('[data-temppass]');
+        if (temp) temp.addEventListener('click', function () {
+          UI.confirm({ title: 'Gerar senha provisória?', body: 'A senha atual de ' + esc(e.name.split(' ')[0]) + ' deixa de funcionar. No próximo acesso, a pessoa cria uma senha nova.', ok: 'Gerar senha provisória',
+            onOk: function () {
+              var pw = Auth.tempPassword();
+              Auth.makePass(pw).then(function (pass) {
+                DB.update(function () { var t = find(id); t.pass = pass; t.mustChange = true; });
+                tempShown[id] = pw; go('equipe/ok/' + id + '/senha', { replace: true });
+              });
+            } });
         });
         var toggle = $('[data-toggle]');
         if (toggle) toggle.addEventListener('click', function () {
@@ -181,20 +194,26 @@
           setErr('f-name', v.name.split(' ').length < 2 ? 'Informe nome e sobrenome.' : ''); if (v.name.split(' ').length < 2) bad.push('f-name');
           var phoneMsg = v.phone.length < 10 ? 'Informe o celular com DDD.' : dup ? 'Este celular já está cadastrado para ' + dup.name + '.' : '';
           setErr('f-phone', phoneMsg); if (phoneMsg) bad.push('f-phone');
-          var mailBad = v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email);
-          setErr('f-email', mailBad ? 'Confira o e-mail: falta o @ ou o domínio.' : ''); if (mailBad) bad.push('f-email');
+          v.email = Auth.normEmail(v.email);
+          var dupMail = DB.get().employees.filter(function (x) { return Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
+          var mailMsg = !v.email ? 'Informe o e-mail: é com ele que a pessoa entra.' : !Auth.validEmail(v.email) ? 'Confira o e-mail: falta o @ ou o domínio.' : dupMail ? 'Este e-mail já é de ' + dupMail.name + '.' : '';
+          setErr('f-email', mailMsg); if (mailMsg) bad.push('f-email');
           setErr('f-func', v.func ? '' : 'Escolha a função.'); if (!v.func) bad.push('f-func');
           if (bad.length) { $('#' + bad[0]).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
 
           UI.busy(save, function () {
-            var newId;
-            DB.update(function (x) {
-              if (e) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); }
-              else { newId = 'c' + Date.now(); x.employees.push({ id: newId, name: v.name, phone: v.phone, email: v.email, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), active: true }); }
+            if (e) {
+              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); });
+              UI.buzz(20); UI.toast('Dados de ' + v.name.split(' ')[0] + ' atualizados'); go('equipe', { replace: true });
+              return;
+            }
+            // Cadastro novo: senha provisória gerada aqui; no primeiro acesso a pessoa cria a própria.
+            var pw = Auth.tempPassword(), newId = 'c' + Date.now();
+            Auth.makePass(pw).then(function (pass) {
+              DB.update(function (x) { x.employees.push({ id: newId, name: v.name, phone: v.phone, email: v.email, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), pass: pass, mustChange: true, active: true }); });
+              tempShown[newId] = pw; UI.buzz(20);
+              go('equipe/ok/' + newId, { replace: true });
             });
-            UI.buzz(20);
-            if (e) { UI.toast('Dados de ' + v.name.split(' ')[0] + ' atualizados'); go('equipe', { replace: true }); }
-            else go('equipe/ok/' + newId, { replace: true });
           });
         });
       }
@@ -202,21 +221,27 @@
   }
 
   // ---------- Confirmação do cadastro ----------
-  function accessText(e) {
-    return 'Olá, ' + e.name.split(' ')[0] + '! Seu acesso ao app da Dindom está pronto.\nCelular: ' + fmtPhone(e.phone) + '\nCódigo de acesso: ' + e.pin;
+  // Senha provisória só fica na memória desta tela, para mostrar uma vez; no aparelho fica guardado só o hash.
+  var tempShown = {};
+
+  function accessText(e, pw) {
+    return 'Olá, ' + e.name.split(' ')[0] + '! Seu acesso ao app da Dindom está pronto.\nE-mail: ' + e.email + (pw ? '\nSenha provisória: ' + pw + ' (no primeiro acesso você cria a sua)' : '') + '\nCódigo do ponto: ' + e.pin;
   }
 
-  function done(id) {
+  function done(id, reset) {
     var e = find(id);
     if (!e) return list();
+    var pw = tempShown[id];
     var html = '<main class="screen no-nav" style="justify-content:center;align-items:center;text-align:center">' +
       '<div class="success-mark">' + icon('check', 'lg') + '</div>' +
-      '<div class="section" style="align-items:center"><div class="eyebrow">Colaborador cadastrado</div>' +
+      '<div class="section" style="align-items:center"><div class="eyebrow">' + (reset ? 'Senha provisória gerada' : 'Colaborador cadastrado') + '</div>' +
       '<h1 style="font-size:var(--fs-2xl)">' + esc(e.name) + '</h1>' +
       '<p class="muted">' + esc(e.func) + ' · ' + esc(unitName(e.unit)) + ' · ' + UI.ROLES[e.role] + '</p></div>' +
-      '<div class="card" style="width:100%;max-width:380px;align-items:center"><div class="eyebrow">Código de acesso</div>' +
-      '<div class="pin-big num" aria-label="Código ' + e.pin.split('').join(' ') + '">' + e.pin.split('').map(function (c) { return '<span>' + c + '</span>'; }).join('') + '</div>' +
-      '<p class="card-meta">Entra no app com o celular <b class="num">' + esc(fmtPhone(e.phone)) + '</b> e este código.</p></div>' +
+      '<div class="card access-card"><div class="eyebrow">Dados de acesso</div>' +
+      '<div class="access-row"><span>E-mail</span><b>' + esc(e.email) + '</b></div>' +
+      (pw ? '<div class="access-row"><span>Senha provisória</span><b class="num temp-pass">' + esc(pw) + '</b></div>' : '') +
+      '<div class="access-row"><span>Código do ponto</span><b class="num">' + esc(e.pin) + '</b></div>' +
+      '<p class="card-meta">' + (pw ? 'Anote ou copie agora: a senha provisória não aparece de novo. No primeiro acesso, ' + esc(e.name.split(' ')[0]) + ' cria a própria senha.' : 'A senha provisória já foi mostrada. Se precisar, gere outra no cadastro.') + '</p></div>' +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner" style="flex-direction:column;gap:8px">' +
       '<button type="button" class="btn primary block" data-copy>' + icon('copy', 'sm') + 'Copiar dados para enviar no WhatsApp</button>' +
@@ -226,9 +251,9 @@
       mount: function (root) {
         root.querySelector('[data-copy]').addEventListener('click', function () {
           try {
-            navigator.clipboard.writeText(accessText(e)).then(function () { UI.toast('Copiado. Cole na conversa com ' + e.name.split(' ')[0] + '.'); },
-              function () { UI.toast('Não foi possível copiar. Anote o código: ' + e.pin, { tone: 'crit', ms: 5000 }); });
-          } catch (er) { UI.toast('Não foi possível copiar. Anote o código: ' + e.pin, { tone: 'crit', ms: 5000 }); }
+            navigator.clipboard.writeText(accessText(e, pw)).then(function () { UI.toast('Copiado. Cole na conversa com ' + e.name.split(' ')[0] + '.'); },
+              function () { UI.toast('Não foi possível copiar. Anote os dados na tela.', { tone: 'crit', ms: 5000 }); });
+          } catch (er) { UI.toast('Não foi possível copiar. Anote os dados na tela.', { tone: 'crit', ms: 5000 }); }
         });
       }
     };
@@ -237,7 +262,7 @@
   Screens.equipe = function (params) {
     if (!UI.isAdmin()) return restricted();
     if (params[0] === 'novo') return form(null);
-    if (params[0] === 'ok') return done(params[1]);
+    if (params[0] === 'ok') return done(params[1], params[2] === 'senha');
     if (params[0]) return form(params[0]);
     return list();
   };

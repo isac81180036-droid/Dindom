@@ -78,3 +78,9 @@
   width: 52px; height: 64px; border-radius: var(--r-md); background: var(--surface-2);
   display: grid; place-items: center; font: 700 2rem var(--font-display);
 }
+/* Dados de acesso mostrados depois do cadastro */
+.access-card { width: 100%; max-width: 400px; text-align: left; gap: var(--sp-2); }
+.access-row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); padding: 8px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
+.access-row span { color: var(--ink-2); }
+.access-row b { min-width: 0; overflow-wrap: anywhere; text-align: right; }
+.temp-pass { font: 700 var(--fs-xl) var(--font-display); letter-spacing: .06em; }
