@@ -74,3 +74,14 @@ A identidade fica em `css/tokens.css` (preto e branco da marca, Montserrat espa�
 Registros com número sequencial (NSR) e comprovante; nunca são apagados nem editados — correções entram como marcações do tipo "ajuste", pedidas pelo colaborador e aprovadas pelo gerente. A jornada pertence ao dia da entrada (turno da noite que passa da meia-noite conta no dia em que começou). Turnos e horas previstas ficam em `shifts` (`js/data.js`); tolerância de atraso em `js/ponto-core.js`.
 
 **Antes de usar oficialmente:** pela Portaria MTP 671/2021, ponto por programa (REP-P) precisa de registro no INPI, atestado técnico e entrega dos arquivos AFD/AEJ à fiscalização. Este protótipo segue as regras de funcionamento (marcações imutáveis, NSR, comprovante), mas ainda não é certificado; a alternativa é integrar com um sistema de ponto já homologado.
+## Supabase (dados compartilhados entre aparelhos)
+
+O app está ligado ao projeto Supabase configurado em `js/config.js` (endereço e chave **publishable**, que é pública; nunca coloque a chave secreta no app). Com ele:
+
+- Login, troca de senha e "Esqueci minha senha" (link por e-mail) pelo Supabase Auth.
+- Os dados ficam na tabela `records` (um item por linha) e chegam em tempo real aos outros aparelhos; cada aparelho guarda uma cópia para abrir sem internet e reenvia o que ficou pendente.
+- Permissões no banco (`supabase/schema.sql`): só membros da equipe leem e gravam; só o admin mexe no cadastro de colaboradores; colaborador desativado perde o acesso.
+- Só existe uma pizzaria por banco: a primeira configuração cria a pizzaria e a conta do administrador.
+- O NSR do ponto é gerado pelo servidor.
+
+Configurações necessárias no painel do Supabase: rodar `supabase/schema.sql`, desligar "Confirm email" e definir o Site URL do app. Para usar sem servidor (só no aparelho), deixe `js/config.js` vazio.

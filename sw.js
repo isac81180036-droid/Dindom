@@ -1,5 +1,5 @@
 // Service worker: guarda a casca do app para abrir rápido e funcionar sem internet.
-var CACHE = 'dindom-v13';
+var CACHE = 'dindom-v14';
 var SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -28,8 +28,10 @@ self.addEventListener('activate', function (e) {
 // publicada aparece na próxima abertura, sem esperar o cache do navegador vencer.
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
-  var sameSite = new URL(e.request.url).origin === self.location.origin;
-  var net = sameSite ? fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(e.request);
+  // Só os arquivos do próprio app passam por aqui. Dados do Supabase e fontes vão direto à rede
+  // (o app já guarda a própria cópia dos dados; respostas do servidor não ficam no cache).
+  if (new URL(e.request.url).origin !== self.location.origin) return;
+  var net = fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' });
   e.respondWith(
     net.then(function (res) {
       var copy = res.clone();
