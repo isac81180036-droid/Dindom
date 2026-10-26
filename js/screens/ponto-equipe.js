@@ -37,7 +37,7 @@
       var p = x.punches.filter(function (y) { return y.id === rec.id; })[0]; p.adjust = { reason: a.reason, by: x.user.name, request: a.id };
       var r = x.adjusts.filter(function (y) { return y.id === a.id; })[0]; r.status = 'aprovado'; r.by = x.user.name; r.decidedAt = Date.now();
     });
-    refresh(); UI.toast('Ajuste aprovado e registrado (NSR ' + rec.nsr + ')');
+    refresh(); UI.toast('Ajuste aprovado e registrado' + (rec.nsr ? ' (NSR ' + rec.nsr + ')' : ''));
   }
 
   function report(list, from, to) {

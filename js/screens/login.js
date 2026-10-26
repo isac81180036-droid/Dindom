@@ -118,8 +118,29 @@
         form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
 
         root.querySelector('[data-forgot]').addEventListener('click', function () {
-          UI.sheet('<h2>Esqueceu a senha?</h2><p class="muted">Peça ao gerente ou ao administrador uma <b>senha provisória</b> em <b>Admin › Colaboradores</b>. No primeiro acesso com ela, você cria uma senha nova.</p>' +
-            '<button type="button" class="btn primary block" data-close>Entendi</button>');
+          if (!(window.Cloud && Cloud.enabled)) {
+            UI.sheet('<h2>Esqueceu a senha?</h2><p class="muted">Peça ao gerente ou ao administrador uma <b>senha provisória</b> em <b>Admin › Colaboradores</b>. No primeiro acesso com ela, você cria uma senha nova.</p>' +
+              '<button type="button" class="btn primary block" data-close>Entendi</button>');
+            return;
+          }
+          // Com servidor: link por e-mail para criar uma senha nova.
+          UI.sheet('<h2>Esqueceu a senha?</h2><p class="muted">Enviamos um link para o seu e-mail. Ao abrir, você cria uma senha nova.</p>' +
+            '<div class="field" id="f-fg"><label for="fg-email">Seu e-mail</label><input id="fg-email" class="input" type="email" inputmode="email" autocapitalize="none" value="' + esc(email.value) + '"><span class="err" hidden></span></div>' +
+            '<button type="button" class="btn primary block" data-send>Enviar link</button><button type="button" class="btn block" data-close>Cancelar</button>',
+            function (sheet, close) {
+              var send = sheet.querySelector('[data-send]'), f = sheet.querySelector('#f-fg');
+              send.addEventListener('click', function () {
+                var v = sheet.querySelector('#fg-email').value;
+                if (!Auth.validEmail(v)) { f.classList.add('error'); f.querySelector('.err').hidden = false; f.querySelector('.err').textContent = 'Confira o e-mail.'; return; }
+                send.classList.add('busy'); send.disabled = true;
+                Auth.forgot(v).then(function () {
+                  close(); UI.toast('Se o e-mail tiver cadastro, o link chega em alguns minutos. Confira também o spam.', { icon: 'mail', ms: 6000 });
+                }, function (er) {
+                  send.classList.remove('busy'); send.disabled = false;
+                  f.classList.add('error'); f.querySelector('.err').hidden = false; f.querySelector('.err').textContent = er.message || 'Não foi possível enviar agora.';
+                });
+              });
+            });
         });
 
         lockState();
@@ -170,6 +191,9 @@
             btn.classList.remove('busy');
             if (first) return leave(root, emp);
             go('perfil', { replace: true }); UI.toast('Senha alterada');
+          }, function (er) {
+            btn.classList.remove('busy');
+            err.hidden = false; err.textContent = (er && er.message) || 'Não foi possível trocar a senha. Confira a internet e tente de novo.';
           });
         });
         root.querySelector('[data-out]').addEventListener('click', function () { if (emp.mustChange) Auth.logout(); else go('perfil', { replace: true }); });

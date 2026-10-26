@@ -43,8 +43,8 @@
 
       '<div class="list"><a class="row" href="#login/senha" style="text-decoration:none;color:inherit"><div class="tile">' + icon('key') + '</div><div class="grow card-title">Alterar minha senha</div>' + icon('chevronRight', 'sm') + '</a>' +
       '<button type="button" class="row" data-logout style="color:var(--crit)"><div class="tile crit">' + icon('logout') + '</div><div class="grow card-title">Sair</div></button></div>' +
-      (UI.isAdmin() ? '<div class="list"><button type="button" class="row" data-wipe style="color:var(--crit)"><div class="tile crit">' + icon('alert') + '</div><div class="grow"><div class="card-title">Apagar dados deste aparelho</div><div class="card-meta" style="color:var(--ink-2)">Volta para a primeira configuração</div></div></button></div>' : '') +
-      '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">Dindom · versão 1.0 · dados salvos neste aparelho</p>' +
+      (UI.isAdmin() && !(window.Cloud && Cloud.orgId) ? '<div class="list"><button type="button" class="row" data-wipe style="color:var(--crit)"><div class="tile crit">' + icon('alert') + '</div><div class="grow"><div class="card-title">Apagar dados deste aparelho</div><div class="card-meta" style="color:var(--ink-2)">Volta para a primeira configuração</div></div></button></div>' : '') +
+      '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">Dindom · versão 1.0 · ' + (window.Cloud && Cloud.orgId ? 'dados sincronizados com o servidor' : 'dados salvos neste aparelho') + '</p>' +
       '</main>';
 
     return {

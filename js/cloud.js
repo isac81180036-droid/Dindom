@@ -1,0 +1,261 @@
+// Sincronização com o Supabase: login, carga dos dados da pizzaria, envio das alterações e tempo real.
+// Cada item (um produto, um ponto, um chamado…) vira uma linha na tabela "records"; configurações
+// e documentos únicos (estoque, lista de compras…) ficam na coleção "meta".
+// Sem configuração (js/config.js vazio), o app funciona só neste aparelho, como antes.
+(function () {
+  var cfg = window.DINDOM_CONFIG || {};
+  // Listas sincronizadas item a item e o campo que identifica cada item.
+  var ITEMS = { employees: 'id', products: 'id', checklists: 'id', events: 'id', maintenance: 'id', notifications: 'id',
+    stores: 'id', punches: 'id', adjusts: 'id', notas: 'key', units: 'id', calendars: 'id' };
+  // Documentos únicos, sincronizados inteiros.
+  var META = ['org', 'deliveryDays', 'categories', 'closing', 'shopping', 'checkHistory', 'nextMaintenanceId', 'settings',
+    'functions', 'prices', 'stock', 'matchMemory', 'shifts'];
+  var PAGE = 1000;
+  var LAST = 'dindom:member'; // último vínculo usado, para abrir sem internet
+
+  var Cloud = {
+    enabled: !!(cfg.supabaseUrl && cfg.supabaseKey && window.supabase && window.supabase.createClient),
+    ITEMS: ITEMS, META: META,
+    orgId: null, user: null, member: null,
+    status: 'off',          // off | ok | saving | offline
+    pendingRefresh: false,
+    recovery: false
+  };
+  var client = null, snapshot = {}, timer = 0, retryTimer = 0, channel = null, pushing = false, again = false;
+
+  if (Cloud.enabled) {
+    client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'dindom-auth' }
+    });
+  }
+  Cloud.client = client;
+
+  function k(col, id) { return col + '|' + id; }
+  function readLast() { try { return JSON.parse(localStorage.getItem(LAST) || 'null'); } catch (e) { return null; } }
+  function writeLast(m) { try { if (m) localStorage.setItem(LAST, JSON.stringify(m)); else localStorage.removeItem(LAST); } catch (e) {} }
+  function netError(err) { return !err || err.status === 0 || /fetch|network|Failed to/i.test(String(err.message || err)); }
+
+  // Estado do app → linhas { collection, id, data }.
+  function flatten(d) {
+    var out = {};
+    Object.keys(ITEMS).forEach(function (col) {
+      var idf = ITEMS[col];
+      (d[col] || []).forEach(function (it) {
+        if (it && it[idf] != null) out[k(col, it[idf])] = { collection: col, id: String(it[idf]), data: it };
+      });
+    });
+    META.forEach(function (m) { if (d[m] !== undefined) out[k('meta', m)] = { collection: 'meta', id: m, data: { v: d[m] } }; });
+    return out;
+  }
+
+  // Linhas do banco → partes do estado do app.
+  function build(rows) {
+    var shared = {};
+    Object.keys(ITEMS).forEach(function (col) { shared[col] = []; });
+    rows.forEach(function (r) {
+      if (r.deleted) return;
+      if (r.collection === 'meta') shared[r.id] = r.data ? r.data.v : null;
+      else if (shared[r.collection]) shared[r.collection].push(r.data);
+    });
+    // Ordem estável: pontos por horário; os demais, na ordem de criação aproximada pelo id.
+    shared.punches.sort(function (a, b) { return a.ts - b.ts; });
+    return shared;
+  }
+
+  function loadAll() {
+    var rows = [];
+    function page(from) {
+      return client.from('records').select('collection,id,data,deleted').eq('org_id', Cloud.orgId)
+        .order('collection').order('id').range(from, from + PAGE - 1)
+        .then(function (r) {
+          if (r.error) throw r.error;
+          rows = rows.concat(r.data);
+          return r.data.length === PAGE ? page(from + PAGE) : rows;
+        });
+    }
+    return page(0).then(function (all) {
+      snapshot = {};
+      all.forEach(function (r) { if (!r.deleted) snapshot[k(r.collection, r.id)] = JSON.stringify(r.collection === 'meta' ? r.data : r.data); });
+      DB.setShared(build(all));
+    });
+  }
+
+  function subscribe() {
+    if (channel) { client.removeChannel(channel); channel = null; }
+    channel = client.channel('dindom-' + Cloud.orgId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: 'org_id=eq.' + Cloud.orgId }, function (p) {
+        var row = p.new; if (!row || !row.collection) return;
+        var key = k(row.collection, row.id), json = JSON.stringify(row.data);
+        if (!row.deleted && snapshot[key] === json) return; // eco do que este aparelho mesmo enviou
+        DB.applyRemote(row);
+        if (row.deleted) delete snapshot[key]; else snapshot[key] = json;
+        if (row.collection === 'punches' && row.data) showNsr(row.data);
+        refreshSoon();
+      })
+      .subscribe();
+  }
+
+  // Redesenha a tela com o que chegou de outro aparelho, sem atrapalhar quem está digitando.
+  var refreshTimer = 0;
+  function refreshSoon() {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(function () {
+      var a = document.activeElement;
+      var typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+      if (typing || document.querySelector('.sheet-wrap')) { Cloud.pendingRefresh = true; return; }
+      if (window.refresh) window.refresh();
+    }, 350);
+  }
+
+  function showNsr(p) {
+    if (!p.nsr) return;
+    document.querySelectorAll('[data-nsr-for="' + p.id + '"]').forEach(function (el) { el.textContent = 'NSR ' + String(p.nsr).padStart(9, '0'); });
+  }
+
+  // Envia só o que mudou desde a última sincronização.
+  function push() {
+    if (!Cloud.orgId || !client) return;
+    if (pushing) { again = true; return; }
+    var cur = flatten(DB.get()), rows = [], marks = [];
+    Object.keys(cur).forEach(function (key) {
+      var c = cur[key], j = JSON.stringify(c.data);
+      if (snapshot[key] !== j) { rows.push({ org_id: Cloud.orgId, collection: c.collection, id: c.id, data: c.data, deleted: false }); marks.push([key, j]); }
+    });
+    Object.keys(snapshot).forEach(function (key) {
+      if (cur[key]) return;
+      var i = key.indexOf('|');
+      rows.push({ org_id: Cloud.orgId, collection: key.slice(0, i), id: key.slice(i + 1), data: {}, deleted: true });
+      marks.push([key, null]);
+    });
+    if (!rows.length) { Cloud.status = 'ok'; return; }
+    pushing = true; Cloud.status = 'saving';
+    var batches = [];
+    for (var i = 0; i < rows.length; i += 400) batches.push(rows.slice(i, i + 400));
+    Promise.all(batches.map(function (b) {
+      return client.from('records').upsert(b, { onConflict: 'org_id,collection,id' }).select('collection,id,data');
+    })).then(function (res) {
+      pushing = false;
+      var failed = res.filter(function (r) { return r.error; })[0];
+      if (failed) { Cloud.status = netError(failed.error) ? 'offline' : 'error'; console.warn('Dindom: falha ao salvar', failed.error); retryLater(); return; }
+      marks.forEach(function (m) { if (m[1] === null) delete snapshot[m[0]]; else snapshot[m[0]] = m[1]; });
+      // O servidor completa alguns dados (ex.: NSR do ponto): traz de volta para este aparelho.
+      res.forEach(function (r) {
+        (r.data || []).forEach(function (row) {
+          var key = k(row.collection, row.id), j = JSON.stringify(row.data);
+          if (snapshot[key] !== j && row.collection === 'punches') { DB.applyRemote(row); snapshot[key] = j; showNsr(row.data); }
+        });
+      });
+      Cloud.status = 'ok';
+      if (again) { again = false; push(); }
+    }, function (err) { pushing = false; Cloud.status = 'offline'; console.warn('Dindom: sem conexão para salvar', err); retryLater(); });
+  }
+
+  function retryLater() { clearTimeout(retryTimer); retryTimer = setTimeout(push, 15000); }
+
+  Cloud.schedule = function (now) {
+    if (!Cloud.orgId) return;
+    clearTimeout(timer);
+    timer = setTimeout(push, now ? 0 : 400);
+  };
+  window.addEventListener('online', function () { if (Cloud.orgId) push(); });
+
+  // Liga o aparelho à pizzaria da conta logada. Retorna { ok } ou { error: 'nomember' | 'inactive' | 'network' }.
+  Cloud.attach = function (user) {
+    return client.from('members').select('org_id,emp_id,role,active').eq('user_id', user.id).limit(1).then(function (r) {
+      if (r.error) throw r.error;
+      var m = r.data && r.data[0];
+      if (!m) return { error: 'nomember' };
+      if (!m.active) return { error: 'inactive' };
+      Cloud.user = user; Cloud.member = m; Cloud.orgId = m.org_id;
+      writeLast({ org_id: m.org_id, emp_id: m.emp_id, role: m.role, user_id: user.id });
+      DB.useOrg(m.org_id);
+      return loadAll().then(function () { subscribe(); push(); Cloud.status = 'ok'; return { ok: true, member: m }; });
+    }).catch(function (err) {
+      // Sem internet: abre com a última cópia deste aparelho e sincroniza quando voltar.
+      var last = readLast();
+      if (netError(err) && last && last.user_id === user.id) {
+        Cloud.user = user; Cloud.member = last; Cloud.orgId = last.org_id; Cloud.status = 'offline';
+        DB.useOrg(last.org_id);
+        retryLater();
+        return { ok: true, member: last, offline: true };
+      }
+      return { error: netError(err) ? 'network' : 'nomember', detail: err };
+    });
+  };
+
+  // Na abertura do app: sessão salva? Liga à pizzaria. Senão, descobre se já existe pizzaria configurada.
+  Cloud.start = function () {
+    if (!Cloud.enabled) return Promise.resolve();
+    Cloud.recovery = /type=recovery/.test(location.hash);
+    var hadTokens = /access_token=/.test(location.hash);
+    return client.auth.getSession().then(function (r) {
+      if (hadTokens) { try { history.replaceState(null, '', location.pathname + location.search + (Cloud.recovery ? '#login/senha' : '#inicio')); } catch (e) {} }
+      var s = r.data && r.data.session;
+      if (!s) return Cloud.checkOrg();
+      return Cloud.attach(s.user).then(function (a) {
+        if (!a.ok) { client.auth.signOut(); return Cloud.checkOrg(); }
+        // Continua logado: refaz a sessão do app a partir do vínculo e do cadastro do colaborador.
+        DB.update(function (x) {
+          x.setupDone = true;
+          var e = x.employees.filter(function (y) { return y.id === a.member.emp_id; })[0];
+          if (!x.session || x.session.empId !== a.member.emp_id) x.session = { empId: a.member.emp_id, remember: true, at: Date.now() };
+          if (e) { x.user.name = e.name; x.user.unit = x.user.unit || e.unit; }
+          x.user.empId = a.member.emp_id; x.user.role = a.member.role;
+        });
+        return a;
+      });
+    }).catch(function () { return Cloud.checkOrg(); });
+  };
+
+  Cloud.checkOrg = function () {
+    return client.rpc('org_exists').then(function (r) {
+      var exists = !r.error && r.data === true;
+      DB.update(function (x) { x.setupDone = exists || (!!readLast() && !!r.error); });
+      Cloud.schemaMissing = !!(r.error && /org_exists|schema cache/i.test(r.error.message || ''));
+    }, function () {});
+  };
+
+  Cloud.signOut = function () {
+    if (channel) { client.removeChannel(channel); channel = null; }
+    Cloud.user = null; Cloud.member = null; Cloud.orgId = null; snapshot = {};
+    return client.auth.signOut().catch(function () {});
+  };
+
+  // Cria a conta de login de um colaborador sem derrubar a sessão de quem está cadastrando.
+  Cloud.createUser = function (email, password) {
+    var temp = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'dindom-tmp' }
+    });
+    return temp.auth.signUp({ email: email, password: password }).then(function (r) {
+      if (r.error) {
+        var msg = /registered|already/i.test(r.error.message) ? 'Este e-mail já tem uma conta no sistema.' : 'Não foi possível criar o acesso: ' + r.error.message;
+        throw new Error(msg);
+      }
+      if (!r.data.user) throw new Error('Não foi possível criar o acesso.');
+      if (r.data.user.identities && r.data.user.identities.length === 0) throw new Error('Este e-mail já tem uma conta no sistema.');
+      return r.data.user.id;
+    });
+  };
+
+  Cloud.addMember = function (userId, empId, role) {
+    return client.from('members').insert({ org_id: Cloud.orgId, user_id: userId, emp_id: empId, role: role }).then(function (r) {
+      if (r.error) throw new Error('Não foi possível ligar o acesso à equipe: ' + r.error.message);
+    });
+  };
+
+  Cloud.updateMember = function (empId, patch) {
+    if (!Cloud.orgId) return Promise.resolve();
+    return client.from('members').update(patch).eq('org_id', Cloud.orgId).eq('emp_id', empId).then(function (r) {
+      if (r.error) console.warn('Dindom: falha ao atualizar acesso', r.error);
+    });
+  };
+
+  Cloud.sendReset = function (email) {
+    var back = location.origin + location.pathname;
+    return client.auth.resetPasswordForEmail(email, { redirectTo: back }).then(function (r) {
+      if (r.error) throw new Error(/rate|limit/i.test(r.error.message) ? 'Muitos e-mails enviados agora. Tente de novo em alguns minutos.' : r.error.message);
+    });
+  };
+
+  window.Cloud = Cloud;
+})();

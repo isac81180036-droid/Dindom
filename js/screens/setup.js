@@ -14,6 +14,7 @@
     var html = '<main class="login">' + L.brand('Bem-vindo!', 'Vamos deixar o sistema da sua pizzaria pronto para usar. Leva um minuto.') +
       '<section class="login-card"><form class="login-form setup-form" novalidate>' +
       '<div class="eyebrow">Primeira configuração</div><h1>Configurar</h1>' +
+      (window.Cloud && Cloud.schemaMissing ? '<p class="login-err">O banco do Supabase ainda não foi preparado. Rode o script supabase/schema.sql no SQL Editor do Supabase e recarregue esta página.</p>' : '') +
 
       '<div class="setup-step"><span class="step-n">1</span><div class="grow"><h3>Unidades</h3><p class="muted">Os nomes das lojas da pizzaria.</p></div></div>' +
       '<div class="field" id="f-units"><div data-units>' + unitInput(0, '') + '</div>' +
@@ -34,7 +35,9 @@
       L.passField('s-pass2', 'Repita a senha', 'new-password', 'Digite de novo') +
       '<p class="login-err" id="s-err" role="alert" hidden></p>' +
       '<button type="submit" class="btn primary block login-go" data-go>Concluir e entrar</button>' +
-      '<p class="card-meta">Os dados ficam salvos neste aparelho. Use o mesmo aparelho para a equipe, ou peça a ligação com o servidor para usar em vários.</p>' +
+      (window.Cloud && Cloud.enabled
+        ? '<p class="card-meta">Os dados ficam salvos no servidor e aparecem em todos os aparelhos da equipe.</p>'
+        : '<p class="card-meta">Os dados ficam salvos neste aparelho. Use o mesmo aparelho para a equipe, ou peça a ligação com o servidor para usar em vários.</p>') +
       '</form></section></main>';
 
     return {
@@ -84,18 +87,45 @@
           var btn = $('[data-go]');
           if (btn.classList.contains('busy')) return;
           btn.classList.add('busy');
+          var empId = 'c' + Date.now();
+          function fill(x, pass) {
+            x.units = units.map(function (n, i) { return { id: 'u' + (i + 1), name: n }; });
+            x.deliveryDays = dayList;
+            x.stock = {}; x.units.forEach(function (u) { x.stock[u.id] = {}; });
+            var admin = { id: empId, name: name, phone: '', email: email, func: 'Gerente', role: 'admin', unit: 'u1', shift: 'Tarde',
+              admission: Cal.today(), pin: String(Math.floor(1000 + Math.random() * 9000)), mustChange: false, active: true, ponto: false };
+            if (pass) admin.pass = pass; // só no modo sem servidor; com servidor a senha fica no Supabase
+            x.employees.push(admin);
+            x.user.unit = 'u1';
+            x.deliveries = DB.deliveries(dayList); // próximas reposições
+            x.closing.delivery = x.deliveries[0].id;
+            x.setupDone = true;
+          }
+          function fail(msg) { btn.classList.remove('busy'); err.hidden = false; err.textContent = msg; }
+
+          // Com servidor: cria a conta no Supabase, cria a pizzaria e grava a configuração no banco.
+          if (window.Cloud && Cloud.enabled) {
+            var sb = Cloud.client;
+            sb.auth.signUp({ email: email, password: p1 }).then(function (r) {
+              if (r.error) throw new Error(/registered|already/i.test(r.error.message) ? 'Este e-mail já tem conta. Se a pizzaria já foi configurada, entre pela tela de login.' : 'Não foi possível criar a conta: ' + r.error.message);
+              if (!r.data.session) throw new Error('No Supabase, desligue "Confirm email" (Authentication › Sign In / Providers › Email) e tente de novo.');
+              return sb.rpc('create_org', { p_name: 'Dindom', p_emp_id: empId }).then(function (o) {
+                if (o.error) throw new Error(/configurada/i.test(o.error.message) ? 'A pizzaria já foi configurada. Entre pela tela de login.' : 'Não foi possível criar a pizzaria: ' + o.error.message);
+                return Cloud.attach(r.data.user);
+              });
+            }).then(function (a) {
+              if (!a.ok) throw new Error('A conta foi criada, mas não deu para ligar à pizzaria. Entre pela tela de login.');
+              DB.update(function (x) { fill(x); x.session = { empId: empId, remember: true, at: Date.now() }; x.user.name = name; x.user.role = 'admin'; x.user.empId = empId; });
+              Cloud.schedule(true);
+              btn.classList.remove('busy'); UI.buzz(25);
+              go('inicio', { replace: true });
+              UI.toast('Tudo pronto! Comece cadastrando os produtos e a equipe.', { ms: 4500 });
+            }).catch(function (e2) { fail(e2.message || 'Sem conexão com o servidor. Confira a internet e tente de novo.'); });
+            return;
+          }
+
           Auth.makePass(p1).then(function (pass) {
-            DB.update(function (x) {
-              x.units = units.map(function (n, i) { return { id: 'u' + (i + 1), name: n }; });
-              x.deliveryDays = dayList;
-              x.stock = {}; x.units.forEach(function (u) { x.stock[u.id] = {}; });
-              x.employees.push({ id: 'c' + Date.now(), name: name, phone: '', email: email, func: 'Gerente', role: 'admin', unit: 'u1', shift: 'Tarde',
-                admission: Cal.today(), pin: String(Math.floor(1000 + Math.random() * 9000)), pass: pass, mustChange: false, active: true, ponto: false });
-              x.user.unit = 'u1';
-              x.deliveries = DB.deliveries(dayList); // próximas reposições
-              x.closing.delivery = x.deliveries[0].id;
-              x.setupDone = true;
-            });
+            DB.update(function (x) { fill(x, pass); });
             return Auth.login(email, p1, true);
           }).then(function (r) {
             btn.classList.remove('busy');

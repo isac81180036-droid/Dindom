@@ -108,11 +108,49 @@
     try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch (e) { /* sem armazenamento: segue em memória */ }
   }
 
+  function syncing() { return window.Cloud && Cloud.orgId; }
+
   window.DB = {
     get: function () { return load(); },
-    update: function (fn) { fn(load()); save(); },
+    // Toda alteração passa por aqui: salva no aparelho e, com o servidor ligado, sincroniza.
+    update: function (fn) { fn(load()); save(); if (syncing()) Cloud.schedule(); },
     // Apaga tudo deste aparelho e volta para a primeira configuração.
     reset: function () { mem = prepare(clone(defaults)); save(); },
+
+    // ---------- Servidor (js/cloud.js) ----------
+    // Passa a usar a cópia local da pizzaria logada (mantém as preferências deste aparelho).
+    useOrg: function (orgId) {
+      var prefs = mem ? mem.prefs : null;
+      KEY = 'dindom:org:' + orgId;
+      mem = null; load();
+      if (prefs) mem.prefs = prefs;
+      mem.setupDone = true;
+      save();
+    },
+    // Recebe os dados completos vindos do servidor.
+    setShared: function (shared) {
+      var d = load();
+      Object.keys(shared).forEach(function (k) { d[k] = shared[k] == null ? clone(defaults[k]) : shared[k]; });
+      d.setupDone = true;
+      prepare(d); save();
+    },
+    // Aplica um item alterado por outro aparelho.
+    applyRemote: function (row) {
+      var d = load();
+      if (row.collection === 'meta') {
+        if (row.deleted) d[row.id] = clone(defaults[row.id]); else d[row.id] = row.data ? row.data.v : null;
+      } else {
+        var idf = Cloud.ITEMS[row.collection]; if (!idf) return;
+        var list = d[row.collection] = d[row.collection] || [];
+        var i = -1;
+        for (var j = 0; j < list.length; j++) if (String(list[j][idf]) === String(row.id)) { i = j; break; }
+        if (row.deleted) { if (i >= 0) list.splice(i, 1); }
+        else if (i >= 0) list[i] = row.data;
+        else list.push(row.data);
+        if (row.collection === 'punches') list.sort(function (a, b) { return a.ts - b.ts; });
+      }
+      prepare(d); save();
+    },
     iso: iso,
     businessDay: businessDay,
     deliveries: deliveries,

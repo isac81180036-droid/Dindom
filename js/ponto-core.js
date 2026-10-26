@@ -76,9 +76,10 @@
     DB.update(function (x) {
       x.punchSeq = (x.punchSeq || 0) + 1;
       var emp = x.employees.filter(function (e) { return e.id === empId; })[0];
-      rec = { id: 'pt' + Date.now() + Math.random().toString(36).slice(2, 6), emp: empId, ts: ts || Date.now(), type: type, unit: emp ? emp.unit : x.user.unit, method: method || 'app', nsr: x.punchSeq };
+      rec = { id: 'pt' + Date.now() + Math.random().toString(36).slice(2, 6), emp: empId, ts: ts || Date.now(), type: type, unit: emp ? emp.unit : x.user.unit, method: method || 'app', nsr: (window.Cloud && Cloud.orgId) ? null : x.punchSeq }; // com servidor, o NSR vem do Supabase
       x.punches.push(rec);
     });
+    if (window.Cloud && Cloud.orgId) Cloud.schedule(true); // ponto vai para o servidor na hora
     return rec;
   };
 
@@ -102,7 +103,7 @@
     var emp = P.employee(rec.emp), unit = DB.get().units.filter(function (u) { return u.id === rec.unit; })[0];
     var d = new Date(rec.ts);
     return 'Comprovante de registro de ponto\nDindom · ' + (unit ? unit.name : '') + '\nColaborador: ' + (emp ? emp.name : '') +
-      '\nRegistro: ' + TYPES[rec.type].label + '\nData: ' + d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR') + '\nNSR: ' + String(rec.nsr).padStart(9, '0');
+      '\nRegistro: ' + TYPES[rec.type].label + '\nData: ' + d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR') + '\nNSR: ' + (rec.nsr ? String(rec.nsr).padStart(9, '0') : 'gerando');
   };
 
   window.Ponto = P;

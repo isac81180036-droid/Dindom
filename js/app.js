@@ -58,6 +58,7 @@
 
   function render() {
     if (unmount) { try { unmount(); } catch (e) {} unmount = null; }
+    if (window.Cloud) Cloud.pendingRefresh = false; // esta tela já sai com o que veio de outros aparelhos
     // Aparelho ainda sem configuração: tudo leva à primeira configuração.
     if (!DB.get().setupDone) current = 'setup';
     else if (current === 'setup') current = 'inicio';
@@ -128,8 +129,13 @@
     });
 
 
-    current = (location.hash || '#inicio').slice(1);
-    render();
+    // Com o servidor ligado, confere a sessão e carrega os dados antes da primeira tela (a abertura cobre a espera).
+    var first = function () {
+      current = (location.hash || '#inicio').slice(1);
+      if (/access_token=|type=recovery/.test(current)) current = 'inicio';
+      render();
+    };
+    (window.Cloud && Cloud.enabled ? Cloud.start() : Promise.resolve()).then(first, first);
 
     // Abertura: a animação é só CSS; aqui só permite pular com um toque e tira o elemento ao terminar.
     var splash = document.getElementById('splash');

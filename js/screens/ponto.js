@@ -45,12 +45,12 @@
       '<h2>' + esc(P.TYPES[rec.type].label) + ' registrada</h2>' +
       '<div class="punch-time num">' + d.toLocaleTimeString('pt-BR') + '</div>' +
       '<div class="receipt-box num"><span>' + esc(P.employee(rec.emp).name) + '</span><span>' + d.toLocaleDateString('pt-BR') + ' · ' + esc(unitName(rec.unit)) + '</span>' +
-      '<span>NSR ' + String(rec.nsr).padStart(9, '0') + (rec.method === 'codigo' ? ' · por código' : '') + '</span></div></div>' +
+      '<span><span data-nsr-for="' + rec.id + '">' + (rec.nsr ? 'NSR ' + String(rec.nsr).padStart(9, '0') : 'NSR gerando…') + '</span>' + (rec.method === 'codigo' ? ' · por código' : '') + '</span></div></div>' +
       '<button type="button" class="btn block" data-copy>' + icon('copy', 'sm') + 'Copiar comprovante</button>' +
       '<button type="button" class="btn primary block" data-close>Pronto</button>',
       function (sheet) {
         sheet.querySelector('[data-copy]').addEventListener('click', function () {
-          try { navigator.clipboard.writeText(P.comprovante(rec)).then(function () { UI.toast('Comprovante copiado'); }, function () { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }); }
+          try { navigator.clipboard.writeText(P.comprovante(DB.get().punches.filter(function (x) { return x.id === rec.id; })[0] || rec)).then(function () { UI.toast('Comprovante copiado'); }, function () { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }); }
           catch (e) { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }
         });
       }, function () { if (after) after(); else refresh(); });
