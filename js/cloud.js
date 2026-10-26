@@ -245,10 +245,36 @@
     });
   };
 
+  var NEEDS_SQL = 'O servidor ainda não aceita o acesso da contabilidade: rode o arquivo supabase/002_contabilidade.sql no Supabase e tente de novo.';
+
   Cloud.addMember = function (userId, empId, role) {
     return client.from('members').insert({ org_id: Cloud.orgId, user_id: userId, emp_id: empId, role: role }).then(function (r) {
-      if (r.error && role === 'contador' && /role|check/i.test(r.error.message)) throw new Error('O servidor ainda não aceita o acesso da contabilidade: rode o arquivo supabase/002_contabilidade.sql no Supabase e tente de novo.');
+      if (r.error && role === 'contador' && /role|check/i.test(r.error.message)) throw new Error(NEEDS_SQL);
       if (r.error) throw new Error('Não foi possível ligar o acesso à equipe: ' + r.error.message);
+    });
+  };
+
+  // Cria o login e liga à equipe. Se o e-mail ficou com conta sem vínculo (cadastro que falhou no meio),
+  // o servidor reaproveita essa conta com a senha nova.
+  Cloud.createAccess = function (email, password, empId, role) {
+    var ready = role === 'contador'
+      // Confere antes de criar a conta, para não sobrar login sem vínculo.
+      ? client.rpc('parceiros_ok').then(function (r) { if (r.error) throw new Error(NEEDS_SQL); })
+      : Promise.resolve();
+    return ready.then(function () {
+      return Cloud.createUser(email, password).then(function (uid) { return Cloud.addMember(uid, empId, role); }, function (er) {
+        if (!/já tem uma conta/.test(er.message)) throw er;
+        return client.rpc('claim_user', { p_email: email, p_emp_id: empId, p_role: role, p_password: password }).then(function (r) {
+          if (r.error || !r.data) throw er;
+        });
+      });
+    });
+  };
+
+  // O admin troca a senha de um parceiro (contabilidade) direto no servidor.
+  Cloud.setPartnerPassword = function (empId, password) {
+    return client.rpc('set_partner_password', { p_emp_id: empId, p_password: password }).then(function (r) {
+      if (r.error) throw new Error(/function|schema cache/i.test(r.error.message) ? NEEDS_SQL : r.error.message);
     });
   };
 
