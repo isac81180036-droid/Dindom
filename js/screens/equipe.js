@@ -136,7 +136,7 @@
       '<div style="display:flex;flex-direction:column;gap:var(--sp-5)">' +
       '<div class="field" id="f-func"><span class="label">Função *</span>' + chips('func', d.functions.map(function (f) { return [f, f]; }), v.func) + '<span class="err" hidden>Escolha a função.</span></div>' +
       '<div class="field"><span class="label">Unidade *</span>' + seg('unit', d.units.map(function (u) { return [u.id, u.name.replace('Unidade ', '')]; }), v.unit) + '</div>' +
-      '<div class="field"><span class="label">Turno</span>' + seg('shift', [['Manhã', 'Manhã'], ['Tarde', 'Tarde'], ['Noite', 'Noite']], v.shift) + '</div></div>' +
+      '<div class="field"><span class="label">Horário de trabalho *</span>' + PontoUI.horarioFields(v) + '</div></div>' +
       '<div class="field"><span class="label">Nível de acesso *</span><div class="seg" data-pick="role">' + [['colaborador', 'Colaborador'], ['gerente', 'Gerente'], ['admin', 'Admin']].map(function (o) {
         return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + (o[0] === v.role) + '">' + o[1] + '</button>';
       }).join('') + '</div>' +
@@ -179,6 +179,7 @@
           var el = ev.target; el.value = fmtPhone(el.value); setErr('f-phone', '');
         });
         $('#emp-name').addEventListener('input', function () { setErr('f-name', ''); });
+        var getHorario = PontoUI.bindHorario(root);
         $('#emp-cpf').addEventListener('input', function (ev) { ev.target.value = fmtCpf(ev.target.value); setErr('f-cpf', ''); });
         $('#emp-pis').addEventListener('input', function (ev) { ev.target.value = fmtPis(ev.target.value); });
 
@@ -237,19 +238,21 @@
           var cpfMsg = v.cpf && !validCpf(v.cpf) ? 'CPF inválido: confira os números.' : '';
           setErr('f-cpf', cpfMsg); if (cpfMsg) bad.push('f-cpf');
           setErr('f-func', v.func ? '' : 'Escolha a função.'); if (!v.func) bad.push('f-func');
+          var hor = getHorario();
+          if (hor) { v.horario = hor; v.shift = Ponto.turnoOf(hor.start); } else bad.push('h-start');
           if (bad.length) { $('#' + bad[0]).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
 
           UI.busy(save, function () {
             if (e) {
               var roleChanged = e.role !== v.role;
-              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'cpf', 'pis', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); });
+              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'cpf', 'pis', 'func', 'unit', 'shift', 'horario', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); });
               if (cloud && roleChanged) Cloud.updateMember(e.id, { role: v.role });
               UI.buzz(20); UI.toast('Dados de ' + v.name.split(' ')[0] + ' atualizados'); go('equipe', { replace: true });
               return;
             }
             // Cadastro novo: senha provisória gerada aqui; no primeiro acesso a pessoa cria a própria.
             var pw = Auth.tempPassword(), newId = 'c' + Date.now();
-            var rec = { id: newId, name: v.name, phone: v.phone, email: v.email, cpf: v.cpf, pis: v.pis, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), mustChange: true, active: true };
+            var rec = { id: newId, name: v.name, phone: v.phone, email: v.email, cpf: v.cpf, pis: v.pis, func: v.func, unit: v.unit, shift: v.shift, horario: v.horario, role: v.role, admission: v.admission, pin: newPin(), mustChange: true, active: true };
             if (cloud) {
               // Com servidor: cria o login da pessoa no Supabase e liga à equipe; a senha não fica no app.
               save.classList.add('busy'); save.disabled = true;

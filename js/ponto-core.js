@@ -23,7 +23,30 @@
 
   P.employee = function (id) { return DB.get().employees.filter(function (e) { return e.id === id; })[0]; };
   P.me = function () { return P.employee(DB.get().user.empId); };
-  P.shift = function (emp) { return DB.get().shifts[emp.shift] || DB.get().shifts.Noite; };
+  function mins(hm) { var p = String(hm || '0:0').split(':'); return Number(p[0]) * 60 + Number(p[1]); }
+  function clock(min) { min = ((min % 1440) + 1440) % 1440; return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+  // Minutos entre entrada e saída; saída menor que a entrada é no dia seguinte.
+  function span(start, end) { var s = mins(end) - mins(start); return s <= 0 ? s + 1440 : s; }
+
+  // Horário do colaborador: entrada, saída e intervalo (min). Quem ainda não tem horário próprio usa o do turno.
+  // hours = horas previstas por dia, já sem o intervalo.
+  P.shift = function (emp) {
+    var h = emp && emp.horario;
+    if (h && h.start && h.end) {
+      var pause = Number(h.pause) || 0;
+      return { start: h.start, end: h.end, pause: pause, hours: Math.max(0, span(h.start, h.end) - pause) / 60, own: true };
+    }
+    var s = DB.get().shifts[emp && emp.shift] || DB.get().shifts.Noite;
+    return { start: s.start, end: clock(mins(s.start) + s.hours * 60), pause: 0, hours: s.hours };
+  };
+  // Ex.: "17:30 às 23:30" ou "17:30 às 23:30 · intervalo 15 min".
+  P.horarioLabel = function (emp, withPause) {
+    var s = P.shift(emp);
+    return s.start + ' às ' + s.end + (withPause && s.pause ? ' · intervalo ' + dur(s.pause) : '');
+  };
+  // Nome do turno pelo horário de entrada (usado em telas antigas e nas exportações).
+  P.turnoOf = function (start) { var m = mins(start); return m < 12 * 60 ? 'Manhã' : m < 17 * 60 ? 'Tarde' : 'Noite'; };
+  P.span = span;
 
   // Agrupa as marcações em jornadas. A jornada pertence ao dia da entrada (a saída pode ser depois da meia-noite).
   P.jornadas = function (empId) {
@@ -55,6 +78,16 @@
     var s = P.shift(emp).start.split(':'), d = new Date(j.marks.entrada.ts);
     var diff = d.getHours() * 60 + d.getMinutes() - (Number(s[0]) * 60 + Number(s[1]));
     return diff > TOLERANCE && diff < 6 * 60 ? diff : 0;
+  };
+
+  // Minutos que saiu antes do horário de saída (0 se saiu no horário, depois ou ainda não saiu).
+  P.earlyBy = function (j, emp) {
+    if (!j.marks.saida) return 0;
+    var s = P.shift(emp), d = new Date(j.start);
+    var st = s.start.split(':'); d.setHours(+st[0], +st[1], 0, 0);
+    var due = d.getTime() + span(s.start, s.end) * 60000;
+    var diff = Math.round((due - j.marks.saida.ts) / 60000);
+    return diff > TOLERANCE && diff < 12 * 60 ? diff : 0;
   };
 
   // Situação atual e próximos registros possíveis.

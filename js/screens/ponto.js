@@ -14,7 +14,7 @@
     if (st.status === 'trabalhando') return 'Trabalhando desde ' + P.hhmm(j.marks.entrada ? j.marks.entrada.ts : j.start) + ' · <span data-worked>' + P.dur(P.worked(j)) + '</span> hoje';
     if (st.status === 'intervalo') return 'Em intervalo desde ' + P.hhmm(j.marks.intervalo.ts) + ' · <span data-worked>' + P.dur(P.worked(j)) + '</span> trabalhadas';
     if (j && j.marks.saida) return 'Expediente encerrado às ' + P.hhmm(j.marks.saida.ts) + ' · ' + P.dur(P.worked(j)) + ' hoje';
-    return 'Você ainda não registrou o ponto hoje · turno ' + esc(emp.shift.toLowerCase()) + ', entrada ' + P.shift(emp).start;
+    return 'Você ainda não registrou o ponto hoje · seu horário: ' + esc(P.horarioLabel(emp));
   }
 
   // Confirmação antes de gravar: a marcação não pode ser apagada depois.
@@ -129,9 +129,10 @@
     if (!js.length) return '<div class="card">' + UI.empty('clock', 'Nenhum registro ainda', 'Os dias trabalhados aparecem aqui assim que você bater o ponto.') + '</div>';
     var hours = P.shift(emp).hours * 60;
     return '<div class="list">' + js.map(function (j) {
-      var m = j.marks, w = P.worked(j), late = P.lateBy(j, emp), stale = P.isStale(j);
+      var m = j.marks, w = P.worked(j), late = P.lateBy(j, emp), early = P.earlyBy(j, emp), stale = P.isStale(j);
       var bal = m.saida ? w - hours : null;
       var flags = (late ? '<span class="pill warn no-dot">Atraso ' + late + ' min</span>' : '') +
+        (early ? '<span class="pill warn no-dot">Saiu ' + P.dur(early) + ' antes</span>' : '') +
         (stale ? '<span class="pill crit no-dot">Sem saída</span>' : '') +
         (j.list.some(function (p) { return p.method === 'ajuste'; }) ? '<span class="pill info no-dot">Ajustado</span>' : '') +
         (!m.saida && !stale ? '<span class="pill ok">Em andamento</span>' : '');
@@ -154,7 +155,7 @@
     var manager = UI.isManager();
 
     var html = '<main class="screen">' +
-      UI.topbar('Ponto', { sub: unitName(emp.unit) + ' · turno ' + emp.shift.toLowerCase() }) +
+      UI.topbar('Ponto', { sub: unitName(emp.unit) + ' · ' + P.horarioLabel(emp) }) +
       (manager ? '<div class="seg" style="max-width:360px"><button type="button" aria-pressed="true">Meu ponto</button><button type="button" data-team aria-pressed="false">Equipe</button></div>' : '') +
       (st.stale.length ? '<div class="banner crit">' + icon('alert', 'sm') + '<div class="grow">Sem registro de saída em ' + dayLabel(st.stale[st.stale.length - 1].date) + '. Peça o ajuste para fechar o dia.</div><button type="button" class="btn sm" data-fix="' + st.stale[st.stale.length - 1].date + '">Ajustar</button></div>' : '') +
       '<section class="card hero ponto-hero">' +
@@ -203,7 +204,69 @@
     };
   }
 
-  window.PontoUI = { statusLine: statusLine, historyRows: historyRows, dayLabel: dayLabel, codeSheet: codeSheet, confirmPunch: confirmPunch };
+  // Horário de trabalho (entrada, saída e intervalo): no cadastro do colaborador e no Ponto da equipe.
+  var PAUSES = [[0, 'Sem'], [15, '15 min'], [30, '30 min'], [60, '1 h'], [120, '2 h']];
+  function horarioFields(emp) {
+    var s = P.shift(emp);
+    return '<div data-horario style="display:flex;flex-direction:column;gap:var(--sp-3)">' +
+      '<div class="ideal-grid"><div class="field"><label for="h-start">Entra às</label><input id="h-start" class="input num" type="time" value="' + s.start + '"></div>' +
+      '<div class="field"><label for="h-end">Sai às</label><input id="h-end" class="input num" type="time" value="' + s.end + '"></div></div>' +
+      '<div class="field"><span class="label">Intervalo</span><div class="seg" data-pause>' + PAUSES.map(function (p) {
+        return '<button type="button" data-v="' + p[0] + '" aria-pressed="' + (p[0] === s.pause) + '">' + p[1] + '</button>';
+      }).join('') + '</div></div>' +
+      '<p class="card-meta" data-h-sum></p><span class="err" data-h-err hidden></span></div>';
+  }
+  // Liga os campos e devolve uma função que lê o horário: { start, end, pause } ou { error }.
+  function bindHorario(root) {
+    var st = root.querySelector('#h-start'), en = root.querySelector('#h-end'), err = root.querySelector('[data-h-err]');
+    var on = root.querySelector('[data-pause] [aria-pressed="true"]'), pause = on ? Number(on.dataset.v) : 0;
+    function read() {
+      if (!st.value || !en.value) return { error: 'Informe a hora de entrada e a de saída.' };
+      if (st.value === en.value) return { error: 'A entrada e a saída estão no mesmo horário.' };
+      var total = P.span(st.value, en.value);
+      if (pause >= total) return { error: 'O intervalo é maior que a jornada.' };
+      return { start: st.value, end: en.value, pause: pause, total: total };
+    }
+    function sum() {
+      var h = read(), box = root.querySelector('[data-h-sum]');
+      err.hidden = true;
+      if (h.error) { box.textContent = ''; return; }
+      var net = h.total - h.pause;
+      var clt = net > 6 * 60 && h.pause < 60 ? ' · Pela CLT, acima de 6h o intervalo é de pelo menos 1h.'
+        : net > 4 * 60 && h.pause < 15 ? ' · Pela CLT, acima de 4h o intervalo é de pelo menos 15 min.' : '';
+      box.innerHTML = '<b class="num">' + P.dur(net) + '</b> de trabalho por dia' + (h.pause ? ', fora o intervalo' : '') + (h.end <= h.start ? ' · sai no dia seguinte' : '') +
+        (clt ? '<span style="color:var(--warn)">' + clt + '</span>' : '');
+    }
+    root.querySelectorAll('[data-pause] [data-v]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        root.querySelectorAll('[data-pause] [data-v]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+        pause = Number(b.dataset.v); sum();
+      });
+    });
+    st.addEventListener('input', sum); en.addEventListener('input', sum);
+    sum();
+    return function () {
+      var h = read();
+      err.hidden = !h.error; if (h.error) err.textContent = h.error;
+      return h.error ? null : { start: h.start, end: h.end, pause: h.pause };
+    };
+  }
+  function horarioSheet(emp) {
+    UI.sheet('<h2>Horário de ' + esc(emp.name.split(' ')[0]) + '</h2><p class="muted">Vale para atrasos, saída antes do horário e horas previstas no banco de horas.</p>' +
+      horarioFields(emp) +
+      '<button type="button" class="btn primary block" data-save>Salvar horário</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sheet, close) {
+        var get = bindHorario(sheet);
+        sheet.querySelector('[data-save]').addEventListener('click', function () {
+          var h = get(); if (!h) return;
+          DB.update(function (x) { var t = x.employees.filter(function (e) { return e.id === emp.id; })[0]; t.horario = h; t.shift = P.turnoOf(h.start); });
+          close(); refresh(); UI.toast('Horário de ' + emp.name.split(' ')[0] + ': ' + h.start + ' às ' + h.end);
+        });
+      });
+  }
+
+  window.PontoUI = { statusLine: statusLine, historyRows: historyRows, dayLabel: dayLabel, codeSheet: codeSheet, confirmPunch: confirmPunch,
+    horarioFields: horarioFields, bindHorario: bindHorario, horarioSheet: horarioSheet };
 
   Screens.ponto = function (params) {
     if (params[0] === 'equipe' || UI.isAccountant()) return Screens.ponto_equipe();

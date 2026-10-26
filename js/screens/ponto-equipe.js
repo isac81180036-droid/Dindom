@@ -10,12 +10,13 @@
   // Situação de cada pessoa hoje, na linguagem do dia a dia da loja.
   function today(emp) {
     var st = P.state(emp.id), j = st.today, now = Date.now();
-    if (st.status === 'trabalhando') return { key: 'on', label: 'Trabalhando desde ' + P.hhmm(j.marks.entrada ? j.marks.entrada.ts : j.start), late: P.lateBy(j, emp), j: j };
-    if (st.status === 'intervalo') return { key: 'pause', label: 'Em intervalo desde ' + P.hhmm(j.marks.intervalo.ts), late: P.lateBy(j, emp), j: j };
-    if (j && j.marks.saida) return { key: 'done', label: 'Saiu às ' + P.hhmm(j.marks.saida.ts), late: P.lateBy(j, emp), j: j };
+    var sh = P.shift(emp);
+    if (st.status === 'trabalhando') return { key: 'on', label: 'Trabalhando desde ' + P.hhmm(j.marks.entrada ? j.marks.entrada.ts : j.start) + ' · sai às ' + sh.end, late: P.lateBy(j, emp), j: j };
+    if (st.status === 'intervalo') return { key: 'pause', label: 'Em intervalo desde ' + P.hhmm(j.marks.intervalo.ts) + ' · sai às ' + sh.end, late: P.lateBy(j, emp), j: j };
+    if (j && j.marks.saida) return { key: 'done', label: 'Saiu às ' + P.hhmm(j.marks.saida.ts) + ' · horário ' + sh.end, late: P.lateBy(j, emp), early: P.earlyBy(j, emp), j: j };
     var start = shiftStartTs(emp);
-    if (now > start + P.TOLERANCE * 60000) return { key: 'missing', label: 'Não chegou · entrada ' + P.shift(emp).start, late: Math.round((now - start) / 60000) };
-    return { key: 'later', label: 'Entra às ' + P.shift(emp).start };
+    if (now > start + P.TOLERANCE * 60000) return { key: 'missing', label: 'Não chegou · entrada ' + sh.start, late: Math.round((now - start) / 60000) };
+    return { key: 'later', label: 'Entra às ' + sh.start + ' · sai às ' + sh.end };
   }
   var PILL = { on: ['ok', 'Trabalhando'], pause: ['info', 'Intervalo'], done: ['', 'Encerrou'], off: ['', 'Folga'], missing: ['crit', 'Atrasado'], later: ['', 'Mais tarde'] };
 
@@ -41,11 +42,18 @@
   function detailSheet(emp) {
     var s = P.summary(emp.id, Cal.today().slice(0, 8) + '01', Cal.today());
     UI.sheet('<div class="card-row"><span class="avatar">' + esc(initials(emp.name)) + '</span><div class="grow"><h2 style="font-size:var(--fs-lg)">' + esc(emp.name) + '</h2>' +
-      '<div class="card-meta">' + esc(emp.func) + ' · turno ' + esc(emp.shift.toLowerCase()) + ' · ' + esc(unitShort(emp.unit)) + '</div></div></div>' +
+      '<div class="card-meta">' + esc(emp.func) + ' · ' + esc(unitShort(emp.unit)) + '</div></div></div>' +
+      '<div class="row" style="border:1px solid var(--line);border-radius:var(--r-md)"><div class="tile">' + icon('clock') + '</div><div class="grow"><div class="card-title num">' + esc(P.horarioLabel(emp)) + '</div>' +
+      '<div class="card-meta">Horário de trabalho' + (P.shift(emp).pause ? ' · intervalo ' + P.dur(P.shift(emp).pause) : '') + ' · ' + P.dur(P.shift(emp).hours * 60) + ' por dia</div></div>' +
+      (UI.isAdmin() ? '<button type="button" class="btn sm" data-horario-edit>Alterar</button>' : '') + '</div>' +
       '<div class="stat-grid three"><div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num">' + P.dur(s.worked) + '</div><div class="card-meta">no mês</div></div>' +
       '<div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num ' + (s.balance >= 0 ? 'pos' : 'neg') + '">' + P.signed(s.balance) + '</div><div class="card-meta">banco</div></div>' +
       '<div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num">' + s.lateCount + '</div><div class="card-meta">atrasos</div></div></div>' +
-      PontoUI.historyRows(emp.id, false) + '<button type="button" class="btn block" data-close>Fechar</button>');
+      PontoUI.historyRows(emp.id, false) + '<button type="button" class="btn block" data-close>Fechar</button>',
+      function (sheet, close) {
+        var ed = sheet.querySelector('[data-horario-edit]');
+        if (ed) ed.addEventListener('click', function () { close(); PontoUI.horarioSheet(emp); });
+      });
   }
 
   // Período da tabela e da exportação: mês atual, mês anterior ou datas escolhidas.
@@ -132,10 +140,11 @@
       '<section class="section"' + (rows.length ? '' : ' hidden') + '><div class="section-head"><h2>Agora</h2></div><div class="card-grid">' + rows.map(function (x) {
         var pill = PILL[x.t.key];
         return '<button type="button" class="card tap team-card" data-emp="' + x.e.id + '"><div class="card-row"><span class="avatar sm">' + esc(initials(x.e.name)) + '</span>' +
-          '<div class="grow"><div class="card-title">' + esc(x.e.name) + '</div><div class="card-meta">' + esc(x.e.func) + ' · ' + esc(unitShort(x.e.unit)) + '</div></div>' +
+          '<div class="grow"><div class="card-title">' + esc(x.e.name) + '</div><div class="card-meta">' + esc(x.e.func) + ' · ' + esc(unitShort(x.e.unit)) + ' · <span class="num">' + esc(P.horarioLabel(x.e)) + '</span></div></div>' +
           '<span class="pill ' + pill[0] + '">' + pill[1] + '</span></div>' +
           '<div class="card-meta">' + esc(x.t.label) + (x.t.j ? ' · ' + P.dur(P.worked(x.t.j)) + ' hoje' : '') + '</div>' +
-          (x.t.late && x.t.key !== 'missing' ? '<span class="pill warn no-dot" style="align-self:flex-start">Chegou ' + x.t.late + ' min atrasado</span>' : '') + '</button>';
+          (x.t.late && x.t.key !== 'missing' ? '<span class="pill warn no-dot" style="align-self:flex-start">Chegou ' + x.t.late + ' min atrasado</span>' : '') +
+          (x.t.early ? '<span class="pill warn no-dot" style="align-self:flex-start">Saiu ' + P.dur(x.t.early) + ' antes do horário</span>' : '') + '</button>';
       }).join('') + '</div></section>' +
 
       (acc ? '' : exportCard(from, to)) +

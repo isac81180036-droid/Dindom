@@ -59,13 +59,13 @@
       var prev = P.shift(e).hours * 60;
       jornadas(e, from, to).forEach(function (j) {
         var m = j.marks, w = P.worked(j);
-        rows.push([br(j.date), WD[Cal.parse(j.date).getDay()], e.name, cpf(e.cpf), pis(e.pis), unitName(e.unit), e.shift,
+        rows.push([br(j.date), WD[Cal.parse(j.date).getDay()], e.name, cpf(e.cpf), pis(e.pis), unitName(e.unit), P.horarioLabel(e),
           m.entrada ? timeOf(m.entrada.ts) : '', m.intervalo ? timeOf(m.intervalo.ts) : '', m.retorno ? timeOf(m.retorno.ts) : '', m.saida ? timeOf(m.saida.ts) : '',
-          hm(w), m.saida ? hm(prev) : '', m.saida ? hm(w - prev, true) : '', P.lateBy(j, e) || '', situacao(j)]);
+          hm(w), m.saida ? hm(prev) : '', m.saida ? hm(w - prev, true) : '', P.lateBy(j, e) || '', P.earlyBy(j, e) || '', situacao(j)]);
       });
     });
-    return csv(['Data', 'Dia', 'Colaborador', 'CPF', 'PIS', 'Unidade', 'Turno', 'Entrada', 'Saída para intervalo', 'Volta do intervalo', 'Saída',
-      'Horas trabalhadas', 'Horas previstas', 'Saldo do dia', 'Atraso (min)', 'Situação'], rows);
+    return csv(['Data', 'Dia', 'Colaborador', 'CPF', 'PIS', 'Unidade', 'Horário', 'Entrada', 'Saída para intervalo', 'Volta do intervalo', 'Saída',
+      'Horas trabalhadas', 'Horas previstas', 'Saldo do dia', 'Atraso (min)', 'Saída antecipada (min)', 'Situação'], rows);
   };
 
   X.resumo = function (from, to, unit) {
@@ -73,10 +73,10 @@
     var rows = people(unit).map(function (e) {
       var s = P.summary(e.id, from, to);
       var nAdj = adj.filter(function (a) { return a.emp === e.id && a.status === 'aprovado' && a.date >= from && a.date <= to; }).length;
-      return [e.name, cpf(e.cpf), pis(e.pis), e.func, unitName(e.unit), e.shift, e.active ? 'Ativo' : 'Inativo',
+      return [e.name, cpf(e.cpf), pis(e.pis), e.func, unitName(e.unit), P.horarioLabel(e, true), e.active ? 'Ativo' : 'Inativo',
         s.days, hm(s.worked), hm(s.expected), hm(s.balance, true), s.lateCount, s.late, s.missing, nAdj];
     });
-    return csv(['Colaborador', 'CPF', 'PIS', 'Função', 'Unidade', 'Turno', 'Situação', 'Dias trabalhados', 'Horas trabalhadas', 'Horas previstas',
+    return csv(['Colaborador', 'CPF', 'PIS', 'Função', 'Unidade', 'Horário', 'Situação', 'Dias trabalhados', 'Horas trabalhadas', 'Horas previstas',
       'Banco de horas', 'Atrasos', 'Atrasos (min)', 'Dias sem saída', 'Ajustes aprovados'], rows);
   };
 
@@ -131,7 +131,7 @@
       if (!js.length && !e.active) return; // quem saiu da empresa só aparece se trabalhou no período
       out.push(''); out.push(line);
       out.push(rpad(e.name, 40) + ' CPF: ' + rpad(cpf(e.cpf) || '-', 15) + ' PIS: ' + (pis(e.pis) || '-'));
-      out.push(rpad('Funcao: ' + e.func, 40) + ' Turno: ' + rpad(e.shift + ' (' + P.shift(e).start + ', ' + P.shift(e).hours + 'h)', 22) + ' Unidade: ' + ascii(unitName(e.unit)));
+      out.push(rpad('Funcao: ' + e.func, 40) + ' Horario: ' + rpad(P.shift(e).start + '-' + P.shift(e).end + (P.shift(e).pause ? ' int ' + P.shift(e).pause + 'min' : ''), 22) + ' Unidade: ' + ascii(unitName(e.unit)));
       out.push(line);
       out.push(rpad('Data', 11) + rpad('Dia', 5) + rpad('Entrada', 9) + rpad('Interv.', 9) + rpad('Volta', 9) + rpad('Saida', 9) + rpad('Trab.', 8) + rpad('Saldo', 8) + rpad('Atraso', 8) + 'Situacao');
       if (!js.length) out.push('  Nenhuma marcacao no periodo.');
