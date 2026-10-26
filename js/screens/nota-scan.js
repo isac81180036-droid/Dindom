@@ -59,7 +59,6 @@
       '<div class="scan-actions">' +
       '<button type="button" class="btn scan-alt" data-photo>' + icon('image', 'sm') + 'Ler de uma foto</button>' +
       '<button type="button" class="btn scan-alt" data-key>' + icon('key', 'sm') + 'Digitar a chave</button>' +
-      '<button type="button" class="btn ghost scan-demo" data-demo>Usar nota de exemplo</button>' +
       '</div></main>';
 
     return {
@@ -85,7 +84,6 @@
         });
         root.querySelector('[data-photo]').addEventListener('click', function () { fromPhoto(); });
         root.querySelector('[data-key]').addEventListener('click', keySheet);
-        root.querySelector('[data-demo]').addEventListener('click', function () { handle(NFCe.demoQR()); });
 
         startCam();
         return function () { if (ctl) ctl.stop(); };

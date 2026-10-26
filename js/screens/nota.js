@@ -31,13 +31,15 @@
     return c;
   }
 
+  function total(c) { return Math.round((c.rows || []).filter(function (r) { return r.include; }).reduce(function (s, r) { return s + (r.total || 0); }, 0) * 100) / 100; }
+
   function header(c) {
     var p = c.parsed;
     return '<section class="card nota-head">' +
       '<div class="card-row"><div class="tile">' + icon('receipt') + '</div><div class="grow">' +
-      '<div class="card-title">' + esc(c.data ? c.data.store.name : 'Buscando loja…') + '</div>' +
+      '<div class="card-title">' + esc(c.data ? (c.data.store.name || c.storeName || 'Loja nova') : 'Buscando loja…') + '</div>' +
       '<div class="card-meta num">CNPJ ' + esc(NFCe.formatCnpj(p.cnpj)) + '</div></div>' +
-      (c.data ? '<b class="num nota-total">' + money(c.data.total) + '</b>' : '') + '</div>' +
+      (c.data ? '<b class="num nota-total">' + money(total(c)) + '</b>' : '') + '</div>' +
       '<div class="card-meta num">' + (p.model === '65' ? 'NFC-e' : 'NF-e') + ' nº ' + esc(p.number) + ' · ' + esc(p.uf) + (c.data ? ' · ' + fmtDate(c.data.date) : ' · ' + esc(p.period)) + '</div>' +
       '<div class="card-meta num nota-key">' + esc(NFCe.formatKey(p.key)) + '</div></section>';
   }
@@ -89,6 +91,44 @@
       });
   }
 
+  // Lançamento manual de um item da nota: produto, quantidade e valor total pago.
+  function addItemSheet(c) {
+    var chosen = null;
+    function listHtml(q) {
+      q = (q || '').toLowerCase();
+      var ps = DB.get().products.filter(function (p) { return !q || p.name.toLowerCase().indexOf(q) >= 0; });
+      if (!DB.get().products.length) return '<div class="row muted">Nenhum produto cadastrado. Cadastre em Estoque › Produtos.</div>';
+      return ps.map(function (p) {
+        return '<button type="button" class="row" data-pid="' + p.id + '"><div class="grow"><div class="card-title">' + esc(p.name) + '</div><div class="card-meta">' + esc(p.cat) + ' · ' + esc(p.unit) + '</div></div>' + (chosen && chosen.id === p.id ? icon('check') : '') + '</button>';
+      }).join('') || '<div class="row muted">Nenhum produto com esse nome.</div>';
+    }
+    UI.sheet('<h2>Adicionar item</h2>' +
+      '<input id="ai-q" class="input" type="search" placeholder="Buscar produto">' +
+      '<div class="list" data-list style="max-height:34vh;overflow:auto">' + listHtml('') + '</div>' +
+      '<div class="ev-when" style="grid-template-columns:1fr 1fr"><div class="field" id="f-ai-qty"><label for="ai-qty">Quantidade <span class="faint" data-unit></span></label><input id="ai-qty" class="input num" inputmode="decimal" placeholder="0"></div>' +
+      '<div class="field" id="f-ai-tot"><label for="ai-tot">Valor total (R$)</label><input id="ai-tot" class="input num" inputmode="decimal" placeholder="0,00"></div></div>' +
+      '<p class="err" data-err hidden style="color:var(--crit);font-weight:600;font-size:var(--fs-sm)"></p>' +
+      '<button type="button" class="btn primary block" data-add>Adicionar</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sheet, close) {
+        function num(s) { return Number(String(s).replace(/\./g, '').replace(',', '.')); }
+        sheet.querySelector('#ai-q').addEventListener('input', function (e) { sheet.querySelector('[data-list]').innerHTML = listHtml(e.target.value); });
+        sheet.querySelector('[data-list]').addEventListener('click', function (e) {
+          var b = e.target.closest('[data-pid]'); if (!b) return;
+          chosen = DB.product(b.dataset.pid);
+          sheet.querySelector('[data-list]').innerHTML = listHtml(sheet.querySelector('#ai-q').value);
+          sheet.querySelector('[data-unit]').textContent = '(' + chosen.unit + ')';
+          sheet.querySelector('#ai-qty').focus();
+        });
+        sheet.querySelector('[data-add]').addEventListener('click', function () {
+          var q = num(sheet.querySelector('#ai-qty').value), tot = num(sheet.querySelector('#ai-tot').value), err = sheet.querySelector('[data-err]');
+          var msg = !chosen ? 'Escolha o produto na lista.' : !(q > 0) ? 'Informe a quantidade.' : !(tot >= 0) || sheet.querySelector('#ai-tot').value === '' ? 'Informe o valor total pago por este item.' : '';
+          err.hidden = !msg; err.textContent = msg; if (msg) return;
+          c.rows.push({ desc: chosen.name, qty: q, unit: chosen.unit, unitPrice: Math.round(tot / q * 100) / 100, total: tot, pid: chosen.id, include: true, addQty: q });
+          close(); refresh(); UI.toast(chosen.name + ' adicionado');
+        });
+      });
+  }
+
   function apply(c) {
     var d = DB.get();
     var rows = c.rows.filter(function (r) { return r.include && r.pid && r.addQty > 0; });
@@ -96,7 +136,7 @@
     var result = [];
     DB.update(function (x) {
       var store = x.stores.filter(function (s) { return s.cnpj === c.data.store.cnpj; })[0];
-      if (!store) { store = { id: 's' + Date.now(), name: c.data.store.name, kind: 'Loja', cnpj: c.data.store.cnpj, dist: '' }; x.stores.push(store); }
+      if (!store) { store = { id: 's' + Date.now(), name: c.data.store.name || c.storeName, kind: 'Loja', cnpj: c.data.store.cnpj, dist: '' }; x.stores.push(store); }
       x.stock[c.unit] = x.stock[c.unit] || {};
       rows.forEach(function (r) {
         var before = x.stock[c.unit][r.pid] || 0;
@@ -111,7 +151,7 @@
         x.prices.push({ pid: r.pid, store: store.id, price: Math.round(perUnit * 100) / 100, date: c.data.date, source: 'nota' });
       });
       x.notas.push({ key: c.parsed.key, number: c.parsed.number, uf: c.parsed.uf, store: store.id, storeName: store.name, date: c.data.date,
-        total: c.data.total, unit: c.unit, by: by, at: Date.now(), items: result });
+        total: total(c), unit: c.unit, by: by, at: Date.now(), items: result });
     });
     UI.buzz(25);
     go('estoque/nota/ok/' + c.parsed.key, { replace: true });
@@ -144,12 +184,14 @@
 
     var matched = c.rows.filter(function (r) { return r.pid; }).length;
     var html = '<main class="screen has-dock no-nav">' + top + header(c) +
-      (c.data.demo ? '<div class="banner" style="background:var(--info-soft);color:var(--info)">' + icon('sparkle', 'sm') + '<div class="grow">Nota de exemplo. No app com servidor, os itens vêm direto da SEFAZ.</div></div>' : '') +
+      (c.data.manual ? '<div class="banner" style="background:var(--info-soft);color:var(--info)">' + icon('receipt', 'sm') + '<div class="grow">Nota identificada. Lance os itens abaixo: a busca automática na SEFAZ entra quando o servidor for ligado.</div></div>' : '') +
+      (c.data.manual && !c.data.store.known ? '<div class="field" id="f-store"><label for="nf-store">Nome da loja</label><input id="nf-store" class="input" placeholder="Ex.: Atacadão da Marginal" value="' + esc(c.storeName || '') + '"><span class="hint">Só na primeira nota desta loja. Nas próximas, ela é reconhecida pelo CNPJ.</span><span class="err" hidden>Informe o nome da loja.</span></div>' : '') +
       '<div class="field"><span class="label">Dar entrada na unidade</span><div class="seg" data-unitsel>' + DB.get().units.map(function (u) {
         return '<button type="button" data-u="' + u.id + '" aria-pressed="' + (u.id === c.unit) + '">' + esc(u.name.replace('Unidade ', '')) + '</button>';
       }).join('') + '</div></div>' +
-      '<section class="section"><div class="section-head"><h2>Itens da nota</h2><span class="card-meta">' + matched + ' de ' + c.rows.length + ' reconhecidos</span></div>' +
-      '<div class="list nota-list">' + c.rows.map(row).join('') + '</div></section></main>' +
+      '<section class="section"><div class="section-head"><h2>Itens da nota</h2><span class="card-meta">' + (c.data.manual ? c.rows.length + (c.rows.length === 1 ? ' item' : ' itens') : matched + ' de ' + c.rows.length + ' reconhecidos') + '</span></div>' +
+      '<div class="list nota-list">' + (c.rows.length ? c.rows.map(row).join('') : '<div class="row muted">Nenhum item lançado ainda.</div>') + '</div>' +
+      '<button type="button" class="btn block" data-additem>' + icon('plus', 'sm') + 'Adicionar item da nota</button></section></main>' +
       '<div class="dock no-nav" data-dock>' + dockHtml(c) + '</div>';
 
     return {
@@ -157,6 +199,9 @@
       mount: function (root) {
         var dock = root.querySelector('[data-dock]');
         root.querySelectorAll('[data-u]').forEach(function (b) { b.addEventListener('click', function () { c.unit = b.dataset.u; refresh(); }); });
+        var storeIn = root.querySelector('#nf-store');
+        if (storeIn) storeIn.addEventListener('input', function () { c.storeName = storeIn.value.trim(); root.querySelector('#f-store').classList.remove('error'); root.querySelector('#f-store .err').hidden = true; root.querySelector('.nota-head .card-title').textContent = c.storeName || 'Loja nova'; });
+        root.querySelector('[data-additem]').addEventListener('click', function () { addItemSheet(c); });
         root.querySelector('.nota-list').addEventListener('click', function (e) {
           var el = e.target.closest('[data-i]'); if (!el) return;
           if (e.target.closest('[data-pick]')) pickSheet(c, Number(el.dataset.i));
@@ -176,6 +221,7 @@
         });
         dock.addEventListener('click', function (e) {
           if (!e.target.closest('[data-apply]')) return;
+          if (c.data.manual && !c.data.store.known && !c.storeName) { var fs = root.querySelector('#f-store'); fs.classList.add('error'); fs.querySelector('.err').hidden = false; fs.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
           var n = c.rows.filter(function (r) { return r.include && r.pid; }).length;
           UI.confirm({ title: 'Dar entrada em ' + n + ' itens?', body: 'As quantidades serão somadas ao estoque da ' + esc(unitName(c.unit)) + '.', ok: 'Dar entrada no estoque', onOk: function () { apply(c); } });
         });

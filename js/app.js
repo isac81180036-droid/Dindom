@@ -14,7 +14,9 @@
   ];
   // Área do administrador: no computador aparece no menu lateral; no celular, pelo Perfil.
   var ADMIN_TABS = [
-    { id: 'equipe', label: 'Colaboradores', icon: 'users' }
+    { id: 'produtos', label: 'Produtos', icon: 'box' },
+    { id: 'checklists/editar', label: 'Modelos de checklist', icon: 'checklist' },
+    { id: 'equipe', label: 'Colaboradores', icon: 'users', admin: true }
   ];
 
   var current = 'inicio';
@@ -38,7 +40,7 @@
     if (!show) return;
     var b = badges();
     var d = DB.get();
-    var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0];
+    var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
     function item(t, cls) {
       return '<li' + (cls ? ' class="' + cls + '"' : '') + '><a href="#' + t.id + '"' + (t.id === tab ? ' aria-current="page"' : '') + '>' +
         icon(t.icon) + '<span>' + t.label + '</span>' +
@@ -46,7 +48,7 @@
     }
     nav.innerHTML = '<div class="brand"><img class="logo-ink" src="icons/wordmark-black.png" alt="Dindom"><span class="since">DESDE 2009</span></div>' +
       '<ul>' + TABS.map(function (t) { return item(t, t.desk ? 'desk-only' : ''); }).join('') +
-      (UI.isAdmin() ? '<li class="desk-only nav-label">Admin</li>' + ADMIN_TABS.map(function (t) { return item(t, 'desk-only'); }).join('') : '') +
+      (UI.isManager() ? '<li class="desk-only nav-label">Gestão</li>' + ADMIN_TABS.filter(function (t) { return !t.admin || UI.isAdmin(); }).map(function (t) { return item(t, 'desk-only'); }).join('') : '') +
       '</ul>' +
       '<a class="nav-foot" href="#perfil"><span class="avatar">' + UI.esc(d.user.name.charAt(0)) + '</span>' +
       '<span class="grow"><b>' + UI.esc(d.user.name) + '</b><span class="muted">' + UI.esc(unit.name) + '</span></span></a>';
@@ -56,9 +58,14 @@
 
   function render() {
     if (unmount) { try { unmount(); } catch (e) {} unmount = null; }
+    // Aparelho ainda sem configuração: tudo leva à primeira configuração.
+    if (!DB.get().setupDone) current = 'setup';
+    else if (current === 'setup') current = 'inicio';
     // Sem sessão, qualquer tela leva ao login (e volta para ela depois de entrar).
     var logged = !!Auth.session();
-    if (!logged && current.split('/')[0] !== 'login') {
+    if (current === 'setup') {
+      // segue para a tela de configuração
+    } else if (!logged && current.split('/')[0] !== 'login') {
       Auth.after = current;
       current = 'login';
       try { history.replaceState(null, '', '#login'); } catch (e) {}

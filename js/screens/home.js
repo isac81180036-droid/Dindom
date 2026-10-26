@@ -28,7 +28,7 @@
   window.MAINT = { PRIORITY: PRIORITY, STATUS: STATUS };
 
   function header(d) {
-    var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0];
+    var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
     var unread = d.notifications.some(function (n) { return !n.read; });
     var bell = '<a class="icon-btn" href="#notificacoes" aria-label="Notificações">' + icon('bell') + (unread ? '<span class="dot"></span>' : '') + '</a>';
     // Celular: assinatura da marca no topo, com agenda e notificações. Computador: a marca já está no menu lateral.
@@ -45,8 +45,13 @@
   }
 
   function closingCard(d) {
+    if (!d.products.length) {
+      return '<section class="card"><div class="card-row"><div class="tile">' + icon('box') + '</div><div class="grow"><div class="card-title">Fechamento de estoque</div>' +
+        '<div class="card-meta">' + (UI.isManager() ? 'Cadastre os produtos para começar a contar o estoque.' : 'O gerente ainda não cadastrou os produtos do estoque.') + '</div></div></div>' +
+        (UI.isManager() ? '<a class="btn primary block" href="#produtos/novo">' + icon('plus', 'sm') + 'Cadastrar produtos</a>' : '') + '</section>';
+    }
     var s = Stats.closing(d);
-    var dl = d.deliveries.filter(function (x) { return x.id === d.closing.delivery; })[0];
+    var dl = d.deliveries.filter(function (x) { return x.id === d.closing.delivery; })[0] || { label: '', date: '' };
     var started = s.counted > 0;
     return '<section class="card hero">' +
       '<div class="card-row"><div class="grow">' +
@@ -60,6 +65,7 @@
   }
 
   function tasksSection(d) {
+    if (!d.checklists.length) return '';
     var open = d.checklists.filter(function (c) { return !c.finishedAt; });
     if (!open.length) {
       return '<section class="section"><div class="section-head"><h2>Suas tarefas</h2></div><div class="card">' +
@@ -79,6 +85,7 @@
   }
 
   function stockSection(d) {
+    if (!d.products.length) return '';
     var pend = Stats.shoppingPending(d);
     var crit = Stats.critical(d);
     return '<section class="section"><div class="section-head"><h2>Estoque</h2></div>' +
@@ -110,8 +117,8 @@
     var pend = Stats.shoppingPending(d);
     var rows = [
       { href: '#manutencao', tone: 'crit', ic: 'alert', title: urgent.length + ' ocorrência' + (urgent.length === 1 ? '' : 's') + ' urgente' + (urgent.length === 1 ? '' : 's'), meta: urgent[0] ? urgent[0].title : 'Nenhuma no momento' },
-      { href: '#estoque/compras', tone: 'warn', ic: 'cart', title: 'Aprovar lista de compras', meta: pend.length + ' itens aguardando · fechamento de ' + d.shopping.fromClosing },
-      { href: '#checklists', tone: 'info', ic: 'checklist', title: lateLists.length + ' checklists em aberto', meta: 'Acompanhe a execução da equipe' }
+      { href: '#estoque/compras', tone: 'warn', ic: 'cart', title: pend.length ? 'Lista de compras' : 'Lista de compras em dia', meta: pend.length ? pend.length + (pend.length === 1 ? ' item' : ' itens') + ' a receber' + (d.shopping.fromClosing ? ' · fechamento de ' + d.shopping.fromClosing : '') : 'Nada pendente' },
+      { href: '#checklists', tone: 'info', ic: 'checklist', title: lateLists.length + (lateLists.length === 1 ? ' checklist em aberto' : ' checklists em aberto'), meta: d.checklists.length ? 'Acompanhe a execução da equipe' : 'Nenhuma rotina criada ainda' }
     ];
     return '<section class="section"><div class="section-head"><h2>Precisa da sua atenção</h2></div><div class="list">' +
       rows.map(function (r) {
@@ -149,6 +156,23 @@
       }).join('') : '<div class="row muted">Nada mais na agenda hoje.</div>') + '</div></section>';
   }
 
+  // Sistema recém-configurado: mostra ao gestor os primeiros cadastros que faltam.
+  function startCard(d) {
+    if (!UI.isManager()) return '';
+    var steps = [
+      { done: d.products.length > 0, href: '#produtos/novo', ic: 'box', title: 'Cadastrar os produtos do estoque', meta: 'Itens contados no fechamento' },
+      { done: d.checklists.length > 0, href: '#checklists/editar', ic: 'checklist', title: 'Criar os checklists', meta: 'Abertura, fechamento e rotinas' }
+    ];
+    if (UI.isAdmin()) steps.push({ done: d.employees.length > 1, href: '#equipe/novo', ic: 'users', title: 'Cadastrar a equipe', meta: 'Cada pessoa recebe e-mail e senha provisória' });
+    if (steps.every(function (s) { return s.done; })) return '';
+    var n = steps.filter(function (s) { return s.done; }).length;
+    return '<section class="section"><div class="section-head"><h2>Comece por aqui</h2><span class="card-meta num">' + n + ' de ' + steps.length + '</span></div><div class="list">' +
+      steps.map(function (s) {
+        return '<a class="row" href="' + s.href + '" style="text-decoration:none;color:inherit"><div class="tile ' + (s.done ? 'ok' : 'accent') + '">' + icon(s.done ? 'check' : s.ic) + '</div>' +
+          '<div class="grow"><div class="card-title"' + (s.done ? ' style="text-decoration:line-through;color:var(--ink-3)"' : '') + '>' + s.title + '</div><div class="card-meta">' + s.meta + '</div></div>' + (s.done ? '' : icon('chevronRight', 'sm')) + '</a>';
+      }).join('') + '</div></section>';
+  }
+
   // Ponto: a ação mais frequente do dia, logo no topo do Início.
   function pontoCard() {
     var emp = Ponto.me();
@@ -163,11 +187,12 @@
       }).join('') + '</div></section>';
   }
 
-  Screens.inicio = function () {    var d = DB.get();
+  Screens.inicio = function () {
+    var d = DB.get();
     var manager = UI.isManager();
     // No celular as colunas viram uma pilha só, na ordem: coluna 1, depois coluna 2.
     var cols = manager
-      ? [pontoCard() + managerSummary(d) + closingCard(d), agendaSection() + stockSection(d)]
+      ? [startCard(d) + pontoCard() + managerSummary(d) + closingCard(d), agendaSection() + stockSection(d)]
       : [pontoCard() + closingCard(d) + tasksSection(d), agendaSection() + stockSection(d) + maintSection(d)];
     var html = '<main class="screen wide">' + header(d) +
       '<div class="home-grid"><div class="col">' + cols[0] + '</div><div class="col">' + cols[1] + '</div></div>' +

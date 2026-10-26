@@ -2,22 +2,17 @@
 // Também a etapa "Crie sua senha" de quem entrou com senha provisória (rota login/senha).
 (function () {
   var esc = UI.esc;
-  var DEMO = [
-    { label: 'Administrador', email: 'admin@dindom.com.br', pass: 'Dindom2009' },
-    { label: 'Gerente', email: 'juliana@dindom.com.br', pass: 'Gerente123' },
-    { label: 'Colaborador', email: 'marina@dindom.com.br', pass: 'Equipe123' }
-  ];
 
   function mmss(ms) { var s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
-  function brand() {
+  function brand(title, text) {
     // Logo no canto superior direito; saudação embaixo, à esquerda, para o verde não ficar vazio.
     // No computador, um notebook flutuando mostra telas reais do sistema (só decoração).
     return '<section class="login-brand">' +
       '<img class="login-logo" src="icons/logo-white.png" alt="Dindom, desde 2009">' +
       '<div class="login-hello"><p class="login-tag">Gestão da pizzaria</p>' +
-      '<h2>' + UI.greeting() + '!</h2>' +
-      '<p>Ponto, estoque, agenda e equipe da Dindom num lugar só.</p></div>' +
+      '<h2>' + esc(title || UI.greeting() + '!') + '</h2>' +
+      '<p>' + esc(text || 'Ponto, estoque, agenda e equipe da Dindom num lugar só.') + '</p></div>' +
       '<div class="login-device" aria-hidden="true"><div class="ld-float">' +
       '<div class="ld-lid"><div class="ld-cam"></div><div class="ld-screen">' +
       SHOTS.map(function (s, i) { return '<img src="' + s + '" alt=""' + (i ? '' : ' class="on"') + ' loading="lazy">'; }).join('') +
@@ -78,9 +73,6 @@
       '<label class="login-remember" for="l-remember"><input id="l-remember" type="checkbox" class="switch" checked><span>Lembrar neste aparelho</span></label>' +
       '<button type="submit" class="btn primary block login-go" data-go>Entrar</button>' +
       '<button type="button" class="btn ghost login-forgot" data-forgot>Esqueci minha senha</button>' +
-      '<details class="login-demo"><summary>' + icon('sparkle', 'sm') + 'Contas de demonstração</summary>' +
-      '<div class="login-demo-list">' + DEMO.map(function (d, i) { return '<button type="button" class="chip" data-demo="' + i + '">' + esc(d.label) + '</button>'; }).join('') + '</div>' +
-      '<p class="card-meta">Preenche e-mail e senha de exemplo. Some quando o app for para produção.</p></details>' +
       '</form></section></main>';
 
     return {
@@ -128,12 +120,6 @@
         root.querySelector('[data-forgot]').addEventListener('click', function () {
           UI.sheet('<h2>Esqueceu a senha?</h2><p class="muted">Peça ao gerente ou ao administrador uma <b>senha provisória</b> em <b>Admin › Colaboradores</b>. No primeiro acesso com ela, você cria uma senha nova.</p>' +
             '<button type="button" class="btn primary block" data-close>Entendi</button>');
-        });
-        root.querySelectorAll('[data-demo]').forEach(function (b) {
-          b.addEventListener('click', function () {
-            var d = DEMO[Number(b.dataset.demo)];
-            email.value = d.email; pass.value = d.pass; setErr(''); submit();
-          });
         });
 
         lockState();
@@ -192,6 +178,9 @@
       }
     };
   }
+
+  // A primeira configuração usa a mesma marca e o mesmo notebook.
+  window.LoginUI = { brand: brand, slides: slides, passField: passField, bindEyes: bindEyes };
 
   Screens.login = function (params) { return params && params[0] === 'senha' ? newPassword() : signIn(); };
 })();

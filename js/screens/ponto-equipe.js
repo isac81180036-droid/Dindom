@@ -89,7 +89,8 @@
           '<div class="card-row"><button type="button" class="btn sm" data-rej="' + a.id + '">Recusar</button><button type="button" class="btn sm primary" data-apr="' + a.id + '">Aprovar ajuste</button></div></div>';
       }).join('') + '</div></section>' : '') +
 
-      '<section class="section"><div class="section-head"><h2>Agora</h2></div><div class="card-grid">' + rows.map(function (r) {
+      (!rows.length ? '<div class="card">' + UI.empty('users', 'Ninguém batendo ponto ainda', 'Os colaboradores cadastrados aparecem aqui com a situação do dia.', UI.isAdmin() ? '<a class="btn primary" href="#equipe/novo">Cadastrar colaborador</a>' : '') + '</div>' : '') +
+      '<section class="section"' + (rows.length ? '' : ' hidden') + '><div class="section-head"><h2>Agora</h2></div><div class="card-grid">' + rows.map(function (r) {
         var pill = PILL[r.t.key];
         return '<button type="button" class="card tap team-card" data-emp="' + r.e.id + '"><div class="card-row"><span class="avatar sm">' + esc(initials(r.e.name)) + '</span>' +
           '<div class="grow"><div class="card-title">' + esc(r.e.name) + '</div><div class="card-meta">' + esc(r.e.func) + ' · ' + esc(unitShort(r.e.unit)) + '</div></div>' +

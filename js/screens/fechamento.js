@@ -113,6 +113,11 @@
 
   Screens.estoque_fechamento = function () {
     var d = DB.get();
+    if (!d.products.length) {
+      return { html: '<main class="screen">' + UI.topbar('Fechamento', { back: '#estoque' }) + '<div class="card">' + UI.empty('box', 'Nenhum produto para contar',
+        UI.isManager() ? 'Cadastre os produtos do estoque e o fechamento passa a calcular a lista de compras.' : 'O gerente ainda não cadastrou os produtos do estoque.',
+        UI.isManager() ? '<a class="btn primary" href="#produtos/novo">Cadastrar produtos</a>' : '') + '</div></main>', tab: 'estoque' };
+    }
     var groups = d.categories.map(function (c) {
       var items = d.products.filter(function (p) { return p.cat === c; });
       return items.length ? '<section class="section count-group" id="cat-' + d.categories.indexOf(c) + '"><div class="eyebrow">' + esc(c) + '</div>' +

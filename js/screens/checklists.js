@@ -25,12 +25,14 @@
 
   function list() {
     var d = DB.get();
-    var periods = ['Abertura', 'Fechamento'];
-    var html = '<main class="screen wide">' + UI.topbar('Checklists', { sub: 'Hoje' }) +
-      periods.map(function (p) {
+    var periods = ['Abertura', 'Durante o expediente', 'Fechamento'];
+    var manager = UI.isManager();
+    var html = '<main class="screen wide">' + UI.topbar('Checklists', { sub: 'Hoje', right: manager ? '<a class="btn sm" href="#checklists/editar">' + icon('settings', 'sm') + 'Modelos</a>' : '' }) +
+      (d.checklists.length ? periods.map(function (p) {
         var cs = d.checklists.filter(function (c) { return c.period === p; });
         return cs.length ? '<section class="section"><div class="eyebrow">' + p + '</div><div class="card-grid">' + cs.map(card).join('') + '</div></section>' : '';
-      }).join('') + '</main>';
+      }).join('') : '<div class="card">' + UI.empty('checklist', 'Nenhum checklist ainda', manager ? 'Crie as rotinas de abertura e fechamento. Dá para começar por um modelo pronto.' : 'O gerente ainda não criou as rotinas da loja.',
+        manager ? '<a class="btn primary" href="#checklists/editar">Criar checklists</a>' : '') + '</div>') + '</main>';
     return { html: html, tab: 'checklists' };
   }
 
@@ -153,5 +155,8 @@
     };
   }
 
-  Screens.checklists = function (params) { return params[0] ? detail(params[0]) : list(); };
+  Screens.checklists = function (params) {
+    if (params[0] === 'editar') return Screens.checklist_editor(params.slice(1));
+    return params[0] ? detail(params[0]) : list();
+  };
 })();

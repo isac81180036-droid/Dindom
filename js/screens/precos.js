@@ -135,7 +135,7 @@
     var A = analyze();
     var html = '<main class="screen">' + UI.topbar('Onde comprar', { back: '#estoque/compras', sub: A.items.length + ' itens pendentes na lista de compras' }) +
       (A.items.length ? recoCard(A) + storeList(A) + itemList(A) +
-        '<p class="card-meta">' + icon('receipt', 'sm') + ' Preços tirados das notas fiscais lançadas no app (os desta prévia são de exemplo). Cada nota escaneada atualiza a comparação.</p>'
+        '<p class="card-meta">' + icon('receipt', 'sm') + ' Preços tirados das notas fiscais lançadas no app. Cada nota lançada atualiza a comparação.</p>'
         : '<div class="card">' + UI.empty('check', 'Nada para comprar agora', 'A lista de compras está toda recebida. O próximo fechamento gera uma nova lista.') + '</div>') +
       '</main>';
     return {

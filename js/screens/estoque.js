@@ -11,6 +11,7 @@
   function productRows(d, term) {
     term = (term || '').toLowerCase();
     var list = d.products.filter(function (p) { return !term || p.name.toLowerCase().indexOf(term) >= 0; });
+    if (!d.products.length) return '<div class="card">' + UI.empty('box', 'Nenhum produto cadastrado', UI.isManager() ? 'Cadastre os itens que vocês contam no fechamento.' : 'O gerente ainda não cadastrou os produtos.', UI.isManager() ? '<a class="btn primary" href="#produtos/novo">Cadastrar produtos</a>' : '') + '</div>';
     if (!list.length) return UI.empty('search', 'Nenhum produto encontrado', 'Confira a grafia ou busque por outro nome.');
     return '<div class="list">' + list.map(function (p) {
       var q = lastQty(d, p.id);
@@ -36,7 +37,7 @@
       '<a class="card tap" href="#estoque/compras" style="text-decoration:none;color:inherit"><div class="tile warn">' + icon('cart') + '</div>' +
       '<div class="card-title">Compras</div><div class="card-meta num">' + pend.length + ' a receber</div>' + UI.bar(d.shopping.items.length ? (1 - pend.length / d.shopping.items.length) * 100 : 100, 'ok') + '</a>' +
       '</div>' +
-      '<section class="section"><div class="section-head"><h2>Produtos</h2></div>' +
+      '<section class="section"><div class="section-head"><h2>Produtos</h2>' + (UI.isManager() ? '<a class="btn ghost sm" href="#produtos">' + icon('settings', 'sm') + 'Gerenciar</a>' : '') + '</div>' +
       '<label class="field"><span class="sr-only">Buscar produto</span><div style="position:relative">' +
       '<span style="position:absolute;left:14px;top:13px;color:var(--ink-3)">' + icon('search', 'sm') + '</span>' +
       '<input id="prod-search" class="input" type="search" placeholder="Buscar produto" style="padding-left:42px"></div></label>' +
@@ -92,11 +93,12 @@
   function compras() {
     var d = DB.get();
     var pend = [], done = [];
-    d.shopping.items.forEach(function (it, i) { (it.received == null ? pend : done).push({ it: it, i: i, p: DB.product(it.pid) }); });
+    d.shopping.items.forEach(function (it, i) { var p = DB.product(it.pid); if (p) (it.received == null ? pend : done).push({ it: it, i: i, p: p }); });
     var pct = d.shopping.items.length ? done.length / d.shopping.items.length * 100 : 0;
 
-    var html = '<main class="screen">' + UI.topbar('Lista de compras', { back: '#estoque', sub: 'Gerada no fechamento de ' + d.shopping.fromClosing }) +
-      '<div class="card"><div class="card-row" style="justify-content:space-between"><b class="num">' + done.length + ' de ' + d.shopping.items.length + ' recebidos</b>' +
+    var html = '<main class="screen">' + UI.topbar('Lista de compras', { back: '#estoque', sub: d.shopping.fromClosing ? 'Gerada no fechamento de ' + d.shopping.fromClosing : 'Gerada ao finalizar o fechamento' }) +
+      (!d.shopping.items.length ? '<div class="card">' + UI.empty('cart', 'Nenhuma lista ainda', 'A lista de compras é gerada sozinha quando o fechamento do estoque é finalizado.', '<a class="btn primary" href="#estoque/fechamento">Ir para o fechamento</a>') + '</div>' : '') +
+      '<div class="card"' + (d.shopping.items.length ? '' : ' hidden') + '><div class="card-row" style="justify-content:space-between"><b class="num">' + done.length + ' de ' + d.shopping.items.length + ' recebidos</b>' +
       '<button type="button" class="btn sm" data-copy>Copiar lista</button></div>' + UI.bar(pct, 'ok') + '</div>' +
       '<div class="quick-actions"><a class="btn primary block" href="#estoque/nota">' + icon('scan', 'sm') + 'Escanear nota da compra</a>' +
       '<a class="btn block" href="#estoque/precos">' + icon('tag', 'sm') + 'Onde comprar</a></div>' +
@@ -105,7 +107,7 @@
           '<b class="num" style="white-space:nowrap">' + fmt(x.it.need) + ' ' + esc(x.p.unit) + '</b>' +
           '<button type="button" class="btn sm dark" data-rcv="' + x.i + '">Receber</button></div>';
       }).join('') + '</div></section>'
-        : '<div class="card">' + UI.empty('truck', 'Tudo recebido', 'Todos os itens da lista chegaram. O próximo fechamento gera uma nova lista.') + '</div>') +
+        : !d.shopping.items.length ? '' : '<div class="card">' + UI.empty('truck', 'Tudo recebido', 'Todos os itens da lista chegaram. O próximo fechamento gera uma nova lista.') + '</div>') +
       (done.length ? '<section class="section"><div class="eyebrow">Recebidos</div><div class="list">' + done.map(function (x) {
         var diff = x.it.received !== x.it.need;
         return '<div class="row"><div class="tile ok">' + icon('check', 'sm') + '</div><div class="grow"><div class="card-title">' + esc(x.p.name) + '</div>' +

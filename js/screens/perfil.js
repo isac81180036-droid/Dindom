@@ -10,7 +10,7 @@
 
   Screens.perfil = function () {
     var d = DB.get();
-    var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0];
+    var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
     var manager = UI.isManager();
     var unread = d.notifications.filter(function (n) { return !n.read; }).length;
     var html = '<main class="screen">' + UI.topbar('Perfil') +
@@ -27,13 +27,14 @@
       '<section class="section"><div class="eyebrow">Aparência</div>' +
       seg('theme', [['system', 'Automático', 'sparkle'], ['light', 'Claro', 'sun'], ['dark', 'Escuro', 'moon']], d.prefs.theme) + '</section>' +
 
-      '<section class="section"><div class="eyebrow">Visualizar como</div>' +
-      seg('role', [['colaborador', 'Colaborador'], ['gerente', 'Gerente'], ['admin', 'Admin']], d.user.role) +
-      '<p class="card-meta">Modo de demonstração: troca o perfil para conferir as duas versões das telas.</p></section>' +
-
-      (UI.isAdmin() ? '<section class="section"><div class="eyebrow">Administração</div><div class="list">' +
-        '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
-        '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a></div></section>' : '') +
+      (manager ? '<section class="section"><div class="eyebrow">Administração</div><div class="list">' +
+        '<a class="row" href="#produtos" style="text-decoration:none;color:inherit"><div class="tile">' + icon('box') + '</div>' +
+        '<div class="grow"><div class="card-title">Produtos do estoque</div><div class="card-meta">' + d.products.length + ' cadastrados · estoque ideal e mínimo</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<a class="row" href="#checklists/editar" style="text-decoration:none;color:inherit"><div class="tile">' + icon('checklist') + '</div>' +
+        '<div class="grow"><div class="card-title">Modelos de checklist</div><div class="card-meta">' + d.checklists.length + ' rotinas · tarefas, prazos e fotos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        (UI.isAdmin() ? '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
+        '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' : '') +
+        '</div></section>' : '') +
 
       (manager ? '<section class="section"><div class="eyebrow">Permissões da equipe</div><div class="list">' +
         '<label class="row" for="perm-justify"><div class="grow"><div class="card-title">Finalizar checklist com pendências</div>' +
@@ -41,9 +42,9 @@
         '<input id="perm-justify" type="checkbox" class="switch"' + (d.settings.staffCanJustify ? ' checked' : '') + '></label></div></section>' : '') +
 
       '<div class="list"><a class="row" href="#login/senha" style="text-decoration:none;color:inherit"><div class="tile">' + icon('key') + '</div><div class="grow card-title">Alterar minha senha</div>' + icon('chevronRight', 'sm') + '</a>' +
-      '<button type="button" class="row" data-reset><div class="tile">' + icon('refresh') + '</div><div class="grow card-title">Restaurar dados de exemplo</div></button>' +
       '<button type="button" class="row" data-logout style="color:var(--crit)"><div class="tile crit">' + icon('logout') + '</div><div class="grow card-title">Sair</div></button></div>' +
-      '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">Dindom · versão protótipo 0.1</p>' +
+      (UI.isAdmin() ? '<div class="list"><button type="button" class="row" data-wipe style="color:var(--crit)"><div class="tile crit">' + icon('alert') + '</div><div class="grow"><div class="card-title">Apagar dados deste aparelho</div><div class="card-meta" style="color:var(--ink-2)">Volta para a primeira configuração</div></div></button></div>' : '') +
+      '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">Dindom · versão 1.0 · dados salvos neste aparelho</p>' +
       '</main>';
 
     return {
@@ -52,19 +53,14 @@
         root.querySelectorAll('[data-seg="theme"] button').forEach(function (b) {
           b.addEventListener('click', function () { DB.update(function (x) { x.prefs.theme = b.dataset.v; }); applyTheme(); refresh(); });
         });
-        root.querySelectorAll('[data-seg="role"] button').forEach(function (b) {
-          b.addEventListener('click', function () {
-            DB.update(function (x) { x.user.role = b.dataset.v; });
-            refresh(); UI.toast('Visualizando como ' + UI.ROLES[b.dataset.v].toLowerCase());
-          });
-        });
         var perm = root.querySelector('#perm-justify');
         if (perm) perm.addEventListener('change', function () {
           DB.update(function (x) { x.settings.staffCanJustify = perm.checked; }); UI.toast('Permissão atualizada');
         });
-        root.querySelector('[data-reset]').addEventListener('click', function () {
-          UI.confirm({ title: 'Restaurar dados de exemplo?', body: 'Contagens, checklists e chamados feitos neste aparelho serão apagados.', ok: 'Restaurar', danger: true,
-            onOk: function () { DB.reset(); applyTheme(); go('inicio', { replace: true }); UI.toast('Dados de exemplo restaurados'); } });
+        var wipe = root.querySelector('[data-wipe]');
+        if (wipe) wipe.addEventListener('click', function () {
+          UI.confirm({ title: 'Apagar todos os dados deste aparelho?', body: 'Produtos, colaboradores, estoque, pontos, checklists, chamados e agenda salvos aqui serão apagados de vez. Não dá para desfazer.', ok: 'Apagar tudo', danger: true,
+            onOk: function () { DB.reset(); applyTheme(); go('setup', { replace: true }); UI.toast('Dados apagados'); } });
         });
         root.querySelector('[data-logout]').addEventListener('click', function () {
           UI.confirm({ title: 'Sair do aplicativo?', body: 'O rascunho da contagem fica salvo neste aparelho.', ok: 'Sair', danger: true,

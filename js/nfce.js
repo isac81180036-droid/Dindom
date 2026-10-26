@@ -46,50 +46,19 @@
   NFCe.formatKey = function (k) { return String(k).replace(/(\d{4})(?=\d)/g, '$1 '); };
   NFCe.formatCnpj = function (c) { return String(c).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5'); };
 
-  // Gera um QR de exemplo válido (mesmo formato da SEFAZ-SP) para testar sem uma nota de verdade.
-  NFCe.demoQR = function () {
-    var d = new Date();
-    var store = DB.get().stores[1];
-    var body = '35' + String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + store.cnpj + '65' + '001' +
-      String(Math.floor(Math.random() * 1e9)).padStart(9, '0') + '1' + String(Math.floor(Math.random() * 1e8)).padStart(8, '0');
-    return 'https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=' + body + dv(body) + '|2|1|1|3A5F9C';
-  };
-
-  // Como cada produto costuma aparecer escrito na nota.
-  var NOTE_DESC = { p1: 'QUEIJO MUSSARELA PECA KG', p2: 'QUEIJO PROVOLONE KG', p3: 'QUEIJO GORGONZOLA KG', p4: 'REQUEIJAO CATUPIRY BISN 1,5KG',
-    p5: 'LINGUICA CALABRESA FATIADA KG', p6: 'PRESUNTO COZIDO FATIADO KG', p7: 'FRANGO DESFIADO CONG KG', p8: 'BACON CUBOS KG',
-    p9: 'FARINHA TRIGO TIPO 00 25KG', p10: 'FERMENTO BIOLOGICO SECO 500G', p11: 'TOMATE PELADO LATA 2,5KG', p12: 'AZEITONA PRETA BALDE',
-    p13: 'PALMITO PUPUNHA POTE', p14: 'TOMATE ITALIANO KG', p15: 'CEBOLA KG', p16: 'MANJERICAO MACO UN', p17: 'REFRIG 2L FD 6UN',
-    p18: 'AGUA MINERAL FD 12UN', p19: 'CX PIZZA 35CM UN', p20: 'CX PIZZA BROTO 25CM UN' };
-  var NOTE_UNIT = { kg: 'KG', 'bisn.': 'UN', saco: 'UN', pct: 'PCT', lata: 'UN', balde: 'UN', pote: 'UN', 'maço': 'UN', fardo: 'FD', un: 'UN' };
-
-  // Busca os itens da nota. Produção: o servidor consulta a SEFAZ (o navegador é bloqueado de acessar direto).
-  // Protótipo: devolve uma nota de exemplo com os itens pendentes da lista de compras.
+  // Busca os itens da nota. A consulta à SEFAZ precisa do servidor (o navegador é bloqueado de acessar direto),
+  // então, por enquanto, a nota entra em modo manual: loja, número e data vêm da chave e os itens são lançados à mão.
   NFCe.fetchItems = function (parsed) {
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        var d = DB.get();
-        var store = d.stores.filter(function (s) { return s.cnpj === parsed.cnpj; })[0];
-        var pend = d.shopping.items.filter(function (i) { return i.received == null; });
-        if (!pend.length) pend = d.shopping.items.slice(0, 5);
-        var items = pend.map(function (it, n) {
-          var p = DB.product(it.pid);
-          var qty = n === 1 ? Math.max(1, Math.round(it.need * .8)) : it.need; // um item veio a menos, como acontece
-          var price = NFCe.lastPrice(p.id, store && store.id) || 10;
-          return { desc: NOTE_DESC[p.id] || p.name.toUpperCase(), qty: qty, unit: NOTE_UNIT[p.unit] || 'UN', unitPrice: price, total: Math.round(qty * price * 100) / 100 };
-        });
-        items.push({ desc: 'SACOLA PLASTICA REFORCADA UN', qty: 4, unit: 'UN', unitPrice: .25, total: 1 });
-        resolve({
-          demo: true,
-          store: { name: store ? store.name : 'Loja ' + NFCe.formatCnpj(parsed.cnpj), cnpj: parsed.cnpj },
-          date: Cal.today(),
-          items: items,
-          total: Math.round(items.reduce(function (s, i) { return s + i.total; }, 0) * 100) / 100
-        });
-      }, 900);
+    var d = DB.get();
+    var store = d.stores.filter(function (s) { return s.cnpj === parsed.cnpj; })[0];
+    return Promise.resolve({
+      manual: true,
+      store: { name: store ? store.name : '', cnpj: parsed.cnpj, known: !!store },
+      date: Cal.today(),
+      items: [],
+      total: 0
     });
   };
-
   NFCe.lastPrice = function (pid, storeId) {
     var list = DB.get().prices.filter(function (x) { return x.pid === pid && (!storeId || x.store === storeId); });
     list.sort(function (a, b) { return a.date < b.date ? 1 : -1; });

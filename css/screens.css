@@ -84,3 +84,27 @@
 .access-row span { color: var(--ink-2); }
 .access-row b { min-width: 0; overflow-wrap: anywhere; text-align: right; }
 .temp-pass { font: 700 var(--fs-xl) var(--font-display); letter-spacing: .06em; }
+/* ---------- Primeira configuração ---------- */
+.setup-form { gap: var(--sp-3); }
+.setup-step { display: flex; gap: var(--sp-3); align-items: flex-start; margin-top: var(--sp-4); }
+.setup-step h3 { font-size: var(--fs-lg); }
+.setup-step .muted { font-size: var(--fs-sm); }
+.step-n { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 700 var(--fs-sm) var(--font-display); background: var(--login-green, var(--ink)); color: #fff; }
+.unit-line { display: flex; gap: var(--sp-2); align-items: center; margin-bottom: var(--sp-2); }
+.unit-line .input { flex: 1; }
+
+/* ---------- Produtos ---------- */
+.ideal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }
+.qty-unit { display: flex; align-items: center; gap: var(--sp-2); }
+.qty-unit .input { flex: 1; min-width: 0; text-align: right; font-weight: 600; }
+.qty-unit span { min-width: 40px; color: var(--ink-2); font-size: var(--fs-sm); }
+
+/* ---------- Editor de checklist ---------- */
+.task-edit { display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-3); }
+.task-edit > .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.te-order { display: flex; flex-direction: column; }
+.te-order .icon-btn { width: 36px; height: 30px; transform: rotate(90deg); }
+.te-order .icon-btn[disabled] { opacity: .25; }
+.te-flags { display: flex; gap: var(--sp-4); flex-wrap: wrap; font-size: var(--fs-sm); color: var(--ink-2); }
+.te-flags label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; }
+.te-flags input { width: 18px; height: 18px; accent-color: var(--ink); }
