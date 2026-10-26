@@ -131,9 +131,10 @@
     // (navegador interno do WhatsApp, alguns iPhones), então o app confirma buscando um arquivo pequeno
     // do próprio site antes de mostrar o aviso, e confere de novo até a conexão voltar.
     var banner = document.getElementById('offline'), recheck = 0;
+    // Qualquer resposta do servidor (até "não encontrado") prova que há internet; só erro de rede conta como offline.
     function probe() {
-      return fetch('manifest.webmanifest?ping=' + Date.now(), { cache: 'no-store' })
-        .then(function (r) { return r.ok; }, function () { return false; });
+      return fetch('manifest.webmanifest', { cache: 'no-store' })
+        .then(function () { return true; }, function () { return false; });
     }
     function setOffline(off) {
       var was = !banner.hidden;

@@ -1,5 +1,5 @@
 // Service worker: guarda a casca do app para abrir rápido e funcionar sem internet.
-var CACHE = 'dindom-v9';
+var CACHE = 'dindom-v10';
 var SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -26,6 +26,8 @@ self.addEventListener('activate', function (e) {
 // Rede primeiro (para receber atualizações); se falhar, usa o cache.
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
+  // Conferência de conexão do app (cache: no-store): vai direto à rede, sem cair na cópia guardada.
+  if (e.request.cache === 'no-store') return;
   e.respondWith(
     fetch(e.request).then(function (res) {
       var copy = res.clone();
