@@ -1,5 +1,5 @@
 // Service worker: guarda a casca do app para abrir rápido e funcionar sem internet.
-var CACHE = 'dindom-v17';
+var CACHE = 'dindom-v18';
 var SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',

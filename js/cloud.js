@@ -245,7 +245,7 @@
     });
   };
 
-  var NEEDS_SQL = 'O servidor ainda não aceita o acesso da contabilidade: rode o arquivo supabase/002_contabilidade.sql no Supabase e tente de novo.';
+  var NEEDS_SQL = Cloud.NEEDS_SQL = 'O servidor ainda não aceita o acesso da contabilidade: rode o arquivo supabase/002_contabilidade.sql no Supabase e tente de novo.';
 
   Cloud.addMember = function (userId, empId, role) {
     return client.from('members').insert({ org_id: Cloud.orgId, user_id: userId, emp_id: empId, role: role }).then(function (r) {

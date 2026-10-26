@@ -392,6 +392,31 @@
       });
   }
 
+  // Banco sem a atualização da contabilidade: passo a passo com o SQL pronto para copiar e colar no Supabase.
+  function sqlHelp(box) {
+    var ref = ((window.DINDOM_CONFIG || {}).supabaseUrl || '').replace(/^https:\/\/([^.]+)\..*$/, '$1');
+    var sql = '';
+    box.hidden = false;
+    box.innerHTML = '<div class="card" style="border:1.5px solid var(--warn)"><div class="card-row"><div class="tile warn">' + icon('alert') + '</div><div class="grow"><div class="card-title">Falta atualizar o banco no Supabase</div>' +
+      '<div class="card-meta">É uma vez só. Nenhum dado é apagado.</div></div></div>' +
+      '<ol class="card-meta" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;color:var(--ink-2)">' +
+      '<li>Toque em <b>Copiar SQL</b>.</li><li>Toque em <b>Abrir Supabase</b>, cole (Ctrl+V) e clique em <b>Run</b>. Se aparecer um aviso, confirme.</li><li>Volte aqui e toque em <b>Cadastrar parceiro</b> de novo.</li></ol>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-copysql disabled>' + icon('copy', 'sm') + 'Copiar SQL</button>' +
+      '<a class="btn" href="https://supabase.com/dashboard/project/' + esc(ref) + '/sql/new" target="_blank" rel="noopener">Abrir Supabase</a></div></div>';
+    var copy = box.querySelector('[data-copysql]');
+    // O texto é baixado antes, para a cópia acontecer na hora do toque (exigência do iPhone).
+    fetch('supabase/002_contabilidade.sql', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); })
+      .then(function (t) { sql = t; copy.disabled = false; }, function () { copy.disabled = false; });
+    copy.addEventListener('click', function () {
+      if (!sql) return UI.toast('Não foi possível baixar o SQL. Confira a internet e tente de novo.', { tone: 'crit', ms: 5000 });
+      try {
+        navigator.clipboard.writeText(sql).then(function () { UI.toast('SQL copiado. Agora cole no Supabase e clique em Run.', { ms: 5000 }); },
+          function () { UI.toast('Não foi possível copiar. Abra o arquivo supabase/002_contabilidade.sql no GitHub.', { tone: 'crit', ms: 6000 }); });
+      } catch (er) { UI.toast('Não foi possível copiar. Abra o arquivo supabase/002_contabilidade.sql no GitHub.', { tone: 'crit', ms: 6000 }); }
+    });
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
   function partnerForm(id) {
     var d = DB.get();
     var cloud = !!(window.Cloud && Cloud.orgId);
@@ -416,6 +441,7 @@
         '<div class="grow"><div class="card-title">' + (e.active ? 'Tirar o acesso' : 'Devolver o acesso') + '</div><div class="card-meta" style="color:var(--ink-2)">' +
         (e.active ? 'O parceiro não entra mais no app.' : 'Volta a entrar com o mesmo e-mail e senha.') + '</div></div></button>' +
         '</div></section>' : '') +
+      '<div data-sqlhelp hidden></div>' +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner"><button type="button" class="btn primary block" data-save style="min-height:56px">' + (e ? 'Salvar alterações' : 'Cadastrar parceiro') + '</button></div></div>';
 
@@ -489,6 +515,7 @@
                 go('parceiros/ok/' + newId, { replace: true });
               }, function (er) {
                 save.classList.remove('busy'); save.disabled = false;
+                if (er.message === Cloud.NEEDS_SQL) { setErr('f-email', ''); return sqlHelp($('[data-sqlhelp]')); }
                 setErr('f-email', er.message || 'Não foi possível criar o acesso.');
                 $('#f-email').scrollIntoView({ block: 'center', behavior: 'smooth' });
               });
