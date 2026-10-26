@@ -206,7 +206,7 @@
   window.PontoUI = { statusLine: statusLine, historyRows: historyRows, dayLabel: dayLabel, codeSheet: codeSheet, confirmPunch: confirmPunch };
 
   Screens.ponto = function (params) {
-    if (params[0] === 'equipe') return Screens.ponto_equipe();
+    if (params[0] === 'equipe' || UI.isAccountant()) return Screens.ponto_equipe();
     return mine();
   };
 })();

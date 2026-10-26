@@ -18,7 +18,7 @@ create table if not exists public.members (
   org_id uuid not null references public.orgs(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   emp_id text not null,
-  role text not null check (role in ('colaborador', 'gerente', 'admin')),
+  role text not null check (role in ('colaborador', 'gerente', 'admin', 'contador')),
   active boolean not null default true,
   created_at timestamptz not null default now(),
   primary key (org_id, user_id)
@@ -168,3 +168,26 @@ begin
     alter publication supabase_realtime add table public.records;
   end if;
 end $$;
+
+-- ---------- Contabilidade (também em 002_contabilidade.sql) ----------
+-- A contabilidade só lê os dados do ponto e não grava nada.
+drop policy if exists "membros leem os dados" on public.records;
+create policy "membros leem os dados" on public.records for select using (
+  public.is_member(org_id) and (
+    public.my_role(org_id) <> 'contador'
+    or collection in ('employees', 'punches', 'adjusts', 'units')
+    or (collection = 'meta' and id in ('shifts', 'org'))
+  )
+);
+drop policy if exists "membros gravam os dados" on public.records;
+create policy "membros gravam os dados" on public.records for insert
+  with check (public.is_member(org_id)
+    and (public.my_role(org_id) <> 'contador' or (collection = 'employees' and id = public.my_emp(org_id)))
+    and (collection <> 'employees' or public.is_admin(org_id) or id = public.my_emp(org_id)));
+drop policy if exists "membros atualizam os dados" on public.records;
+create policy "membros atualizam os dados" on public.records for update
+  using (public.is_member(org_id)
+    and (public.my_role(org_id) <> 'contador' or (collection = 'employees' and id = public.my_emp(org_id))))
+  with check (public.is_member(org_id)
+    and (public.my_role(org_id) <> 'contador' or (collection = 'employees' and id = public.my_emp(org_id)))
+    and (collection <> 'employees' or public.is_admin(org_id) or id = public.my_emp(org_id)));

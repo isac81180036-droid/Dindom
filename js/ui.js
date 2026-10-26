@@ -120,9 +120,11 @@
   };
 
   // Níveis de acesso: colaborador < gerente < admin. O admin tem tudo do gerente e mais a área de cadastro.
-  UI.ROLES = { colaborador: 'Colaborador', gerente: 'Gerente', admin: 'Administrador' };
+  // contador = contabilidade externa: só consulta e exporta o ponto.
+  UI.ROLES = { colaborador: 'Colaborador', gerente: 'Gerente', admin: 'Administrador', contador: 'Contabilidade' };
   UI.isManager = function () { var r = DB.get().user.role; return r === 'gerente' || r === 'admin'; };
   UI.isAdmin = function () { return DB.get().user.role === 'admin'; };
+  UI.isAccountant = function () { return DB.get().user.role === 'contador'; };
 
   window.UI = UI;
   // Registro das telas; cada arquivo em js/screens/ adiciona a sua.

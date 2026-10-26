@@ -47,7 +47,10 @@
         (b[t.id] ? '<span class="badge num">' + b[t.id] + '</span>' : '') + '</a></li>';
     }
     nav.innerHTML = '<div class="brand"><img class="logo-ink" src="icons/wordmark-black.png" alt="Dindom"><span class="since">DESDE 2009</span></div>' +
-      '<ul>' + TABS.map(function (t) { return item(t, t.desk ? 'desk-only' : ''); }).join('') +
+      (UI.isAccountant()
+        // Contabilidade: só o ponto da equipe e o perfil.
+        ? '<ul style="grid-template-columns:repeat(2,1fr)">' + item({ id: 'ponto', label: 'Ponto da equipe', icon: 'clock' }) + item({ id: 'perfil', label: 'Perfil', icon: 'user' })
+        : '<ul>' + TABS.map(function (t) { return item(t, t.desk ? 'desk-only' : ''); }).join('')) +
       (UI.isManager() ? '<li class="desk-only nav-label">Gestão</li>' + ADMIN_TABS.filter(function (t) { return !t.admin || UI.isAdmin(); }).map(function (t) { return item(t, 'desk-only'); }).join('') : '') +
       '</ul>' +
       '<a class="nav-foot" href="#perfil"><span class="avatar">' + UI.esc(d.user.name.charAt(0)) + '</span>' +
@@ -76,6 +79,8 @@
       current = 'inicio';
       try { history.replaceState(null, '', '#inicio'); } catch (e) {}
     }
+    // Contabilidade só chega ao ponto da equipe e ao perfil.
+    if (logged && UI.isAccountant() && ['ponto', 'perfil', 'login', 'notificacoes'].indexOf(current.split('/')[0]) < 0) current = 'ponto/equipe';
     var parts = current.split('/');
     var screen = Screens[parts[0]] || Screens.inicio;
     var view = screen(parts.slice(1));

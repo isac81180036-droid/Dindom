@@ -6,10 +6,19 @@
   var ROLE_HINT = {
     colaborador: 'Vê e executa as próprias tarefas: contagem, checklists, manutenção e agenda.',
     gerente: 'Tudo do colaborador, mais aprovações, status de chamados e permissões da equipe.',
-    admin: 'Acesso total, incluindo cadastro de colaboradores e configurações das unidades.'
+    admin: 'Acesso total, incluindo cadastro de colaboradores e configurações das unidades.',
+    contador: 'Para o escritório de contabilidade: só consulta e exporta o ponto da equipe. Não vê nem altera mais nada.'
   };
 
   function digits(s) { return String(s || '').replace(/\D/g, ''); }
+  function fmtCpf(s) { var d = digits(s).slice(0, 11); return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2'); }
+  function fmtPis(s) { var d = digits(s).slice(0, 11); return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{5})(\d)/, '$1.$2.$3').replace(/\.(\d{2})(\d)$/, '.$1-$2'); }
+  // CPF válido pelos dígitos verificadores.
+  function validCpf(s) {
+    var c = digits(s); if (c.length !== 11 || /^(\d)\1+$/.test(c)) return false;
+    for (var t = 9; t < 11; t++) { var sum = 0; for (var i = 0; i < t; i++) sum += Number(c[i]) * (t + 1 - i); if (((sum * 10) % 11) % 10 !== Number(c[t])) return false; }
+    return true;
+  }
   function fmtPhone(s) {
     var d = digits(s).slice(0, 11);
     if (d.length <= 2) return d ? '(' + d : '';
@@ -47,7 +56,7 @@
       icon('chevronRight', 'sm') + '</div>' +
       '<div class="card-row card-meta" style="flex-wrap:wrap;gap:6px">' +
       (e.active ? '' : '<span class="pill">Inativo</span>') +
-      (e.role !== 'colaborador' ? '<span class="pill no-dot info">' + icon('shield', 'sm') + UI.ROLES[e.role] + '</span>' : '') +
+      (e.role !== 'colaborador' ? '<span class="pill no-dot ' + (e.role === 'contador' ? 'warn' : 'info') + '">' + icon(e.role === 'contador' ? 'file' : 'shield', 'sm') + UI.ROLES[e.role] + '</span>' : '') +
       '<span class="num">' + esc(fmtPhone(e.phone)) + '</span><span>·</span><span>' + esc(since(e.admission)) + '</span></div></a>';
   }
 
@@ -69,7 +78,8 @@
     var count = function (s) { return d.employees.filter(function (e) { return s === 'todos' || (s === 'ativos') === e.active; }).length; };
     var html = '<main class="screen wide">' +
       UI.topbar('Colaboradores', { sub: act + ' ativos em ' + d.units.length + ' unidades' }) +
-      '<a class="btn primary block cta" href="#equipe/novo" style="min-height:56px;font-size:var(--fs-lg)">' + icon('userPlus') + 'Cadastrar colaborador</a>' +
+      '<div class="quick-actions"><a class="btn primary block" href="#equipe/novo" style="min-height:56px;font-size:var(--fs-lg)">' + icon('userPlus') + 'Cadastrar colaborador</a>' +
+      '<a class="btn block" href="#equipe/novo/contador" style="min-height:56px">' + icon('file', 'sm') + 'Dar acesso à contabilidade</a></div>' +
       '<label class="field"><span class="sr-only">Buscar colaborador</span><div style="position:relative">' +
       '<span style="position:absolute;left:14px;top:13px;color:var(--ink-3)">' + icon('search', 'sm') + '</span>' +
       '<input id="emp-search" class="input" type="search" placeholder="Buscar por nome, função ou celular" style="padding-left:42px" value="' + esc(filter.q) + '"></div></label>' +
@@ -104,22 +114,30 @@
     }).join('') + '</div>';
   }
 
-  function form(id) {
+  // preset: nível de acesso já marcado ao abrir (ex.: 'contador' pelo botão "Acesso da contabilidade").
+  function form(id, preset) {
     var d = DB.get();
     var cloud = !!(window.Cloud && Cloud.orgId); // com servidor, o login de cada pessoa fica no Supabase
     var e = id ? find(id) : null;
     if (id && !e) return list();
-    var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', phone: '', email: '', func: '', unit: d.user.unit, shift: 'Noite', role: 'colaborador', admission: Cal.today() };
+    var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', phone: '', email: '', cpf: '', pis: '', func: '', unit: d.user.unit, shift: 'Noite', role: preset || 'colaborador', admission: Cal.today() };
+    var acc = v.role === 'contador';
 
     var html = '<main class="screen no-nav">' +
       UI.topbar(e ? 'Editar colaborador' : 'Novo colaborador', { back: '#equipe', sub: e ? (e.active ? 'Ativo' : 'Inativo') + ' · ' + since(e.admission) : 'Os campos com * são obrigatórios' }) +
       '<div class="field" id="f-name"><label for="emp-name">Nome completo *</label><input id="emp-name" class="input" autocomplete="name" autocapitalize="words" maxlength="60" placeholder="Ex.: Rafael Souza" value="' + esc(v.name) + '"><span class="err" hidden></span></div>' +
       '<div class="field" id="f-phone"><label for="emp-phone">Celular (WhatsApp) *</label><input id="emp-phone" class="input num" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="' + esc(fmtPhone(v.phone)) + '"><span class="hint">Para avisos pelo WhatsApp.</span><span class="err" hidden></span></div>' +
       '<div class="field" id="f-email"><label for="emp-email">E-mail *</label><input id="emp-email" class="input" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="nome@dindom.com.br" value="' + esc(v.email) + '"' + (cloud && e ? ' readonly' : '') + '><span class="hint">' + (cloud && e ? 'O e-mail de acesso não muda por aqui. Para trocar, cadastre a pessoa de novo com o e-mail novo.' : 'É com ele que a pessoa entra no app.') + '</span><span class="err" hidden></span></div>' +
+      '<div class="ideal-grid" data-staff' + (acc ? ' hidden' : '') + '><div class="field" id="f-cpf"><label for="emp-cpf">CPF <span class="faint">(opcional)</span></label><input id="emp-cpf" class="input num" inputmode="numeric" placeholder="000.000.000-00" value="' + esc(fmtCpf(v.cpf)) + '"><span class="err" hidden></span></div>' +
+      '<div class="field"><label for="emp-pis">PIS/NIS <span class="faint">(opcional)</span></label><input id="emp-pis" class="input num" inputmode="numeric" placeholder="000.00000.00-0" value="' + esc(fmtPis(v.pis)) + '"></div></div>' +
+      '<p class="card-meta" data-staff' + (acc ? ' hidden' : '') + '>CPF e PIS identificam o funcionário na exportação do ponto para a contabilidade.</p>' +
+      '<div data-staff' + (acc ? ' hidden' : '') + ' style="display:flex;flex-direction:column;gap:var(--sp-5)">' +
       '<div class="field" id="f-func"><span class="label">Função *</span>' + chips('func', d.functions.map(function (f) { return [f, f]; }), v.func) + '<span class="err" hidden>Escolha a função.</span></div>' +
       '<div class="field"><span class="label">Unidade *</span>' + seg('unit', d.units.map(function (u) { return [u.id, u.name.replace('Unidade ', '')]; }), v.unit) + '</div>' +
-      '<div class="field"><span class="label">Turno</span>' + seg('shift', [['Manhã', 'Manhã'], ['Tarde', 'Tarde'], ['Noite', 'Noite']], v.shift) + '</div>' +
-      '<div class="field"><span class="label">Nível de acesso *</span>' + seg('role', [['colaborador', 'Colaborador'], ['gerente', 'Gerente'], ['admin', 'Admin']], v.role) +
+      '<div class="field"><span class="label">Turno</span>' + seg('shift', [['Manhã', 'Manhã'], ['Tarde', 'Tarde'], ['Noite', 'Noite']], v.shift) + '</div></div>' +
+      '<div class="field"><span class="label">Nível de acesso *</span><div class="seg seg-wrap" data-pick="role">' + [['colaborador', 'Colaborador'], ['gerente', 'Gerente'], ['admin', 'Admin'], ['contador', 'Contabilidade']].map(function (o) {
+        return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + (o[0] === v.role) + '">' + o[1] + '</button>';
+      }).join('') + '</div>' +
       '<span class="hint" data-role-hint>' + ROLE_HINT[v.role] + '</span></div>' +
       '<div class="field"><label for="emp-adm">Data de admissão</label><input id="emp-adm" class="input" type="date" value="' + esc(v.admission) + '"></div>' +
       (e ? '<section class="section"><div class="eyebrow">Acesso</div><div class="list">' +
@@ -149,7 +167,11 @@
             var b = ev.target.closest('[data-v]'); if (!b) return;
             g.querySelectorAll('[data-v]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
             v[g.dataset.pick] = b.dataset.v;
-            if (g.dataset.pick === 'role') $('[data-role-hint]').textContent = ROLE_HINT[b.dataset.v];
+            if (g.dataset.pick === 'role') {
+              $('[data-role-hint]').textContent = ROLE_HINT[b.dataset.v];
+              // Contabilidade não é funcionário da loja: sem função, turno nem ponto.
+              root.querySelectorAll('[data-staff]').forEach(function (s) { s.hidden = b.dataset.v === 'contador'; });
+            }
             if (g.dataset.pick === 'func') setErr('f-func', '');
             // Função "Gerente" sugere o nível de acesso de gerente.
             if (g.dataset.pick === 'func' && b.dataset.v === 'Gerente' && v.role === 'colaborador') $('[data-pick="role"] [data-v="gerente"]').click();
@@ -159,6 +181,8 @@
           var el = ev.target; el.value = fmtPhone(el.value); setErr('f-phone', '');
         });
         $('#emp-name').addEventListener('input', function () { setErr('f-name', ''); });
+        $('#emp-cpf').addEventListener('input', function (ev) { ev.target.value = fmtCpf(ev.target.value); setErr('f-cpf', ''); });
+        $('#emp-pis').addEventListener('input', function (ev) { ev.target.value = fmtPis(ev.target.value); });
 
         var newpin = $('[data-newpin]');
         if (newpin) newpin.addEventListener('click', function () {
@@ -211,20 +235,26 @@
           var dupMail = DB.get().employees.filter(function (x) { return Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
           var mailMsg = !v.email ? 'Informe o e-mail: é com ele que a pessoa entra.' : !Auth.validEmail(v.email) ? 'Confira o e-mail: falta o @ ou o domínio.' : dupMail ? 'Este e-mail já é de ' + dupMail.name + '.' : '';
           setErr('f-email', mailMsg); if (mailMsg) bad.push('f-email');
+          v.cpf = digits($('#emp-cpf').value); v.pis = digits($('#emp-pis').value);
+          var isAcc = v.role === 'contador';
+          if (isAcc) { v.func = 'Contabilidade'; v.cpf = ''; v.pis = ''; }
+          var cpfMsg = v.cpf && !validCpf(v.cpf) ? 'CPF inválido: confira os números.' : '';
+          setErr('f-cpf', cpfMsg); if (cpfMsg) bad.push('f-cpf');
           setErr('f-func', v.func ? '' : 'Escolha a função.'); if (!v.func) bad.push('f-func');
           if (bad.length) { $('#' + bad[0]).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
 
           UI.busy(save, function () {
             if (e) {
               var roleChanged = e.role !== v.role;
-              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); });
+              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'cpf', 'pis', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); t.ponto = v.role === 'contador' ? false : t.ponto; });
               if (cloud && roleChanged) Cloud.updateMember(e.id, { role: v.role });
               UI.buzz(20); UI.toast('Dados de ' + v.name.split(' ')[0] + ' atualizados'); go('equipe', { replace: true });
               return;
             }
             // Cadastro novo: senha provisória gerada aqui; no primeiro acesso a pessoa cria a própria.
             var pw = Auth.tempPassword(), newId = 'c' + Date.now();
-            var rec = { id: newId, name: v.name, phone: v.phone, email: v.email, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), mustChange: true, active: true };
+            var rec = { id: newId, name: v.name, phone: v.phone, email: v.email, cpf: v.cpf, pis: v.pis, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), mustChange: true, active: true };
+            if (v.role === 'contador') rec.ponto = false; // contabilidade não bate ponto
             if (cloud) {
               // Com servidor: cria o login da pessoa no Supabase e liga à equipe; a senha não fica no app.
               save.classList.add('busy'); save.disabled = true;
@@ -241,7 +271,8 @@
               return;
             }
             Auth.makePass(pw).then(function (pass) {
-              DB.update(function (x) { x.employees.push({ id: newId, name: v.name, phone: v.phone, email: v.email, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), pass: pass, mustChange: true, active: true }); });
+              rec.pass = pass;
+              DB.update(function (x) { x.employees.push(rec); });
               tempShown[newId] = pw; UI.buzz(20);
               go('equipe/ok/' + newId, { replace: true });
             });
@@ -292,7 +323,7 @@
 
   Screens.equipe = function (params) {
     if (!UI.isAdmin()) return restricted();
-    if (params[0] === 'novo') return form(null);
+    if (params[0] === 'novo') return form(null, params[1] === 'contador' ? 'contador' : null);
     if (params[0] === 'ok') return done(params[1], params[2] === 'senha');
     if (params[0]) return form(params[0]);
     return list();

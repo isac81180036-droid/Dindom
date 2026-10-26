@@ -85,3 +85,12 @@ O app está ligado ao projeto Supabase configurado em `js/config.js` (endereço 
 - O NSR do ponto é gerado pelo servidor.
 
 Configurações necessárias no painel do Supabase: rodar `supabase/schema.sql`, desligar "Confirm email" e definir o Site URL do app. Para usar sem servidor (só no aparelho), deixe `js/config.js` vazio.
+## Acesso da Contabilidade
+
+Em Gestão › Colaboradores › **Dar acesso à contabilidade**, o admin cria um login com o nível **Contabilidade**. Esse acesso:
+
+- vê só o **Ponto da equipe** (todas as unidades) e o próprio Perfil; não vê estoque, compras, checklists, manutenção nem agenda;
+- não aprova ajustes nem altera dados (bloqueado também no banco, por `supabase/002_contabilidade.sql`);
+- exporta, por período (mês atual, mês anterior ou datas livres) e por unidade, três planilhas CSV (separador `;`, UTF-8, datas DD/MM/AAAA, horas HH:MM): **Marcações**, **Espelho de ponto** e **Resumo do período** (`js/ponto-export.js`). CPF e PIS do cadastro identificam cada funcionário.
+
+No Supabase já em uso, rode `supabase/002_contabilidade.sql` uma vez (instalações novas já recebem isso pelo `schema.sql`).

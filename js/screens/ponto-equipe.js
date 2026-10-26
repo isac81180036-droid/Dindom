@@ -10,11 +10,9 @@
   // Situação de cada pessoa hoje, na linguagem do dia a dia da loja.
   function today(emp) {
     var st = P.state(emp.id), j = st.today, now = Date.now();
-    var dow = new Date().getDay();
     if (st.status === 'trabalhando') return { key: 'on', label: 'Trabalhando desde ' + P.hhmm(j.marks.entrada ? j.marks.entrada.ts : j.start), late: P.lateBy(j, emp), j: j };
     if (st.status === 'intervalo') return { key: 'pause', label: 'Em intervalo desde ' + P.hhmm(j.marks.intervalo.ts), late: P.lateBy(j, emp), j: j };
     if (j && j.marks.saida) return { key: 'done', label: 'Saiu às ' + P.hhmm(j.marks.saida.ts), late: P.lateBy(j, emp), j: j };
-    if (dow === 1) return { key: 'off', label: 'Folga' };
     var start = shiftStartTs(emp);
     if (now > start + P.TOLERANCE * 60000) return { key: 'missing', label: 'Não chegou · entrada ' + P.shift(emp).start, late: Math.round((now - start) / 60000) };
     return { key: 'later', label: 'Entra às ' + P.shift(emp).start };
@@ -40,15 +38,6 @@
     refresh(); UI.toast('Ajuste aprovado e registrado' + (rec.nsr ? ' (NSR ' + rec.nsr + ')' : ''));
   }
 
-  function report(list, from, to) {
-    var lines = ['Colaborador;Função;Unidade;Dias;Horas trabalhadas;Horas previstas;Banco de horas;Atrasos;Dias sem saída'];
-    list.forEach(function (e) {
-      var s = P.summary(e.id, from, to);
-      lines.push([e.name, e.func, unitShort(e.unit), s.days, P.dur(s.worked), P.dur(s.expected), P.signed(s.balance) || '0', s.lateCount, s.missing].join(';'));
-    });
-    return 'Espelho de ponto Dindom · ' + from.split('-').reverse().join('/') + ' a ' + to.split('-').reverse().join('/') + '\n' + lines.join('\n');
-  }
-
   function detailSheet(emp) {
     var s = P.summary(emp.id, Cal.today().slice(0, 8) + '01', Cal.today());
     UI.sheet('<div class="card-row"><span class="avatar">' + esc(initials(emp.name)) + '</span><div class="grow"><h2 style="font-size:var(--fs-lg)">' + esc(emp.name) + '</h2>' +
@@ -59,53 +48,95 @@
       PontoUI.historyRows(emp.id, false) + '<button type="button" class="btn block" data-close>Fechar</button>');
   }
 
+  // Período da tabela e da exportação: mês atual, mês anterior ou datas escolhidas.
+  var period = { mode: 'mes', from: null, to: null };
+  function range() {
+    var t = Cal.today(), d = Cal.parse(t);
+    if (period.mode === 'anterior') return [DB.iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)), DB.iso(new Date(d.getFullYear(), d.getMonth(), 0))];
+    if (period.mode === 'custom' && period.from && period.to) return period.from <= period.to ? [period.from, period.to] : [period.to, period.from];
+    return [t.slice(0, 8) + '01', t];
+  }
+  function br(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+  function exportCard(from, to) {
+    var c = PontoExport.count(from, to, unitFilter);
+    function opt(kind, title, desc) {
+      return '<button type="button" class="row" data-export="' + kind + '"><div class="tile">' + icon('file') + '</div>' +
+        '<div class="grow"><div class="card-title">' + title + '</div><div class="card-meta">' + desc + '</div></div><span class="pill no-dot">CSV</span></button>';
+    }
+    return '<section class="card export-card">' +
+      '<div class="card-row"><div class="tile accent">' + icon('file') + '</div><div class="grow"><div class="card-title">Exportar para a contabilidade</div>' +
+      '<div class="card-meta">Planilhas que abrem no Excel e entram nos sistemas de folha</div></div></div>' +
+      '<div class="seg" data-period>' + [['mes', 'Mês atual'], ['anterior', 'Mês anterior'], ['custom', 'Escolher datas']].map(function (o) {
+        return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + (period.mode === o[0]) + '">' + o[1] + '</button>';
+      }).join('') + '</div>' +
+      (period.mode === 'custom' ? '<div class="ev-when" style="grid-template-columns:1fr 1fr"><div class="field"><label for="p-from">De</label><input id="p-from" type="date" class="input" value="' + from + '"></div>' +
+        '<div class="field"><label for="p-to">Até</label><input id="p-to" type="date" class="input" value="' + to + '"></div></div>' : '') +
+      '<p class="card-meta num">' + br(from) + ' a ' + br(to) + ' · ' + c.people + (c.people === 1 ? ' colaborador' : ' colaboradores') + ' · ' + c.days + ' dias com registro' +
+      (unitFilter !== 'todas' ? ' · ' + esc(unitShort(unitFilter)) : '') + '</p>' +
+      '<div class="list">' +
+      opt('marcacoes', 'Marcações', 'Cada batida, com data, hora, tipo, origem e NSR') +
+      opt('espelho', 'Espelho de ponto', 'Um dia por linha: entrada, intervalo, saída, horas e saldo') +
+      opt('resumo', 'Resumo do período', 'Um colaborador por linha: horas, banco de horas e atrasos') +
+      '</div>' +
+      '<p class="card-meta">Os sistemas de folha (Domínio, Alterdata e outros) importam planilhas como estas escolhendo as colunas. O arquivo oficial AFD/AEJ só é possível com o ponto registrado como REP-P.</p>' +
+      '</section>';
+  }
+
   Screens.ponto_equipe = function () {
-    if (!UI.isManager()) return Screens.ponto([]);
+    var acc = UI.isAccountant(); // contabilidade: só consulta e exporta
+    if (!UI.isManager() && !acc) return Screens.ponto([]);
     var d = DB.get();
-    var emps = d.employees.filter(function (e) { return e.active && e.ponto !== false && (unitFilter === 'todas' || e.unit === unitFilter); });
+    var r = range(), from = r[0], to = r[1];
+    var all = d.employees.filter(function (e) { return e.ponto !== false && e.role !== 'contador' && (unitFilter === 'todas' || e.unit === unitFilter); });
+    var emps = all.filter(function (e) { return e.active; });
     var rows = emps.map(function (e) { return { e: e, t: today(e) }; });
-    var count = function (k) { return rows.filter(function (r) { return r.t.key === k; }).length; };
+    var count = function (k) { return rows.filter(function (x) { return x.t.key === k; }).length; };
     var order = { missing: 0, on: 1, pause: 2, later: 3, done: 4, off: 5 };
     rows.sort(function (a, b) { return order[a.t.key] - order[b.t.key] || a.e.name.localeCompare(b.e.name); });
     var pend = d.adjusts.filter(function (a) { return a.status === 'pendente'; });
-    var from = Cal.today().slice(0, 8) + '01', to = Cal.today();
+    // Na tabela entram também quem saiu da empresa mas tem registro no período.
+    var table = all.filter(function (e) { return e.active || P.summary(e.id, from, to).days; });
 
-    var html = '<main class="screen wide">' + UI.topbar('Ponto da equipe', { sub: 'Hoje, ' + new Date().toLocaleDateString('pt-BR') }) +
-      (P.me() && P.me().ponto !== false ? '<div class="seg" style="max-width:360px"><button type="button" data-mine aria-pressed="false">Meu ponto</button><button type="button" aria-pressed="true">Equipe</button></div>' : '') +
+    var html = '<main class="screen wide">' + UI.topbar('Ponto da equipe', { sub: acc ? 'Acesso da contabilidade · somente consulta' : 'Hoje, ' + new Date().toLocaleDateString('pt-BR') }) +
+      (!acc && P.me() && P.me().ponto !== false ? '<div class="seg" style="max-width:360px"><button type="button" data-mine aria-pressed="false">Meu ponto</button><button type="button" aria-pressed="true">Equipe</button></div>' : '') +
+      '<div class="chips" role="toolbar" aria-label="Unidade">' + [{ id: 'todas', name: 'Todas as unidades' }].concat(d.units).map(function (u) {
+        return '<button type="button" class="chip" data-uf="' + u.id + '" aria-pressed="' + (unitFilter === u.id) + '">' + esc(u.name.replace('Unidade ', '')) + '</button>';
+      }).join('') + '</div>' +
+      (acc ? exportCard(from, to) : '') +
       '<div class="stat-grid four">' +
       '<div class="card"><div class="stat num">' + count('on') + '</div><div class="card-meta">trabalhando agora</div></div>' +
       '<div class="card"><div class="stat num">' + count('pause') + '</div><div class="card-meta">em intervalo</div></div>' +
       '<div class="card"><div class="stat num' + (count('missing') ? ' neg' : '') + '">' + count('missing') + '</div><div class="card-meta">atrasados sem registro</div></div>' +
-      '<div class="card"><div class="stat num">' + pend.length + '</div><div class="card-meta">ajustes para aprovar</div></div></div>' +
-      '<div class="chips" role="toolbar" aria-label="Unidade">' + [{ id: 'todas', name: 'Todas as unidades' }].concat(d.units).map(function (u) {
-        return '<button type="button" class="chip" data-uf="' + u.id + '" aria-pressed="' + (unitFilter === u.id) + '">' + esc(u.name.replace('Unidade ', '')) + '</button>';
-      }).join('') + '</div>' +
+      '<div class="card"><div class="stat num">' + pend.length + '</div><div class="card-meta">' + (acc ? 'ajustes aguardando o gerente' : 'ajustes para aprovar') + '</div></div></div>' +
 
-      (pend.length ? '<section class="section"><div class="section-head"><h2>Ajustes para aprovar</h2></div><div class="card-grid">' + pend.map(function (a) {
+      (pend.length ? '<section class="section"><div class="section-head"><h2>' + (acc ? 'Ajustes aguardando o gerente' : 'Ajustes para aprovar') + '</h2></div><div class="card-grid">' + pend.map(function (a) {
         var e = P.employee(a.emp);
         return '<div class="card"><div class="card-row"><span class="avatar sm">' + esc(initials(e.name)) + '</span><div class="grow"><div class="card-title">' + esc(e.name) + '</div>' +
           '<div class="card-meta">' + esc(P.TYPES[a.type].label) + ' · ' + PontoUI.dayLabel(a.date) + ' às <b class="num">' + esc(a.time) + '</b></div></div></div>' +
           '<p class="muted">“' + esc(a.reason) + '”</p>' +
-          '<div class="card-row"><button type="button" class="btn sm" data-rej="' + a.id + '">Recusar</button><button type="button" class="btn sm primary" data-apr="' + a.id + '">Aprovar ajuste</button></div></div>';
+          (acc ? '<span class="pill warn no-dot" style="align-self:flex-start">Ainda não entra nas planilhas</span>'
+            : '<div class="card-row"><button type="button" class="btn sm" data-rej="' + a.id + '">Recusar</button><button type="button" class="btn sm primary" data-apr="' + a.id + '">Aprovar ajuste</button></div>') + '</div>';
       }).join('') + '</div></section>' : '') +
 
       (!rows.length ? '<div class="card">' + UI.empty('users', 'Ninguém batendo ponto ainda', 'Os colaboradores cadastrados aparecem aqui com a situação do dia.', UI.isAdmin() ? '<a class="btn primary" href="#equipe/novo">Cadastrar colaborador</a>' : '') + '</div>' : '') +
-      '<section class="section"' + (rows.length ? '' : ' hidden') + '><div class="section-head"><h2>Agora</h2></div><div class="card-grid">' + rows.map(function (r) {
-        var pill = PILL[r.t.key];
-        return '<button type="button" class="card tap team-card" data-emp="' + r.e.id + '"><div class="card-row"><span class="avatar sm">' + esc(initials(r.e.name)) + '</span>' +
-          '<div class="grow"><div class="card-title">' + esc(r.e.name) + '</div><div class="card-meta">' + esc(r.e.func) + ' · ' + esc(unitShort(r.e.unit)) + '</div></div>' +
+      '<section class="section"' + (rows.length ? '' : ' hidden') + '><div class="section-head"><h2>Agora</h2></div><div class="card-grid">' + rows.map(function (x) {
+        var pill = PILL[x.t.key];
+        return '<button type="button" class="card tap team-card" data-emp="' + x.e.id + '"><div class="card-row"><span class="avatar sm">' + esc(initials(x.e.name)) + '</span>' +
+          '<div class="grow"><div class="card-title">' + esc(x.e.name) + '</div><div class="card-meta">' + esc(x.e.func) + ' · ' + esc(unitShort(x.e.unit)) + '</div></div>' +
           '<span class="pill ' + pill[0] + '">' + pill[1] + '</span></div>' +
-          '<div class="card-meta">' + esc(r.t.label) + (r.t.j ? ' · ' + P.dur(P.worked(r.t.j)) + ' hoje' : '') + '</div>' +
-          (r.t.late && r.t.key !== 'missing' ? '<span class="pill warn no-dot" style="align-self:flex-start">Chegou ' + r.t.late + ' min atrasado</span>' : '') + '</button>';
+          '<div class="card-meta">' + esc(x.t.label) + (x.t.j ? ' · ' + P.dur(P.worked(x.t.j)) + ' hoje' : '') + '</div>' +
+          (x.t.late && x.t.key !== 'missing' ? '<span class="pill warn no-dot" style="align-self:flex-start">Chegou ' + x.t.late + ' min atrasado</span>' : '') + '</button>';
       }).join('') + '</div></section>' +
 
-      '<section class="section"><div class="section-head"><h2>Mês até hoje</h2><button type="button" class="btn ghost sm" data-report>' + icon('copy', 'sm') + 'Copiar relatório</button></div>' +
+      (acc ? '' : exportCard(from, to)) +
+      '<section class="section"><div class="section-head"><h2 class="num">' + br(from) + ' a ' + br(to) + '</h2></div>' +
       '<div class="table-wrap"><table class="ponto-table"><thead><tr><th>Colaborador</th><th>Dias</th><th>Horas</th><th>Banco</th><th>Atrasos</th></tr></thead><tbody>' +
-      emps.map(function (e) {
+      (table.length ? table.map(function (e) {
         var s = P.summary(e.id, from, to);
-        return '<tr data-emp="' + e.id + '"><td><b>' + esc(e.name) + '</b><span class="card-meta">' + esc(e.func) + '</span></td><td class="num">' + s.days + '</td><td class="num">' + P.dur(s.worked) + '</td>' +
+        return '<tr data-emp="' + e.id + '"><td><b>' + esc(e.name) + '</b><span class="card-meta">' + esc(e.func) + (e.active ? '' : ' · inativo') + '</span></td><td class="num">' + s.days + '</td><td class="num">' + P.dur(s.worked) + '</td>' +
           '<td class="num ' + (s.balance >= 0 ? 'pos' : 'neg') + '">' + (P.signed(s.balance) || '0') + '</td><td class="num">' + s.lateCount + (s.missing ? ' <span class="pill crit no-dot">' + s.missing + ' sem saída</span>' : '') + '</td></tr>';
-      }).join('') + '</tbody></table></div></section></main>';
+      }).join('') : '<tr><td colspan="5" class="muted">Nenhum registro no período.</td></tr>') + '</tbody></table></div></section></main>';
 
     return {
       html: html, tab: 'ponto',
@@ -114,18 +145,29 @@
           var t = e.target;
           if (t.closest('[data-mine]')) return go('ponto');
           var uf = t.closest('[data-uf]'); if (uf) { unitFilter = uf.dataset.uf; return refresh(); }
+          var pm = t.closest('[data-period] [data-v]');
+          if (pm) { period.mode = pm.dataset.v; if (pm.dataset.v === 'custom' && !period.from) { period.from = from; period.to = to; } return refresh(); }
+          var ex = t.closest('[data-export]');
+          if (ex) {
+            var kind = ex.dataset.export, text = PontoExport[kind](from, to, unitFilter), name = PontoExport.filename(kind, from, to, unitFilter);
+            if (PontoExport.download(name, text)) UI.toast('Arquivo baixado: ' + name, { icon: 'file', ms: 4500 });
+            else {
+              try { navigator.clipboard.writeText(text).then(function () { UI.toast('O aparelho não permitiu baixar. A planilha foi copiada: cole no Excel.', { ms: 5000 }); }); }
+              catch (er) { UI.toast('Não foi possível baixar a planilha neste aparelho.', { tone: 'crit' }); }
+            }
+            return;
+          }
           var apr = t.closest('[data-apr]'), rej = t.closest('[data-rej]');
-          if (apr || rej) {
+          if ((apr || rej) && !acc) {
             var a = DB.get().adjusts.filter(function (x) { return x.id === (apr || rej).dataset[apr ? 'apr' : 'rej']; })[0];
             if (apr) return UI.confirm({ title: 'Aprovar ajuste?', body: 'Será registrada a ' + esc(P.TYPES[a.type].label.toLowerCase()) + ' de ' + esc(P.employee(a.emp).name.split(' ')[0]) + ' em ' + PontoUI.dayLabel(a.date) + ' às ' + esc(a.time) + '. Fica marcado como ajuste.', ok: 'Aprovar', onOk: function () { approve(a, true); } });
             return approve(a, false);
           }
-          if (t.closest('[data-report]')) {
-            try { navigator.clipboard.writeText(report(emps, from, to)).then(function () { UI.toast('Relatório copiado. Cole numa planilha ou mande ao contador.'); }, function () { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }); }
-            catch (er) { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }
-            return;
-          }
           var em = t.closest('[data-emp]'); if (em) detailSheet(P.employee(em.dataset.emp));
+        });
+        root.addEventListener('change', function (e) {
+          if (e.target.id === 'p-from' && e.target.value) { period.from = e.target.value; refresh(); }
+          if (e.target.id === 'p-to' && e.target.value) { period.to = e.target.value; refresh(); }
         });
       }
     };

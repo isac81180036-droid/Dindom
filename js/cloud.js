@@ -117,12 +117,18 @@
     if (!Cloud.orgId || !client) return;
     if (pushing) { again = true; return; }
     var cur = flatten(DB.get()), rows = [], marks = [];
+    // Contabilidade só consulta: o único dado que envia é o próprio cadastro (ex.: após trocar a senha provisória).
+    if (Cloud.readOnly) {
+      var mine = k('employees', Cloud.member.emp_id), only = {};
+      if (cur[mine]) only[mine] = cur[mine];
+      cur = only;
+    }
     Object.keys(cur).forEach(function (key) {
       var c = cur[key], j = JSON.stringify(c.data);
       if (snapshot[key] !== j) { rows.push({ org_id: Cloud.orgId, collection: c.collection, id: c.id, data: c.data, deleted: false }); marks.push([key, j]); }
     });
     Object.keys(snapshot).forEach(function (key) {
-      if (cur[key]) return;
+      if (cur[key] || Cloud.readOnly) return;
       var i = key.indexOf('|');
       rows.push({ org_id: Cloud.orgId, collection: key.slice(0, i), id: key.slice(i + 1), data: {}, deleted: true });
       marks.push([key, null]);
@@ -167,6 +173,7 @@
       if (!m) return { error: 'nomember' };
       if (!m.active) return { error: 'inactive' };
       Cloud.user = user; Cloud.member = m; Cloud.orgId = m.org_id;
+      Cloud.readOnly = m.role === 'contador';
       writeLast({ org_id: m.org_id, emp_id: m.emp_id, role: m.role, user_id: user.id });
       DB.useOrg(m.org_id);
       return loadAll().then(function () { subscribe(); push(); Cloud.status = 'ok'; return { ok: true, member: m }; });
@@ -175,6 +182,7 @@
       var last = readLast();
       if (netError(err) && last && last.user_id === user.id) {
         Cloud.user = user; Cloud.member = last; Cloud.orgId = last.org_id; Cloud.status = 'offline';
+        Cloud.readOnly = last.role === 'contador';
         DB.useOrg(last.org_id);
         retryLater();
         return { ok: true, member: last, offline: true };
