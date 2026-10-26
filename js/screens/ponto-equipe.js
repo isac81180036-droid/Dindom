@@ -60,10 +60,15 @@
 
   function exportCard(from, to) {
     var c = PontoExport.count(from, to, unitFilter);
-    function opt(kind, title, desc) {
+    function opt(kind, title, desc, ext, warn) {
       return '<button type="button" class="row" data-export="' + kind + '"><div class="tile">' + icon('file') + '</div>' +
-        '<div class="grow"><div class="card-title">' + title + '</div><div class="card-meta">' + desc + '</div></div><span class="pill no-dot">CSV</span></button>';
+        '<div class="grow"><div class="card-title">' + title + '</div><div class="card-meta">' + desc + '</div>' +
+        (warn ? '<div class="card-meta" style="color:var(--warn);font-weight:600">' + warn + '</div>' : '') + '</div><span class="pill no-dot">' + (ext || 'CSV') + '</span></button>';
     }
+    // O AFD precisa do CNPJ da empresa e do PIS de cada funcionário.
+    var co = PontoExport.company(), afd = PontoExport.afd(from, to, unitFilter);
+    var afdWarn = !co.cnpj ? 'Falta o CNPJ da empresa: o administrador cadastra em Perfil › Dados da empresa.'
+      : afd.skipped.length ? afd.skipped.length + (afd.skipped.length === 1 ? ' funcionário sem PIS fica' : ' funcionários sem PIS ficam') + ' de fora: ' + esc(afd.skipped.join(', ')) + '.' : '';
     return '<section class="card export-card">' +
       '<div class="card-row"><div class="tile accent">' + icon('file') + '</div><div class="grow"><div class="card-title">Exportar para a contabilidade</div>' +
       '<div class="card-meta">Planilhas que abrem no Excel e entram nos sistemas de folha</div></div></div>' +
@@ -78,6 +83,10 @@
       opt('marcacoes', 'Marcações', 'Cada batida, com data, hora, tipo, origem e NSR') +
       opt('espelho', 'Espelho de ponto', 'Um dia por linha: entrada, intervalo, saída, horas e saldo') +
       opt('resumo', 'Resumo do período', 'Um colaborador por linha: horas, banco de horas e atrasos') +
+      '</div>' +
+      '<div class="eyebrow">Texto (TXT)</div><div class="list">' +
+      opt('afd', 'AFD · arquivo de ponto', 'Para importar no sistema da contabilidade: cada batida com NSR, data, hora e PIS', 'TXT', afdWarn) +
+      opt('espelhoTxt', 'Espelho de ponto em texto', 'Relatório por funcionário e por dia, com totais, para conferir ou arquivar', 'TXT') +
       '</div>' +
       '<p class="card-meta">Os sistemas de folha (Domínio, Alterdata e outros) importam planilhas como estas escolhendo as colunas. O arquivo oficial AFD/AEJ só é possível com o ponto registrado como REP-P.</p>' +
       '</section>';
@@ -149,8 +158,13 @@
           if (pm) { period.mode = pm.dataset.v; if (pm.dataset.v === 'custom' && !period.from) { period.from = from; period.to = to; } return refresh(); }
           var ex = t.closest('[data-export]');
           if (ex) {
-            var kind = ex.dataset.export, text = PontoExport[kind](from, to, unitFilter), name = PontoExport.filename(kind, from, to, unitFilter);
-            if (PontoExport.download(name, text)) UI.toast('Arquivo baixado: ' + name, { icon: 'file', ms: 4500 });
+            var kind = ex.dataset.export, name = PontoExport.filename(kind, from, to, unitFilter), text, extra = '';
+            if (kind === 'afd') {
+              if (!PontoExport.company().cnpj) { UI.toast('Falta o CNPJ da empresa. O administrador cadastra em Perfil › Dados da empresa.', { tone: 'crit', ms: 5000 }); return; }
+              var r = PontoExport.afd(from, to, unitFilter);
+              text = r.text; extra = ' · ' + r.lines + ' marcações' + (r.skipped.length ? ' · ' + r.skipped.length + ' sem PIS de fora' : '');
+            } else text = PontoExport[kind](from, to, unitFilter);
+            if (PontoExport.download(name, text)) UI.toast('Arquivo baixado: ' + name + extra, { icon: 'file', ms: 5000 });
             else {
               try { navigator.clipboard.writeText(text).then(function () { UI.toast('O aparelho não permitiu baixar. A planilha foi copiada: cole no Excel.', { ms: 5000 }); }); }
               catch (er) { UI.toast('Não foi possível baixar a planilha neste aparelho.', { tone: 'crit' }); }

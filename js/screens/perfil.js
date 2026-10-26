@@ -8,6 +8,37 @@
     }).join('') + '</div>';
   }
 
+  function fmtCnpj(s) { var c = String(s || '').replace(/\D/g, '').slice(0, 14); return c.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2'); }
+  // CNPJ válido pelos dígitos verificadores.
+  function validCnpj(s) {
+    var c = String(s || '').replace(/\D/g, '');
+    if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false;
+    function dv(n) { var w = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], sum = 0; for (var i = 0; i < n; i++) sum += Number(c[i]) * w[i]; var r = sum % 11; return r < 2 ? 0 : 11 - r; }
+    return dv(12) === Number(c[12]) && dv(13) === Number(c[13]);
+  }
+
+  // Dados da empresa: vão no cabeçalho do arquivo de ponto (AFD) e do espelho.
+  function companySheet() {
+    var o = DB.get().org || {};
+    UI.sheet('<h2>Dados da empresa</h2><p class="muted">Aparecem no arquivo de ponto (AFD) e no espelho que a contabilidade exporta.</p>' +
+      '<div class="field" id="f-legal"><label for="co-legal">Razão social</label><input id="co-legal" class="input" maxlength="150" placeholder="Ex.: Dindom Pizzaria Ltda" value="' + esc(o.legalName || '') + '"><span class="err" hidden>Informe a razão social.</span></div>' +
+      '<div class="field" id="f-cnpj"><label for="co-cnpj">CNPJ</label><input id="co-cnpj" class="input num" inputmode="numeric" placeholder="00.000.000/0000-00" value="' + esc(fmtCnpj(o.cnpj)) + '"><span class="err" hidden>CNPJ inválido: confira os números.</span></div>' +
+      '<button type="button" class="btn primary block" data-save>Salvar</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sheet, close) {
+        var cn = sheet.querySelector('#co-cnpj');
+        cn.addEventListener('input', function () { cn.value = fmtCnpj(cn.value); sheet.querySelector('#f-cnpj').classList.remove('error'); sheet.querySelector('#f-cnpj .err').hidden = true; });
+        sheet.querySelector('[data-save]').addEventListener('click', function () {
+          var legal = sheet.querySelector('#co-legal').value.trim(), cnpj = cn.value.replace(/\D/g, '');
+          var badL = !legal, badC = !validCnpj(cnpj);
+          sheet.querySelector('#f-legal').classList.toggle('error', badL); sheet.querySelector('#f-legal .err').hidden = !badL;
+          sheet.querySelector('#f-cnpj').classList.toggle('error', badC); sheet.querySelector('#f-cnpj .err').hidden = !badC;
+          if (badL || badC) return;
+          DB.update(function (x) { x.org = Object.assign({}, x.org, { legalName: legal, cnpj: cnpj }); });
+          close(); refresh(); UI.toast('Dados da empresa salvos');
+        });
+      });
+  }
+
   Screens.perfil = function () {
     var d = DB.get();
     var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
@@ -33,7 +64,9 @@
         '<a class="row" href="#checklists/editar" style="text-decoration:none;color:inherit"><div class="tile">' + icon('checklist') + '</div>' +
         '<div class="grow"><div class="card-title">Modelos de checklist</div><div class="card-meta">' + d.checklists.length + ' rotinas · tarefas, prazos e fotos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         (UI.isAdmin() ? '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
-        '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' : '') +
+        '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<button type="button" class="row" data-company><div class="tile">' + icon('store') + '</div>' +
+        '<div class="grow"><div class="card-title">Dados da empresa</div><div class="card-meta">' + (d.org && d.org.cnpj ? esc(d.org.legalName || '') + ' · CNPJ ' + esc(fmtCnpj(d.org.cnpj)) : 'Razão social e CNPJ, usados no arquivo de ponto (AFD)') + '</div></div>' + icon('chevronRight', 'sm') + '</button>' : '') +
         '</div></section>' : '') +
 
       (manager ? '<section class="section"><div class="eyebrow">Permissões da equipe</div><div class="list">' +
@@ -57,6 +90,8 @@
         if (perm) perm.addEventListener('change', function () {
           DB.update(function (x) { x.settings.staffCanJustify = perm.checked; }); UI.toast('Permissão atualizada');
         });
+        var company = root.querySelector('[data-company]');
+        if (company) company.addEventListener('click', companySheet);
         var wipe = root.querySelector('[data-wipe]');
         if (wipe) wipe.addEventListener('click', function () {
           UI.confirm({ title: 'Apagar todos os dados deste aparelho?', body: 'Produtos, colaboradores, estoque, pontos, checklists, chamados e agenda salvos aqui serão apagados de vez. Não dá para desfazer.', ok: 'Apagar tudo', danger: true,

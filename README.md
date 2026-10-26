@@ -91,6 +91,6 @@ Em Gestão › Colaboradores › **Dar acesso à contabilidade**, o admin cria u
 
 - vê só o **Ponto da equipe** (todas as unidades) e o próprio Perfil; não vê estoque, compras, checklists, manutenção nem agenda;
 - não aprova ajustes nem altera dados (bloqueado também no banco, por `supabase/002_contabilidade.sql`);
-- exporta, por período (mês atual, mês anterior ou datas livres) e por unidade, três planilhas CSV (separador `;`, UTF-8, datas DD/MM/AAAA, horas HH:MM): **Marcações**, **Espelho de ponto** e **Resumo do período** (`js/ponto-export.js`). CPF e PIS do cadastro identificam cada funcionário.
+- exporta, por período (mês atual, mês anterior ou datas livres) e por unidade, três planilhas CSV (separador `;`, UTF-8, datas DD/MM/AAAA, horas HH:MM): **Marcações**, **Espelho de ponto** e **Resumo do período**; e dois arquivos TXT: **AFD** (leiaute de relógio de ponto da Portaria 1510: cabeçalho tipo 1 com CNPJ e razão social, marcações tipo 3 com NSR, data, hora e PIS, fechamento tipo 9) e **Espelho de ponto em texto** (`js/ponto-export.js`). CPF e PIS do cadastro identificam cada funcionário; o CNPJ e a razão social ficam em Perfil › Dados da empresa.
 
 No Supabase já em uso, rode `supabase/002_contabilidade.sql` uma vez (instalações novas já recebem isso pelo `schema.sql`).
