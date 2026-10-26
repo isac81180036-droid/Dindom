@@ -8,14 +8,7 @@
     }).join('') + '</div>';
   }
 
-  function fmtCnpj(s) { var c = String(s || '').replace(/\D/g, '').slice(0, 14); return c.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2'); }
-  // CNPJ válido pelos dígitos verificadores.
-  function validCnpj(s) {
-    var c = String(s || '').replace(/\D/g, '');
-    if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false;
-    function dv(n) { var w = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], sum = 0; for (var i = 0; i < n; i++) sum += Number(c[i]) * w[i]; var r = sum % 11; return r < 2 ? 0 : 11 - r; }
-    return dv(12) === Number(c[12]) && dv(13) === Number(c[13]);
-  }
+  var fmtCnpj = UI.fmtCnpj, validCnpj = UI.validCnpj;
 
   // Dados da empresa: vão no cabeçalho do arquivo de ponto (AFD) e do espelho.
   function companySheet() {
@@ -64,7 +57,9 @@
         '<a class="row" href="#checklists/editar" style="text-decoration:none;color:inherit"><div class="tile">' + icon('checklist') + '</div>' +
         '<div class="grow"><div class="card-title">Modelos de checklist</div><div class="card-meta">' + d.checklists.length + ' rotinas · tarefas, prazos e fotos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         (UI.isAdmin() ? '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
-        '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active && e.role !== 'contador'; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<a class="row" href="#parceiros" style="text-decoration:none;color:inherit"><div class="tile">' + icon('file') + '</div>' +
+        '<div class="grow"><div class="card-title">Parceiros</div><div class="card-meta">Login da contabilidade · ' + d.employees.filter(function (e) { return e.active && e.role === 'contador'; }).length + ' com acesso</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<button type="button" class="row" data-company><div class="tile">' + icon('store') + '</div>' +
         '<div class="grow"><div class="card-title">Dados da empresa</div><div class="card-meta">' + (d.org && d.org.cnpj ? esc(d.org.legalName || '') + ' · CNPJ ' + esc(fmtCnpj(d.org.cnpj)) : 'Razão social e CNPJ, usados no arquivo de ponto (AFD)') + '</div></div>' + icon('chevronRight', 'sm') + '</button>' : '') +
         '</div></section>' : '') +

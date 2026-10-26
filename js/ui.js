@@ -126,6 +126,15 @@
   UI.isAdmin = function () { return DB.get().user.role === 'admin'; };
   UI.isAccountant = function () { return DB.get().user.role === 'contador'; };
 
+  UI.fmtCnpj = function (s) { var c = String(s || '').replace(/\D/g, '').slice(0, 14); return c.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2'); };
+  // CNPJ válido pelos dígitos verificadores.
+  UI.validCnpj = function (s) {
+    var c = String(s || '').replace(/\D/g, '');
+    if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false;
+    function dv(n) { var w = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2], sum = 0; for (var i = 0; i < n; i++) sum += Number(c[i]) * w[i]; var r = sum % 11; return r < 2 ? 0 : 11 - r; }
+    return dv(12) === Number(c[12]) && dv(13) === Number(c[13]);
+  };
+
   window.UI = UI;
   // Registro das telas; cada arquivo em js/screens/ adiciona a sua.
   window.Screens = window.Screens || {};

@@ -6,8 +6,7 @@
   var ROLE_HINT = {
     colaborador: 'Vê e executa as próprias tarefas: contagem, checklists, manutenção e agenda.',
     gerente: 'Tudo do colaborador, mais aprovações, status de chamados e permissões da equipe.',
-    admin: 'Acesso total, incluindo cadastro de colaboradores e configurações das unidades.',
-    contador: 'Para o escritório de contabilidade: só consulta e exporta o ponto da equipe. Não vê nem altera mais nada.'
+    admin: 'Acesso total, incluindo cadastro de colaboradores e configurações das unidades.'
   };
 
   function digits(s) { return String(s || '').replace(/\D/g, ''); }
@@ -56,13 +55,14 @@
       icon('chevronRight', 'sm') + '</div>' +
       '<div class="card-row card-meta" style="flex-wrap:wrap;gap:6px">' +
       (e.active ? '' : '<span class="pill">Inativo</span>') +
-      (e.role !== 'colaborador' ? '<span class="pill no-dot ' + (e.role === 'contador' ? 'warn' : 'info') + '">' + icon(e.role === 'contador' ? 'file' : 'shield', 'sm') + UI.ROLES[e.role] + '</span>' : '') +
+      (e.role !== 'colaborador' ? '<span class="pill no-dot info">' + icon('shield', 'sm') + UI.ROLES[e.role] + '</span>' : '') +
       '<span class="num">' + esc(fmtPhone(e.phone)) + '</span><span>·</span><span>' + esc(since(e.admission)) + '</span></div></a>';
   }
 
   function listItems() {
     var q = filter.q.toLowerCase();
     var items = DB.get().employees.filter(function (e) {
+      if (e.role === 'contador') return false; // parceiros ficam na área própria
       if (filter.status === 'ativos' && !e.active) return false;
       if (filter.status === 'inativos' && e.active) return false;
       if (filter.unit !== 'todas' && e.unit !== filter.unit) return false;
@@ -74,12 +74,15 @@
 
   function list() {
     var d = DB.get();
-    var act = d.employees.filter(function (e) { return e.active; }).length;
-    var count = function (s) { return d.employees.filter(function (e) { return s === 'todos' || (s === 'ativos') === e.active; }).length; };
+    var staff = d.employees.filter(function (e) { return e.role !== 'contador'; });
+    var partners = d.employees.filter(function (e) { return e.role === 'contador'; });
+    var act = staff.filter(function (e) { return e.active; }).length;
+    var count = function (s) { return staff.filter(function (e) { return s === 'todos' || (s === 'ativos') === e.active; }).length; };
     var html = '<main class="screen wide">' +
       UI.topbar('Colaboradores', { sub: act + ' ativos em ' + d.units.length + ' unidades' }) +
       '<div class="quick-actions"><a class="btn primary block" href="#equipe/novo" style="min-height:56px;font-size:var(--fs-lg)">' + icon('userPlus') + 'Cadastrar colaborador</a>' +
-      '<a class="btn block" href="#equipe/novo/contador" style="min-height:56px">' + icon('file', 'sm') + 'Dar acesso à contabilidade</a></div>' +
+      '<a class="btn block" href="#parceiros/novo" style="min-height:56px">' + icon('file', 'sm') + 'Cadastrar parceiro</a></div>' +
+      (partners.length ? '<a class="row" href="#parceiros" style="text-decoration:none;color:inherit"><div class="tile warn">' + icon('file') + '</div><div class="grow"><div class="card-title">Parceiros</div><div class="card-meta">' + partners.length + (partners.length === 1 ? ' cadastrado' : ' cadastrados') + ' · contabilidade com acesso ao ponto</div></div>' + icon('chevronRight', 'sm') + '</a>' : '') +
       '<label class="field"><span class="sr-only">Buscar colaborador</span><div style="position:relative">' +
       '<span style="position:absolute;left:14px;top:13px;color:var(--ink-3)">' + icon('search', 'sm') + '</span>' +
       '<input id="emp-search" class="input" type="search" placeholder="Buscar por nome, função ou celular" style="padding-left:42px" value="' + esc(filter.q) + '"></div></label>' +
@@ -114,28 +117,27 @@
     }).join('') + '</div>';
   }
 
-  // preset: nível de acesso já marcado ao abrir (ex.: 'contador' pelo botão "Acesso da contabilidade").
-  function form(id, preset) {
+  function form(id) {
     var d = DB.get();
     var cloud = !!(window.Cloud && Cloud.orgId); // com servidor, o login de cada pessoa fica no Supabase
     var e = id ? find(id) : null;
     if (id && !e) return list();
-    var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', phone: '', email: '', cpf: '', pis: '', func: '', unit: d.user.unit, shift: 'Noite', role: preset || 'colaborador', admission: Cal.today() };
-    var acc = v.role === 'contador';
+    if (e && e.role === 'contador') return Screens.parceiros([e.id]); // parceiros têm a própria tela
+    var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', phone: '', email: '', cpf: '', pis: '', func: '', unit: d.user.unit, shift: 'Noite', role: 'colaborador', admission: Cal.today() };
 
     var html = '<main class="screen no-nav">' +
       UI.topbar(e ? 'Editar colaborador' : 'Novo colaborador', { back: '#equipe', sub: e ? (e.active ? 'Ativo' : 'Inativo') + ' · ' + since(e.admission) : 'Os campos com * são obrigatórios' }) +
       '<div class="field" id="f-name"><label for="emp-name">Nome completo *</label><input id="emp-name" class="input" autocomplete="name" autocapitalize="words" maxlength="60" placeholder="Ex.: Rafael Souza" value="' + esc(v.name) + '"><span class="err" hidden></span></div>' +
       '<div class="field" id="f-phone"><label for="emp-phone">Celular (WhatsApp) *</label><input id="emp-phone" class="input num" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="' + esc(fmtPhone(v.phone)) + '"><span class="hint">Para avisos pelo WhatsApp.</span><span class="err" hidden></span></div>' +
       '<div class="field" id="f-email"><label for="emp-email">E-mail *</label><input id="emp-email" class="input" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="nome@dindom.com.br" value="' + esc(v.email) + '"' + (cloud && e ? ' readonly' : '') + '><span class="hint">' + (cloud && e ? 'O e-mail de acesso não muda por aqui. Para trocar, cadastre a pessoa de novo com o e-mail novo.' : 'É com ele que a pessoa entra no app.') + '</span><span class="err" hidden></span></div>' +
-      '<div class="ideal-grid" data-staff' + (acc ? ' hidden' : '') + '><div class="field" id="f-cpf"><label for="emp-cpf">CPF <span class="faint">(opcional)</span></label><input id="emp-cpf" class="input num" inputmode="numeric" placeholder="000.000.000-00" value="' + esc(fmtCpf(v.cpf)) + '"><span class="err" hidden></span></div>' +
+      '<div class="ideal-grid"><div class="field" id="f-cpf"><label for="emp-cpf">CPF <span class="faint">(opcional)</span></label><input id="emp-cpf" class="input num" inputmode="numeric" placeholder="000.000.000-00" value="' + esc(fmtCpf(v.cpf)) + '"><span class="err" hidden></span></div>' +
       '<div class="field"><label for="emp-pis">PIS/NIS <span class="faint">(opcional)</span></label><input id="emp-pis" class="input num" inputmode="numeric" placeholder="000.00000.00-0" value="' + esc(fmtPis(v.pis)) + '"></div></div>' +
-      '<p class="card-meta" data-staff' + (acc ? ' hidden' : '') + '>CPF e PIS identificam o funcionário na exportação do ponto para a contabilidade.</p>' +
-      '<div data-staff' + (acc ? ' hidden' : '') + ' style="display:flex;flex-direction:column;gap:var(--sp-5)">' +
+      '<p class="card-meta">CPF e PIS identificam o funcionário na exportação do ponto para a contabilidade.</p>' +
+      '<div style="display:flex;flex-direction:column;gap:var(--sp-5)">' +
       '<div class="field" id="f-func"><span class="label">Função *</span>' + chips('func', d.functions.map(function (f) { return [f, f]; }), v.func) + '<span class="err" hidden>Escolha a função.</span></div>' +
       '<div class="field"><span class="label">Unidade *</span>' + seg('unit', d.units.map(function (u) { return [u.id, u.name.replace('Unidade ', '')]; }), v.unit) + '</div>' +
       '<div class="field"><span class="label">Turno</span>' + seg('shift', [['Manhã', 'Manhã'], ['Tarde', 'Tarde'], ['Noite', 'Noite']], v.shift) + '</div></div>' +
-      '<div class="field"><span class="label">Nível de acesso *</span><div class="seg seg-wrap" data-pick="role">' + [['colaborador', 'Colaborador'], ['gerente', 'Gerente'], ['admin', 'Admin'], ['contador', 'Contabilidade']].map(function (o) {
+      '<div class="field"><span class="label">Nível de acesso *</span><div class="seg" data-pick="role">' + [['colaborador', 'Colaborador'], ['gerente', 'Gerente'], ['admin', 'Admin']].map(function (o) {
         return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + (o[0] === v.role) + '">' + o[1] + '</button>';
       }).join('') + '</div>' +
       '<span class="hint" data-role-hint>' + ROLE_HINT[v.role] + '</span></div>' +
@@ -167,11 +169,7 @@
             var b = ev.target.closest('[data-v]'); if (!b) return;
             g.querySelectorAll('[data-v]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
             v[g.dataset.pick] = b.dataset.v;
-            if (g.dataset.pick === 'role') {
-              $('[data-role-hint]').textContent = ROLE_HINT[b.dataset.v];
-              // Contabilidade não é funcionário da loja: sem função, turno nem ponto.
-              root.querySelectorAll('[data-staff]').forEach(function (s) { s.hidden = b.dataset.v === 'contador'; });
-            }
+            if (g.dataset.pick === 'role') $('[data-role-hint]').textContent = ROLE_HINT[b.dataset.v];
             if (g.dataset.pick === 'func') setErr('f-func', '');
             // Função "Gerente" sugere o nível de acesso de gerente.
             if (g.dataset.pick === 'func' && b.dataset.v === 'Gerente' && v.role === 'colaborador') $('[data-pick="role"] [data-v="gerente"]').click();
@@ -236,8 +234,6 @@
           var mailMsg = !v.email ? 'Informe o e-mail: é com ele que a pessoa entra.' : !Auth.validEmail(v.email) ? 'Confira o e-mail: falta o @ ou o domínio.' : dupMail ? 'Este e-mail já é de ' + dupMail.name + '.' : '';
           setErr('f-email', mailMsg); if (mailMsg) bad.push('f-email');
           v.cpf = digits($('#emp-cpf').value); v.pis = digits($('#emp-pis').value);
-          var isAcc = v.role === 'contador';
-          if (isAcc) { v.func = 'Contabilidade'; v.cpf = ''; v.pis = ''; }
           var cpfMsg = v.cpf && !validCpf(v.cpf) ? 'CPF inválido: confira os números.' : '';
           setErr('f-cpf', cpfMsg); if (cpfMsg) bad.push('f-cpf');
           setErr('f-func', v.func ? '' : 'Escolha a função.'); if (!v.func) bad.push('f-func');
@@ -246,7 +242,7 @@
           UI.busy(save, function () {
             if (e) {
               var roleChanged = e.role !== v.role;
-              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'cpf', 'pis', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); t.ponto = v.role === 'contador' ? false : t.ponto; });
+              DB.update(function (x) { var t = x.employees.filter(function (y) { return y.id === e.id; })[0]; ['name', 'phone', 'email', 'cpf', 'pis', 'func', 'unit', 'shift', 'role', 'admission'].forEach(function (k) { t[k] = v[k]; }); });
               if (cloud && roleChanged) Cloud.updateMember(e.id, { role: v.role });
               UI.buzz(20); UI.toast('Dados de ' + v.name.split(' ')[0] + ' atualizados'); go('equipe', { replace: true });
               return;
@@ -254,7 +250,6 @@
             // Cadastro novo: senha provisória gerada aqui; no primeiro acesso a pessoa cria a própria.
             var pw = Auth.tempPassword(), newId = 'c' + Date.now();
             var rec = { id: newId, name: v.name, phone: v.phone, email: v.email, cpf: v.cpf, pis: v.pis, func: v.func, unit: v.unit, shift: v.shift, role: v.role, admission: v.admission, pin: newPin(), mustChange: true, active: true };
-            if (v.role === 'contador') rec.ponto = false; // contabilidade não bate ponto
             if (cloud) {
               // Com servidor: cria o login da pessoa no Supabase e liga à equipe; a senha não fica no app.
               save.classList.add('busy'); save.disabled = true;
@@ -287,29 +282,30 @@
   var tempShown = {};
 
   function accessText(e, pw) {
-    return 'Olá, ' + e.name.split(' ')[0] + '! Seu acesso ao app da Dindom está pronto.\nE-mail: ' + e.email + (pw ? '\nSenha provisória: ' + pw + ' (no primeiro acesso você cria a sua)' : '') + '\nCódigo do ponto: ' + e.pin;
+    return 'Olá, ' + e.name.split(' ')[0] + '! Seu acesso ao app da Dindom está pronto.\nE-mail: ' + e.email + (pw ? '\nSenha provisória: ' + pw + ' (no primeiro acesso você cria a sua)' : '') + (e.role === 'contador' ? '\nVocê vai ver o ponto de todos os colaboradores e baixar os relatórios.' : '\nCódigo do ponto: ' + e.pin);
   }
 
   function done(id, reset) {
     var e = find(id);
     if (!e) return list();
+    var partner = e.role === 'contador';
     var pw = tempShown[id];
     var html = '<main class="screen no-nav" style="justify-content:center;align-items:center;text-align:center">' +
       '<div class="success-mark">' + icon('check', 'lg') + '</div>' +
-      '<div class="section" style="align-items:center"><div class="eyebrow">' + (reset ? 'Senha provisória gerada' : 'Colaborador cadastrado') + '</div>' +
+      '<div class="section" style="align-items:center"><div class="eyebrow">' + (reset ? 'Senha provisória gerada' : partner ? 'Parceiro cadastrado' : 'Colaborador cadastrado') + '</div>' +
       '<h1 style="font-size:var(--fs-2xl)">' + esc(e.name) + '</h1>' +
-      '<p class="muted">' + esc(e.func) + ' · ' + esc(unitName(e.unit)) + ' · ' + UI.ROLES[e.role] + '</p></div>' +
+      '<p class="muted">' + (partner ? esc(e.contact ? 'Responsável: ' + e.contact + ' · ' : '') + 'Contabilidade · acesso ao ponto de todos os colaboradores' : esc(e.func) + ' · ' + esc(unitName(e.unit)) + ' · ' + UI.ROLES[e.role]) + '</p></div>' +
       '<div class="card access-card"><div class="eyebrow">Dados de acesso</div>' +
       '<div class="access-row"><span>E-mail</span><b>' + esc(e.email) + '</b></div>' +
       (pw ? '<div class="access-row"><span>Senha provisória</span><b class="num temp-pass">' + esc(pw) + '</b></div>' : '') +
-      '<div class="access-row"><span>Código do ponto</span><b class="num">' + esc(e.pin) + '</b></div>' +
+      (partner ? '' : '<div class="access-row"><span>Código do ponto</span><b class="num">' + esc(e.pin) + '</b></div>') +
       '<p class="card-meta">' + (pw ? 'Anote ou copie agora: a senha provisória não aparece de novo. No primeiro acesso, ' + esc(e.name.split(' ')[0]) + ' cria a própria senha.' : 'A senha provisória já foi mostrada. Se precisar, gere outra no cadastro.') + '</p></div>' +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner" style="flex-direction:column;gap:8px">' +
       '<button type="button" class="btn primary block" data-copy>' + icon('copy', 'sm') + 'Copiar dados para enviar no WhatsApp</button>' +
-      '<div style="display:flex;gap:8px;width:100%"><a class="btn block" href="#equipe/novo">Cadastrar outro</a><a class="btn block" href="#equipe">Ver equipe</a></div></div></div>';
+      '<div style="display:flex;gap:8px;width:100%"><a class="btn block" href="#' + (partner ? 'parceiros' : 'equipe') + '/novo">Cadastrar outro</a><a class="btn block" href="#' + (partner ? 'parceiros' : 'equipe') + '">' + (partner ? 'Ver parceiros' : 'Ver equipe') + '</a></div></div></div>';
     return {
-      html: html, tab: 'equipe', nav: false,
+      html: html, tab: partner ? 'parceiros' : 'equipe', nav: false,
       mount: function (root) {
         root.querySelector('[data-copy]').addEventListener('click', function () {
           try {
@@ -321,9 +317,164 @@
     };
   }
 
+  // ---------- Parceiros (contabilidade) ----------
+  // Parceiro não é funcionário: não bate ponto e só vê o ponto de todos os colaboradores (nível 'contador').
+  function partnerCard(e) {
+    return '<a class="card tap emp-card' + (e.active ? '' : ' inactive') + '" href="#parceiros/' + e.id + '" style="text-decoration:none;color:inherit">' +
+      '<div class="card-row"><span class="avatar">' + esc(initials(e.name)) + '</span>' +
+      '<div class="grow"><div class="card-title">' + esc(e.name) + '</div><div class="card-meta">' + esc(e.contact ? e.contact + ' · ' : '') + esc(e.email) + '</div></div>' +
+      icon('chevronRight', 'sm') + '</div>' +
+      '<div class="card-row card-meta" style="flex-wrap:wrap;gap:6px">' +
+      (e.active ? '<span class="pill ok">Com acesso</span>' : '<span class="pill">Sem acesso</span>') +
+      '<span class="pill no-dot warn">' + icon('file', 'sm') + 'Contabilidade</span>' +
+      (e.mustChange ? '<span>Ainda não entrou</span>' : '') + '</div></a>';
+  }
+
+  function partnerList() {
+    var partners = DB.get().employees.filter(function (e) { return e.role === 'contador'; })
+      .sort(function (a, b) { return (b.active - a.active) || a.name.localeCompare(b.name, 'pt-BR'); });
+    var html = '<main class="screen wide">' +
+      UI.topbar('Parceiros', { back: '#equipe', sub: 'Escritórios de contabilidade com acesso ao ponto' }) +
+      '<div class="quick-actions"><a class="btn primary block" href="#parceiros/novo" style="min-height:56px;font-size:var(--fs-lg)">' + icon('plus') + 'Cadastrar parceiro</a></div>' +
+      '<p class="card-meta">O parceiro entra com e-mail e senha e vê o ponto de todos os colaboradores, de todas as unidades. Pode baixar os relatórios em CSV e TXT (AFD e espelho). Não vê estoque, checklists nem nada mais.</p>' +
+      (partners.length ? '<div class="card-grid">' + partners.map(partnerCard).join('') + '</div>'
+        : '<div class="card">' + UI.empty('file', 'Nenhum parceiro cadastrado', 'Cadastre o escritório de contabilidade para ele pegar o ponto da equipe direto no app.', '<a class="btn primary" href="#parceiros/novo">Cadastrar parceiro</a>') + '</div>') +
+      '</main>';
+    return { html: html, tab: 'parceiros' };
+  }
+
+  function partnerForm(id) {
+    var d = DB.get();
+    var cloud = !!(window.Cloud && Cloud.orgId);
+    var e = id ? find(id) : null;
+    if (id && (!e || e.role !== 'contador')) return partnerList();
+    var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', contact: '', email: '', phone: '', cnpj: '' };
+
+    var html = '<main class="screen no-nav">' +
+      UI.topbar(e ? 'Editar parceiro' : 'Novo parceiro', { back: '#parceiros', sub: e ? (e.active ? 'Com acesso' : 'Sem acesso') : 'Os campos com * são obrigatórios' }) +
+      '<div class="card"><div class="card-row"><div class="tile warn">' + icon('file') + '</div><div class="grow"><div class="card-title">Acesso da contabilidade</div>' +
+      '<div class="card-meta">Vê e exporta o ponto de todos os colaboradores. Não vê nem altera mais nada.</div></div></div></div>' +
+      '<div class="field" id="f-name"><label for="pa-name">Nome do escritório *</label><input id="pa-name" class="input" autocapitalize="words" maxlength="80" placeholder="Ex.: Contábil Silva" value="' + esc(v.name) + '"><span class="err" hidden></span></div>' +
+      '<div class="field"><label for="pa-contact">Responsável <span class="faint">(opcional)</span></label><input id="pa-contact" class="input" autocomplete="name" autocapitalize="words" maxlength="60" placeholder="Ex.: Márcia Silva" value="' + esc(v.contact || '') + '"></div>' +
+      '<div class="field" id="f-email"><label for="pa-email">E-mail de acesso *</label><input id="pa-email" class="input" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="contato@escritorio.com.br" value="' + esc(v.email) + '"' + (cloud && e ? ' readonly' : '') + '><span class="hint">' + (cloud && e ? 'O e-mail de acesso não muda por aqui. Para trocar, cadastre o parceiro de novo com o e-mail novo.' : 'É com ele que a contabilidade entra no app.') + '</span><span class="err" hidden></span></div>' +
+      '<div class="ideal-grid"><div class="field" id="f-phone"><label for="pa-phone">Telefone <span class="faint">(opcional)</span></label><input id="pa-phone" class="input num" inputmode="tel" placeholder="(11) 3333-4444" value="' + esc(fmtPhone(v.phone)) + '"><span class="err" hidden></span></div>' +
+      '<div class="field" id="f-cnpj"><label for="pa-cnpj">CNPJ <span class="faint">(opcional)</span></label><input id="pa-cnpj" class="input num" inputmode="numeric" placeholder="00.000.000/0000-00" value="' + esc(UI.fmtCnpj(v.cnpj)) + '"><span class="err" hidden></span></div></div>' +
+      (e ? '<section class="section"><div class="eyebrow">Acesso</div><div class="list">' +
+        '<div class="row"><div class="tile">' + icon('mail') + '</div><div class="grow"><div class="card-title">Entra com ' + esc(e.email) + '</div><div class="card-meta">' + (e.mustChange ? 'Ainda com senha provisória' : 'Já criou a própria senha') + '</div></div></div>' +
+        '<button type="button" class="row" data-temppass><div class="tile">' + icon('key') + '</div><div class="grow"><div class="card-title">' + (cloud ? 'Enviar link para nova senha' : 'Gerar senha provisória') + '</div><div class="card-meta">' + (cloud ? 'Vai por e-mail, para quem esqueceu a senha' : 'Para quem esqueceu a senha') + '</div></div></button>' +
+        '<button type="button" class="row" data-toggle style="color:' + (e.active ? 'var(--crit)' : 'var(--ok)') + '"><div class="tile ' + (e.active ? 'crit' : 'ok') + '">' + icon(e.active ? 'logout' : 'check') + '</div>' +
+        '<div class="grow"><div class="card-title">' + (e.active ? 'Tirar o acesso' : 'Devolver o acesso') + '</div><div class="card-meta" style="color:var(--ink-2)">' +
+        (e.active ? 'O parceiro não entra mais no app.' : 'Volta a entrar com o mesmo e-mail e senha.') + '</div></div></button>' +
+        '</div></section>' : '') +
+      '</main>' +
+      '<div class="dock no-nav"><div class="dock-inner"><button type="button" class="btn primary block" data-save style="min-height:56px">' + (e ? 'Salvar alterações' : 'Cadastrar parceiro') + '</button></div></div>';
+
+    return {
+      html: html, tab: 'parceiros', nav: false,
+      mount: function (root) {
+        function $(s) { return root.querySelector(s); }
+        function setErr(fid, msg) {
+          var f = $('#' + fid); f.classList.toggle('error', !!msg);
+          var er = f.querySelector('.err'); er.hidden = !msg; if (msg) er.textContent = msg;
+        }
+        $('#pa-name').addEventListener('input', function () { setErr('f-name', ''); });
+        $('#pa-email').addEventListener('input', function () { setErr('f-email', ''); });
+        $('#pa-phone').addEventListener('input', function (ev) { ev.target.value = fmtPhone(ev.target.value); setErr('f-phone', ''); });
+        $('#pa-cnpj').addEventListener('input', function (ev) { ev.target.value = UI.fmtCnpj(ev.target.value); setErr('f-cnpj', ''); });
+
+        var temp = $('[data-temppass]');
+        if (temp) temp.addEventListener('click', function () {
+          if (cloud) return UI.confirm({ title: 'Enviar link para nova senha?', body: 'Vai um e-mail para ' + esc(e.email) + ' com um link para criar uma senha nova.', ok: 'Enviar e-mail',
+            onOk: function () {
+              Cloud.sendReset(e.email).then(function () { UI.toast('E-mail enviado para ' + e.email, { icon: 'mail', ms: 4000 }); },
+                function (er) { UI.toast(er.message || 'Não foi possível enviar o e-mail.', { tone: 'crit', ms: 5000 }); });
+            } });
+          UI.confirm({ title: 'Gerar senha provisória?', body: 'A senha atual de ' + esc(e.name) + ' deixa de funcionar. No próximo acesso, o parceiro cria uma senha nova.', ok: 'Gerar senha provisória',
+            onOk: function () {
+              var pw = Auth.tempPassword();
+              Auth.makePass(pw).then(function (pass) {
+                DB.update(function () { var t = find(id); t.pass = pass; t.mustChange = true; });
+                tempShown[id] = pw; go('parceiros/ok/' + id + '/senha', { replace: true });
+              });
+            } });
+        });
+        var toggle = $('[data-toggle]');
+        if (toggle) toggle.addEventListener('click', function () {
+          var off = e.active;
+          var run = function () {
+            DB.update(function () { find(id).active = !off; });
+            if (cloud) Cloud.updateMember(id, { active: !off });
+            refresh(); UI.toast(off ? 'Acesso de ' + e.name + ' retirado' : 'Acesso de ' + e.name + ' devolvido');
+          };
+          if (off) UI.confirm({ title: 'Tirar o acesso de ' + e.name + '?', body: 'O parceiro deixa de entrar no app na hora. O ponto da equipe não muda.', ok: 'Tirar o acesso', danger: true, onOk: run });
+          else run();
+        });
+
+        var save = $('[data-save]');
+        save.addEventListener('click', function () {
+          v.name = $('#pa-name').value.trim().replace(/\s+/g, ' ');
+          v.contact = $('#pa-contact').value.trim().replace(/\s+/g, ' ');
+          v.email = Auth.normEmail($('#pa-email').value.trim());
+          v.phone = digits($('#pa-phone').value);
+          v.cnpj = digits($('#pa-cnpj').value);
+          var bad = [];
+          var nameMsg = v.name.length < 3 ? 'Informe o nome do escritório.' : '';
+          setErr('f-name', nameMsg); if (nameMsg) bad.push('f-name');
+          var dupMail = DB.get().employees.filter(function (x) { return Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
+          var mailMsg = !v.email ? 'Informe o e-mail: é com ele que a contabilidade entra.' : !Auth.validEmail(v.email) ? 'Confira o e-mail: falta o @ ou o domínio.' : dupMail ? 'Este e-mail já é de ' + dupMail.name + '.' : '';
+          setErr('f-email', mailMsg); if (mailMsg) bad.push('f-email');
+          var phoneMsg = v.phone && v.phone.length < 10 ? 'Informe o telefone com DDD.' : '';
+          setErr('f-phone', phoneMsg); if (phoneMsg) bad.push('f-phone');
+          var cnpjMsg = v.cnpj && !UI.validCnpj(v.cnpj) ? 'CNPJ inválido: confira os números.' : '';
+          setErr('f-cnpj', cnpjMsg); if (cnpjMsg) bad.push('f-cnpj');
+          if (bad.length) { $('#' + bad[0]).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+
+          UI.busy(save, function () {
+            if (e) {
+              DB.update(function () { var t = find(e.id); ['name', 'contact', 'email', 'phone', 'cnpj'].forEach(function (k) { t[k] = v[k]; }); });
+              UI.buzz(20); UI.toast('Dados de ' + v.name + ' atualizados'); go('parceiros', { replace: true });
+              return;
+            }
+            var pw = Auth.tempPassword(), newId = 'p' + Date.now();
+            var rec = { id: newId, name: v.name, contact: v.contact, email: v.email, phone: v.phone, cnpj: v.cnpj, func: 'Contabilidade', role: 'contador', partner: true, ponto: false,
+              unit: d.user.unit, admission: Cal.today(), mustChange: true, active: true };
+            if (cloud) {
+              save.classList.add('busy'); save.disabled = true;
+              Cloud.createUser(v.email, pw).then(function (uid) { return Cloud.addMember(uid, newId, 'contador'); }).then(function () {
+                DB.update(function (x) { x.employees.push(rec); });
+                Cloud.schedule(true);
+                tempShown[newId] = pw; UI.buzz(20);
+                go('parceiros/ok/' + newId, { replace: true });
+              }, function (er) {
+                save.classList.remove('busy'); save.disabled = false;
+                setErr('f-email', er.message || 'Não foi possível criar o acesso.');
+                $('#f-email').scrollIntoView({ block: 'center', behavior: 'smooth' });
+              });
+              return;
+            }
+            Auth.makePass(pw).then(function (pass) {
+              rec.pass = pass;
+              DB.update(function (x) { x.employees.push(rec); });
+              tempShown[newId] = pw; UI.buzz(20);
+              go('parceiros/ok/' + newId, { replace: true });
+            });
+          });
+        });
+      }
+    };
+  }
+
+  Screens.parceiros = function (params) {
+    if (!UI.isAdmin()) return restricted();
+    if (params[0] === 'novo') return partnerForm(null);
+    if (params[0] === 'ok') return done(params[1], params[2] === 'senha');
+    if (params[0]) return partnerForm(params[0]);
+    return partnerList();
+  };
+
   Screens.equipe = function (params) {
     if (!UI.isAdmin()) return restricted();
-    if (params[0] === 'novo') return form(null, params[1] === 'contador' ? 'contador' : null);
+    if (params[0] === 'novo') return form(null);
     if (params[0] === 'ok') return done(params[1], params[2] === 'senha');
     if (params[0]) return form(params[0]);
     return list();

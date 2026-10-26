@@ -247,6 +247,7 @@
 
   Cloud.addMember = function (userId, empId, role) {
     return client.from('members').insert({ org_id: Cloud.orgId, user_id: userId, emp_id: empId, role: role }).then(function (r) {
+      if (r.error && role === 'contador' && /role|check/i.test(r.error.message)) throw new Error('O servidor ainda não aceita o acesso da contabilidade: rode o arquivo supabase/002_contabilidade.sql no Supabase e tente de novo.');
       if (r.error) throw new Error('Não foi possível ligar o acesso à equipe: ' + r.error.message);
     });
   };

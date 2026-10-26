@@ -16,7 +16,8 @@
   var ADMIN_TABS = [
     { id: 'produtos', label: 'Produtos', icon: 'box' },
     { id: 'checklists/editar', label: 'Modelos de checklist', icon: 'checklist' },
-    { id: 'equipe', label: 'Colaboradores', icon: 'users', admin: true }
+    { id: 'equipe', label: 'Colaboradores', icon: 'users', admin: true },
+    { id: 'parceiros', label: 'Parceiros', icon: 'file', admin: true }
   ];
 
   var current = 'inicio';
