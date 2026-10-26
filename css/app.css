@@ -258,12 +258,6 @@ button.row:active { background: var(--surface-2); }
 }
 .banner.crit { background: var(--crit-soft); color: var(--crit); }
 .banner > .grow { flex: 1; min-width: 0; }
-/* Fica no fluxo da página: empurra o conteúdo em vez de cobrir o cabeçalho. */
-.banner.offline {
-  position: sticky; top: var(--safe-t); z-index: 25; border-radius: 0;
-  padding-left: max(16px, var(--safe-l)); padding-right: max(16px, var(--safe-r));
-}
-.banner.offline:not([hidden]) + #app .screen { padding-top: var(--sp-4); }
 .card-meta .ico, .muted .ico { vertical-align: -4px; }
 
 /* ---------- Estados ---------- */

@@ -60,7 +60,6 @@
   .sheet .grabber { display: none; }
 
   .toasts { top: auto; bottom: 24px; left: var(--side-w); }
-  .banner.offline { margin-left: var(--side-w); }
 }
 
 /* ---------- Mouse ---------- */

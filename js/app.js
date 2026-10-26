@@ -127,29 +127,6 @@
       render();
     });
 
-    // Aviso de "sem conexão". O navegador às vezes diz que está offline com internet funcionando
-    // (navegador interno do WhatsApp, alguns iPhones), então o app confirma buscando um arquivo pequeno
-    // do próprio site antes de mostrar o aviso, e confere de novo até a conexão voltar.
-    var banner = document.getElementById('offline'), recheck = 0;
-    // Qualquer resposta do servidor (até "não encontrado") prova que há internet; só erro de rede conta como offline.
-    function probe() {
-      return fetch('manifest.webmanifest', { cache: 'no-store' })
-        .then(function () { return true; }, function () { return false; });
-    }
-    function setOffline(off) {
-      var was = !banner.hidden;
-      banner.hidden = !off;
-      clearTimeout(recheck);
-      if (off) recheck = setTimeout(net, 15000);
-      else if (was) UI.toast('Conexão restabelecida', { icon: 'refresh' });
-    }
-    function net() {
-      if (navigator.onLine !== false && banner.hidden) return; // tudo certo: nem precisa conferir
-      probe().then(function (ok) { setOffline(!ok); });
-    }
-    window.addEventListener('online', net);
-    window.addEventListener('offline', function () { setTimeout(net, 1000); });
-    net();
 
     current = (location.hash || '#inicio').slice(1);
     render();
