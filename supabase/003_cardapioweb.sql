@@ -67,8 +67,9 @@ create or replace function public.cw_get(p_env text, p_key text, p_path text, ou
 language plpgsql security definer set search_path = public, extensions as $$
 declare r extensions.http_response;
 begin
-  perform extensions.http_set_curlopt('CURLOPT_TIMEOUT_MSEC', '6000');
-  r := extensions.http((
+  -- Versões antigas da extensão não aceitam mudar o tempo limite: fica o padrão (5 segundos).
+  begin perform extensions.http_set_curlopt('CURLOPT_TIMEOUT_MSEC', '6000'); exception when others then null; end;
+  r :=extensions.http((
     'GET',
     (case when p_env = 'sandbox' then 'https://integracao.sandbox.cardapioweb.com' else 'https://integracao.cardapioweb.com' end) || '/api/partner/v1' || p_path,
     array[extensions.http_header('X-API-KEY', p_key), extensions.http_header('Accept', 'application/json')],
