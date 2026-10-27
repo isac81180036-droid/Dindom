@@ -115,3 +115,12 @@
 .cw-rank-head .card-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cw-rank .bar { height: 6px; margin-top: 2px; }
 .banner.info { background: var(--info-soft); color: var(--info); }
+.cw-ins { gap: var(--sp-2); }
+.cw-ins-value { font: 650 var(--fs-lg)/1.25 var(--font-display); overflow-wrap: anywhere; }
+.cw-ins-text { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
+.cw-ins-do { display: flex; gap: var(--sp-2); align-items: flex-start; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: var(--surface-2); font-size: var(--fs-sm); }
+.cw-ins-do .ico { flex: none; margin-top: 2px; color: var(--accent); }
+.cw-ins .btn.sm { align-self: flex-start; }
+.cw-decision { align-items: flex-start; }
+.cw-decision-n { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); color: var(--bg); font-size: var(--fs-sm); font-weight: 700; }
+.cw-decision .card-title { font-weight: 600; }

@@ -41,7 +41,7 @@
   var channel = null, timer = 0, rtTimer = 0;
 
   function ready() { return !!(window.Cloud && Cloud.orgId && Cloud.client); }
-  function missingSql(err) { return /schema cache|does not exist|cw_report|cw_connect/i.test((err && err.message) || ''); }
+  function missingSql(err) { return /schema cache|does not exist|cw_report|cw_connect|cw_insights/i.test((err && err.message) || ''); }
   function netError(err) { return !err || /fetch|network|Failed to/i.test(String(err.message || err)); }
 
   // Períodos no "dia de trabalho" do app: vira às 5h, então o movimento da madrugada conta no dia anterior.
@@ -223,12 +223,13 @@
     } else body = report(e);
 
     return {
-      html: '<main class="screen wide">' + UI.topbar('Vendas', { sub: sub, right: gear }) + body + '</main>',
+      html: '<main class="screen wide">' + UI.topbar('Vendas', { sub: sub, right: gear }) + (st && (st.connected || st.has_orders) ? tabs('vendas') : '') + body + '</main>',
       tab: 'vendas',
       mount: function (root) {
         var box = root.querySelector('[data-sqlhelp]');
         if (box) UI.sqlHelp(box, SQL_FILE, 'Volte aqui e toque em <b>Conectar</b> na tela de Vendas.');
         root.addEventListener('click', function (ev) {
+          var tb = ev.target.closest('[data-tab]'); if (tb) return go(tb.dataset.tab);
           var p = ev.target.closest('[data-period]');
           if (p) { period = p.dataset.period; if (stale(period, 15000)) load(period, redrawIf('vendas')); return refresh(); }
           if (ev.target.closest('[data-retry]')) { delete cache[period]; refresh(); return; }
@@ -241,6 +242,79 @@
         if (stale(period, 15000)) load(period, redrawIf('vendas'));
         watch();
         return function () { if (route() !== 'vendas') unwatch(); };
+      }
+    };
+  }
+
+  // ---------- Insights ----------
+
+  var INS_PERIODS = [['7d', '7 dias', 7], ['30d', '30 dias', 30], ['90d', '90 dias', 90]];
+  var insPeriod = '30d';
+
+  function tabs(active) {
+    return '<div class="seg" style="max-width:360px">' + [['vendas', 'Resumo'], ['vendas/insights', 'Insights']].map(function (t) {
+      return '<button type="button" data-tab="' + t[0] + '" aria-pressed="' + (t[0] === active) + '">' + t[1] + '</button>';
+    }).join('') + '</div>';
+  }
+
+  function insRange(p) {
+    var days = INS_PERIODS.filter(function (x) { return x[0] === p; })[0][2];
+    var b = DB.businessDay().split('-');
+    var end = new Date(+b[0], b[1] - 1, +b[2] + 1, DB.DAY_START_HOUR);
+    var start = new Date(+b[0], b[1] - 1, +b[2] + 1 - days, DB.DAY_START_HOUR);
+    return [start, end];
+  }
+
+  function loadIns(p, done) {
+    var key = 'ins:' + p;
+    if (!ready() || loading[key]) return;
+    loading[key] = true;
+    var r = insRange(p), tz = '';
+    try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (er) {}
+    Cloud.client.rpc('cw_insights', { p_from: r[0].toISOString(), p_to: r[1].toISOString(), p_tz: tz }).then(function (res) {
+      loading[key] = false;
+      if (res.error) cache[key] = { at: Date.now(), error: missingSql(res.error) ? 'sql' : netError(res.error) ? 'network' : res.error.message, data: cache[key] && cache[key].data };
+      else cache[key] = { at: Date.now(), data: res.data };
+      if (done) done();
+    }, function () {
+      loading[key] = false;
+      cache[key] = { at: Date.now(), error: 'network', data: cache[key] && cache[key].data };
+      if (done) done();
+    });
+  }
+
+  function insightsScreen() {
+    var key = 'ins:' + insPeriod, e = cache[key];
+    var label = INS_PERIODS.filter(function (x) { return x[0] === insPeriod; })[0][1];
+    var chipsIns = '<div class="chips" role="toolbar" aria-label="Período">' + INS_PERIODS.map(function (p) {
+      return '<button type="button" class="chip" data-ins-period="' + p[0] + '" aria-pressed="' + (insPeriod === p[0]) + '">' + p[1] + '</button>';
+    }).join('') + '</div>';
+    var body;
+    if (!ready()) body = '<div class="card">' + UI.empty('wifiOff', 'Precisa do servidor', 'Os insights são calculados no servidor. Entre no app com a internet ligada.') + '</div>';
+    else if (!e) body = chipsIns + '<div class="card"><p class="muted" style="margin:0">Calculando os insights…</p></div>';
+    else if (e.error === 'sql') {
+      body = UI.isAdmin() ? '<div data-sqlhelp></div>' : '<div class="card">' + UI.empty('sparkle', 'Insights ainda não ligados', 'Peça ao administrador para atualizar o banco (arquivo 004_insights.sql).') + '</div>';
+    } else if (!e.data) {
+      body = '<div class="banner crit">' + icon('alert', 'sm') + '<div class="grow">' + esc(e.error === 'network' ? 'Sem conexão com o servidor.' : e.error) + '</div><button type="button" class="btn sm" data-retry>Tentar de novo</button></div>';
+    } else body = (e.error === 'network' ? '<div class="banner crit">' + icon('wifiOff', 'sm') + '<div class="grow">Sem conexão. Mostrando o último cálculo.</div></div>' : '') +
+      chipsIns + CWInsights.html(e.data, 'últimos ' + label);
+
+    return {
+      html: '<main class="screen wide">' + UI.topbar('Vendas', { sub: 'Insights e decisões' }) + tabs('vendas/insights') + body + '</main>',
+      tab: 'vendas',
+      mount: function (root) {
+        var box = root.querySelector('[data-sqlhelp]');
+        if (box) UI.sqlHelp(box, 'supabase/004_insights.sql', 'Volte aqui e abra <b>Vendas › Insights</b> de novo.');
+        root.addEventListener('click', function (ev) {
+          var tb = ev.target.closest('[data-tab]'); if (tb) return go(tb.dataset.tab);
+          var p = ev.target.closest('[data-ins-period]');
+          if (p) { insPeriod = p.dataset.insPeriod; if (stale('ins:' + insPeriod, 120000)) loadIns(insPeriod, redrawIf('vendas/insights')); return refresh(); }
+          if (ev.target.closest('[data-retry]')) { delete cache[key]; refresh(); return; }
+          var l = ev.target.closest('[data-ins-list]');
+          if (l && e && e.data) CWInsights.openList(e.data, 'últimos ' + label, +l.dataset.insList);
+        });
+        // Os insights mudam devagar: recalcula no máximo a cada 2 minutos.
+        if (stale(key, 120000)) loadIns(insPeriod, redrawIf('vendas/insights'));
       }
     };
   }
@@ -320,6 +394,7 @@
   Screens.vendas = function (params) {
     if (!UI.isManager()) return Screens.inicio();
     if (params[0] === 'conexao' && UI.isAdmin()) return connectionScreen();
+    if (params[0] === 'insights') return insightsScreen();
     return salesScreen();
   };
 

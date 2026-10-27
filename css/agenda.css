@@ -50,16 +50,16 @@
 .tg-col.today { background-color: color-mix(in srgb, var(--accent) 3%, transparent); }
 .ev {
   position: absolute; z-index: 1; overflow: hidden; text-align: left; cursor: pointer;
-  border: 0; border-left: 3px solid var(--c); border-radius: 6px; padding: 3px 6px;
-  background: color-mix(in srgb, var(--c) 17%, var(--surface)); color: var(--ink);
+  border: 0; border-radius: 6px; padding: 3px 6px;
+  background: var(--c); color: var(--surface);  /* cor cheia, como os eventos de dia inteiro */
   display: flex; flex-direction: column; gap: 1px; font-size: 12px; line-height: 1.25;
   box-shadow: 0 0 0 1px var(--surface);
 }
 .ev b { font-weight: 650; overflow: hidden; text-overflow: ellipsis; }
-.ev span { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev span { color: color-mix(in srgb, var(--surface) 85%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev.short { flex-direction: row; align-items: center; padding-block: 0; white-space: nowrap; }
-.ev.past, .chip-ev.past, .mg-ev.past, .ag-item.past { opacity: .55; }
-.ev:hover { z-index: 2; filter: brightness(.97); }
+.ev.past, .chip-ev.past, .mg-ev.past, .ag-item.past { opacity: .75; }
+.ev:hover { z-index: 2; filter: brightness(.92); }
 .now-line { position: absolute; left: -1px; right: 0; height: 2px; background: var(--crit); z-index: 2; pointer-events: none; }
 .now-line::before { content: ""; position: absolute; left: -6px; top: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--crit); }
 
@@ -75,8 +75,8 @@
 .mg-num { align-self: center; width: 28px; height: 28px; border-radius: 50%; border: 0; background: none; font-size: var(--fs-sm); font-weight: 600; color: var(--ink); flex: none; }
 .mg-cell.today .mg-num { background: var(--accent); color: var(--accent-ink); }
 .mg-ev { font-size: 11px; padding: 1px 5px; border-radius: 4px; }
-.mg-ev:not(.allday) { background: transparent; color: var(--ink); padding-left: 2px; }
-.mg-ev i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--c); margin-right: 3px; }
+.mg-ev:not(.allday) { background: color-mix(in srgb, var(--c) 24%, var(--surface)); color: var(--ink); padding-left: 4px; }
+.mg-ev i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 3px; }
 .mg-ev .t { display: none; color: var(--ink-2); font-weight: 500; }
 .mg-more { border: 0; background: none; font-size: 11px; font-weight: 600; color: var(--ink-2); text-align: left; padding: 0 4px; }
 
@@ -97,7 +97,8 @@
 }
 .ag-item .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ag-item b { font-weight: 650; }
-.ev-bar { width: 4px; border-radius: 4px; background: var(--c); flex: none; }
+.ev-bar { width: 5px; border-radius: 4px; background: var(--c); flex: none; }
+.ag-item { background: color-mix(in srgb, var(--c) 16%, var(--surface)); }
 .ag-none { padding: 14px 4px; color: var(--ink-3); font-size: var(--fs-sm); border-bottom: 1px dashed var(--line); }
 
 /* ---------- Minicalendário e filtros ---------- */
