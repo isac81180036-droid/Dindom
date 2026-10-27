@@ -179,3 +179,10 @@
 }
 .ag-hint .grow { flex: 1; min-width: 0; }
 .ag-hint .icon-btn { width: 36px; height: 36px; }
+/* Cor do evento: "da agenda" ou uma das cores */
+.color-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.color-pick button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--c); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.color-pick button .ico { opacity: 0; }
+.color-pick button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.color-pick button[aria-pressed="true"] .ico { opacity: 1; }
+.color-pick button.auto { width: auto; padding: 0 14px 0 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink); display: inline-flex; gap: 8px; font-size: var(--fs-sm); font-weight: 600; }

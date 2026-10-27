@@ -12,7 +12,7 @@
     var c = Cal.calendar(e.cal);
     var rep = Cal.repeatLabel(e);
     UI.sheet(
-      '<div class="ev-detail" style="--c:var(--cal-' + c.color + ')">' +
+      '<div class="ev-detail" style="--c:var(--cal-' + Cal.colorOf(e) + ')">' +
       '<div class="card-row"><span class="ev-swatch"></span><h2 class="grow">' + esc(e.title) + '</h2></div>' +
       '<div class="ev-lines">' +
       '<div>' + icon('clock', 'sm') + '<span>' + esc(Cal.dayTitle(date)) + '<br><span class="muted num">' + Cal.timeRange(e) + (rep ? ' · ' + rep : '') + '</span></span></div>' +
@@ -50,7 +50,7 @@
     var v = {
       title: ev.title || '', cal: ev.cal || d.calendars[0].id, date: ev.date || Cal.today(),
       start: ev.start || '09:00', end: ev.end || '10:00', allDay: !!ev.allDay,
-      repeat: ev.repeat || 'none', place: ev.place || '', notes: ev.notes || ''
+      repeat: ev.repeat || 'none', place: ev.place || '', notes: ev.notes || '', color: ev.color || 0
     };
     var weekday = Cal.WEEK[Cal.parse(v.date).getDay()];
 
@@ -60,6 +60,12 @@
       '<span class="err" hidden>Dê um nome ao evento.</span></div>' +
       '<div class="field"><span class="label">Agenda</span><div class="chips wrap" data-cals>' + d.calendars.map(function (c) {
         return '<button type="button" class="chip" data-cal="' + c.id + '" aria-pressed="' + (c.id === v.cal) + '" style="--c:var(--cal-' + c.color + ')"><span class="cal-dot"></span>' + esc(c.name) + '</button>';
+      }).join('') + '</div></div>' +
+      // Cor: "da agenda" (padrão) ou uma cor própria do evento.
+      '<div class="field"><span class="label">Cor</span><div class="color-pick" data-colors>' +
+      '<button type="button" class="auto" data-color="0" aria-pressed="' + !v.color + '" style="--c:var(--cal-' + Cal.calendar(v.cal).color + ')"><span class="cal-dot"></span>Da agenda</button>' +
+      Cal.COLORS.map(function (c) {
+        return '<button type="button" data-color="' + c[0] + '" aria-pressed="' + (c[0] === v.color) + '" aria-label="' + c[1] + '" title="' + c[1] + '" style="--c:var(--cal-' + c[0] + ')">' + icon('check', 'sm') + '</button>';
       }).join('') + '</div></div>' +
       '<label class="row" for="ev-allday" style="padding:0;min-height:var(--tap)"><span class="grow card-title">Dia inteiro</span><input id="ev-allday" type="checkbox" class="switch"' + (v.allDay ? ' checked' : '') + '></label>' +
       '<div class="ev-when">' +
@@ -82,6 +88,13 @@
           b.addEventListener('click', function () {
             sheet.querySelectorAll('[data-cal]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
             v.cal = b.dataset.cal;
+            $('[data-color="0"]').style.setProperty('--c', 'var(--cal-' + Cal.calendar(v.cal).color + ')');
+          });
+        });
+        sheet.querySelectorAll('[data-color]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            sheet.querySelectorAll('[data-color]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+            v.color = Number(b.dataset.color);
           });
         });
         $('#ev-allday').addEventListener('change', function () {
@@ -116,10 +129,11 @@
           if (badTime) ok = false;
           if (!ok) return;
           if (out.allDay) { delete out.start; delete out.end; }
+          if (v.color) out.color = v.color;
           UI.busy(save, function () {
             DB.update(function (x) {
               if (isNew) { out.id = 'e' + Date.now(); x.events.push(out); }
-              else { var t = x.events.filter(function (y) { return y.id === ev.id; })[0]; Object.keys(out).forEach(function (k) { t[k] = out[k]; }); if (out.allDay) { delete t.start; delete t.end; } }
+              else { var t = x.events.filter(function (y) { return y.id === ev.id; })[0]; Object.keys(out).forEach(function (k) { t[k] = out[k]; }); if (out.allDay) { delete t.start; delete t.end; } if (!v.color) delete t.color; }
             });
             close();
             if (window.Agenda) Agenda.focus(out.date);

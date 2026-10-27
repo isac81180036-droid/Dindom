@@ -77,6 +77,8 @@
   function prepare(d) {
     Object.keys(defaults).forEach(function (k) { if (d[k] === undefined) d[k] = clone(defaults[k]); });
     if (!d.prefs.hiddenCals) d.prefs.hiddenCals = {};
+    // Sem agendas (ex.: banco novo no servidor): volta às padrão, senão não dá para criar evento.
+    if (!d.calendars || !d.calendars.length) d.calendars = clone(defaults.calendars);
     d.deliveries = deliveries(d.deliveryDays);
     if (!d.deliveries.some(function (x) { return x.id === d.closing.delivery; })) d.closing.delivery = d.deliveries[0] ? d.deliveries[0].id : null;
 

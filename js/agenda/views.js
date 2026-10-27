@@ -3,7 +3,7 @@
   var esc = UI.esc;
   var HOUR = 48; // altura de uma hora na grade, em px (igual a --hour no CSS)
 
-  function color(e) { return 'var(--cal-' + Cal.calendar(e.cal).color + ')'; }
+  function color(e) { return 'var(--cal-' + Cal.colorOf(e) + ')'; }
   function nowMins() { var n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
   function isPast(o) {
     var t = Cal.today();

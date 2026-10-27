@@ -30,6 +30,9 @@
   --cal-3: #7a4fd1;
   --cal-4: #1f8a57;
   --cal-5: #c2386b;
+  --cal-6: #c93434;
+  --cal-7: #a87b00;
+  --cal-8: #59626e;
 
   --font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
   --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -93,6 +96,9 @@
     --cal-3: #b294ff;
     --cal-4: #3ccf87;
     --cal-5: #ff7eb0;
+    --cal-6: #ff7b7b;
+    --cal-7: #f0c64a;
+    --cal-8: #a8b1bd;
     color-scheme: dark;
   }
 }
@@ -124,6 +130,9 @@
   --cal-3: #b294ff;
   --cal-4: #3ccf87;
   --cal-5: #ff7eb0;
+  --cal-6: #ff7b7b;
+  --cal-7: #f0c64a;
+  --cal-8: #a8b1bd;
   color-scheme: dark;
 }
 

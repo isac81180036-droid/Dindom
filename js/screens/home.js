@@ -150,7 +150,7 @@
     return '<section class="section"><div class="section-head"><h2>Agenda de hoje</h2><a class="btn ghost sm" href="#agenda">Abrir agenda</a></div>' +
       '<div class="list">' + (list.length ? list.map(function (o) {
         var c = Cal.calendar(o.ev.cal);
-        return '<a class="row today-ev" href="#agenda" style="text-decoration:none;color:inherit;--c:var(--cal-' + c.color + ')">' +
+        return '<a class="row today-ev" href="#agenda" style="text-decoration:none;color:inherit;--c:var(--cal-' + Cal.colorOf(o.ev) + ')">' +
           '<span class="time num">' + (o.ev.allDay ? 'Dia' : o.ev.start) + '</span><span class="ev-bar"></span>' +
           '<span class="grow"><span class="card-title">' + esc(o.ev.title) + '</span><span class="card-meta" style="display:block">' + Cal.timeRange(o.ev) + (o.ev.place ? ' · ' + esc(o.ev.place) : '') + '</span></span></a>';
       }).join('') : '<div class="row muted">Nada mais na agenda hoje.</div>') + '</div></section>';

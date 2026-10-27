@@ -27,6 +27,9 @@
     },
 
     calendar: function (id) { return DB.get().calendars.filter(function (c) { return c.id === id; })[0] || DB.get().calendars[0]; },
+    // Cores que o evento pode ter; sem cor própria, o evento usa a cor da agenda.
+    COLORS: [[1, 'Laranja'], [2, 'Azul'], [3, 'Roxo'], [4, 'Verde'], [5, 'Rosa'], [6, 'Vermelho'], [7, 'Amarelo'], [8, 'Grafite']],
+    colorOf: function (e) { return e.color || Cal.calendar(e.cal).color; },
 
     // Ocorrências visíveis entre duas datas (inclusive), já expandindo repetições.
     occurrences: function (from, to) {
