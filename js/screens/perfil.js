@@ -52,6 +52,8 @@
       seg('theme', [['system', 'Automático', 'sparkle'], ['light', 'Claro', 'sun'], ['dark', 'Escuro', 'moon']], d.prefs.theme) + '</section>' +
 
       (manager ? '<section class="section"><div class="eyebrow">Administração</div><div class="list">' +
+        '<a class="row" href="#vendas" style="text-decoration:none;color:inherit"><div class="tile">' + icon('receipt') + '</div>' +
+        '<div class="grow"><div class="card-title">Vendas</div><div class="card-meta">Pedidos da Cardápio Web · faturamento e mais vendidos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#produtos" style="text-decoration:none;color:inherit"><div class="tile">' + icon('box') + '</div>' +
         '<div class="grow"><div class="card-title">Produtos do estoque</div><div class="card-meta">' + d.products.length + ' cadastrados · estoque ideal e mínimo</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#checklists/editar" style="text-decoration:none;color:inherit"><div class="tile">' + icon('checklist') + '</div>' +

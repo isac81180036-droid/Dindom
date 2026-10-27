@@ -108,3 +108,10 @@
 .te-flags { display: flex; gap: var(--sp-4); flex-wrap: wrap; font-size: var(--fs-sm); color: var(--ink-2); }
 .te-flags label { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; }
 .te-flags input { width: 18px; height: 18px; accent-color: var(--ink); }
+/* ---------- Vendas (Cardápio Web) ---------- */
+.cw-kpis .stat, .cw-stages .stat { font-size: var(--fs-xl); }
+.cw-rank > .grow { display: flex; flex-direction: column; gap: 4px; }
+.cw-rank-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.cw-rank-head .card-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-rank .bar { height: 6px; margin-top: 2px; }
+.banner.info { background: var(--info-soft); color: var(--info); }

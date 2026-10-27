@@ -93,4 +93,15 @@ Em Gestão › Colaboradores › **Dar acesso à contabilidade**, o admin cria u
 - não aprova ajustes nem altera dados (bloqueado também no banco, por `supabase/002_contabilidade.sql`);
 - exporta, por período (mês atual, mês anterior ou datas livres) e por unidade, três planilhas CSV (separador `;`, UTF-8, datas DD/MM/AAAA, horas HH:MM): **Marcações**, **Espelho de ponto** e **Resumo do período**; e dois arquivos TXT: **AFD** (leiaute de relógio de ponto da Portaria 1510: cabeçalho tipo 1 com CNPJ e razão social, marcações tipo 3 com NSR, data, hora e PIS, fechamento tipo 9) e **Espelho de ponto em texto** (`js/ponto-export.js`). CPF e PIS do cadastro identificam cada funcionário; o CNPJ e a razão social ficam em Perfil › Dados da empresa.
 
-No Supabase já em uso, rode `supabase/002_contabilidade.sql` uma vez (instalações novas já recebem isso pelo `schema.sql`).
+No Supabase já em uso, rode `supabase/002_contabilidade.sql` uma vez (instalações novas já recebem isso pelo `schema.sql`).## Vendas (Cardápio Web)
+
+Gerentes e administradores veem em **Vendas** (menu Gestão no computador; Perfil › Administração no celular) o movimento da loja na Cardápio Web: faturamento, pedidos, ticket médio e cancelados por período (hoje, ontem, 7 dias, mês, sempre no dia de trabalho que vira às 5h), pedidos em andamento com o tempo de espera, itens e sabores mais vendidos, tipo de pedido, canal e formas de pagamento. O Início do gerente mostra o resumo de hoje (`js/screens/vendas.js`).
+
+**Como ligar (uma vez):**
+1. No Supabase, rode `supabase/003_cardapioweb.sql` (o app oferece o SQL pronto para copiar). Ele liga as extensões `http` e `pg_cron` e agenda a busca dos pedidos a cada minuto.
+2. No Portal da Cardápio Web: **Configurações › Integrações › API** › gerar token.
+3. No app, como administrador: Vendas › ícone de engrenagem › cole o token › **Conectar**. Para experimentar antes, use "Experimentar com a loja de teste" (loja pública da documentação da Cardápio Web).
+
+**Como funciona:** o token fica só no banco (tabela `cw_config`, sem leitura pelo app). A cada minuto o próprio banco consulta a API (`cw_sync`): pedidos alterados nas últimas horas, uma página do histórico dos últimos 30 dias até completar e até 30 pedidos completos por minuto, para não estourar o limite da API (300 chamadas a cada 3 minutos por loja, dividido com outros sistemas que usem o mesmo token). Os pedidos ficam em `cw_orders` sem telefone e endereço do cliente (só o primeiro nome e o bairro), e só gerente e administrador conseguem ler. A tela pede o resumo já somado (`cw_report`) e se atualiza sozinha quando chega pedido.
+
+**Limites:** o app só lê. Aceitar, cancelar e mudar status continuam no Portal da Cardápio Web. A integração usa o token do estabelecimento (modelo "legado" da API); resumos e rankings prontos da própria Cardápio Web e a gestão de insumos exigem OAuth, que só existe para apps publicados na CW App Store. Se a Cardápio Web desligar o token legado, será preciso cadastrar o Dindom como app lá. Pedidos de mesa e comanda só aparecem depois de fechados (regra da API).

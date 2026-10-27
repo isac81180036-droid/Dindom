@@ -1,6 +1,7 @@
-# Netlify: publica só os arquivos do app (sem README, render.yaml e serve.ps1).
+# Netlify: publica só os arquivos do app (sem README, render.yaml e serve.ps1). A pasta supabase vai junto
+# para o app oferecer o SQL pronto para copiar quando o banco precisa de atualização.
 [build]
-  command = "rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img dist/"
+  command = "rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img supabase dist/"
   publish = "dist"
 
 # O service worker e a página principal sempre buscam a versão nova.

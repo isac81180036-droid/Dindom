@@ -192,7 +192,7 @@
     var manager = UI.isManager();
     // No celular as colunas viram uma pilha só, na ordem: coluna 1, depois coluna 2.
     var cols = manager
-      ? [startCard(d) + pontoCard() + managerSummary(d) + closingCard(d), agendaSection() + stockSection(d)]
+      ? [startCard(d) + pontoCard() + CW.homeCard() + managerSummary(d) + closingCard(d), agendaSection() + stockSection(d)]
       : [pontoCard() + closingCard(d) + tasksSection(d), agendaSection() + stockSection(d) + maintSection(d)];
     var html = '<main class="screen wide">' + header(d) +
       '<div class="home-grid"><div class="col">' + cols[0] + '</div><div class="col">' + cols[1] + '</div></div>' +
@@ -201,6 +201,7 @@
       html: html, tab: 'inicio',
       mount: function (r) {
         r.querySelector('[data-unit]').addEventListener('click', unitSheet);
+        CW.homeLoad();
         r.querySelectorAll('[data-home-punch]').forEach(function (b) { b.addEventListener('click', function () { PontoUI.confirmPunch(Ponto.me().id, b.dataset.homePunch, 'app'); }); });
       }
     };

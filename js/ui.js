@@ -126,6 +126,33 @@
   UI.isAdmin = function () { return DB.get().user.role === 'admin'; };
   UI.isAccountant = function () { return DB.get().user.role === 'contador'; };
 
+  // Banco sem uma atualização: passo a passo com o SQL pronto para copiar e colar no Supabase.
+  // "last" é o último passo (HTML), dizendo o que fazer ao voltar para o app.
+  UI.sqlHelp = function (box, file, last) {
+    var ref = ((window.DINDOM_CONFIG || {}).supabaseUrl || '').replace(/^https:\/\/([^.]+)\..*$/, '$1');
+    var sql = '';
+    var fail = 'Não foi possível copiar. Abra o arquivo ' + file + ' no GitHub.';
+    box.hidden = false;
+    box.innerHTML = '<div class="card" style="border:1.5px solid var(--warn)"><div class="card-row"><div class="tile warn">' + icon('alert') + '</div><div class="grow"><div class="card-title">Falta atualizar o banco no Supabase</div>' +
+      '<div class="card-meta">É uma vez só. Nenhum dado é apagado.</div></div></div>' +
+      '<ol class="card-meta" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;color:var(--ink-2)">' +
+      '<li>Toque em <b>Copiar SQL</b>.</li><li>Toque em <b>Abrir Supabase</b>, cole (Ctrl+V) e clique em <b>Run</b>. Se aparecer um aviso, confirme.</li><li>' + last + '</li></ol>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-copysql disabled>' + icon('copy', 'sm') + 'Copiar SQL</button>' +
+      '<a class="btn" href="https://supabase.com/dashboard/project/' + UI.esc(ref) + '/sql/new" target="_blank" rel="noopener">Abrir Supabase</a></div></div>';
+    var copy = box.querySelector('[data-copysql]');
+    // O texto é baixado antes, para a cópia acontecer na hora do toque (exigência do iPhone).
+    fetch(file, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); })
+      .then(function (t) { sql = t; copy.disabled = false; }, function () { copy.disabled = false; });
+    copy.addEventListener('click', function () {
+      if (!sql) return UI.toast('Não foi possível baixar o SQL. Confira a internet e tente de novo.', { tone: 'crit', ms: 5000 });
+      try {
+        navigator.clipboard.writeText(sql).then(function () { UI.toast('SQL copiado. Agora cole no Supabase e clique em Run.', { ms: 5000 }); },
+          function () { UI.toast(fail, { tone: 'crit', ms: 6000 }); });
+      } catch (er) { UI.toast(fail, { tone: 'crit', ms: 6000 }); }
+    });
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+
   UI.fmtCnpj = function (s) { var c = String(s || '').replace(/\D/g, '').slice(0, 14); return c.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2'); };
   // CNPJ válido pelos dígitos verificadores.
   UI.validCnpj = function (s) {

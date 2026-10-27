@@ -155,6 +155,7 @@
     },
     iso: iso,
     businessDay: businessDay,
+    DAY_START_HOUR: DAY_START_HOUR,
     deliveries: deliveries,
     WEEK: WEEK,
     // Estoque atual de um produto na unidade selecionada.

@@ -1,5 +1,5 @@
 {
-  "buildCommand": "rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img dist/",
+  "buildCommand": "rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img supabase dist/",
   "outputDirectory": "dist",
   "framework": null,
   "headers": [

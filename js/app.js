@@ -14,6 +14,7 @@
   ];
   // Área do administrador: no computador aparece no menu lateral; no celular, pelo Perfil.
   var ADMIN_TABS = [
+    { id: 'vendas', label: 'Vendas', icon: 'receipt' },
     { id: 'produtos', label: 'Produtos', icon: 'box' },
     { id: 'checklists/editar', label: 'Modelos de checklist', icon: 'checklist' },
     { id: 'equipe', label: 'Colaboradores', icon: 'users', admin: true },
