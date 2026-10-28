@@ -104,12 +104,14 @@
   };
 
   // Registra uma marcação com número sequencial (NSR) e devolve o registro.
-  P.punch = function (empId, type, method, ts) {
+  // geo: resultado da trava de localização ({ dist, acc } ou { trusted: true }), guardado para conferência.
+  P.punch = function (empId, type, method, ts, geo) {
     var rec;
     DB.update(function (x) {
       x.punchSeq = (x.punchSeq || 0) + 1;
       var emp = x.employees.filter(function (e) { return e.id === empId; })[0];
       rec = { id: 'pt' + Date.now() + Math.random().toString(36).slice(2, 6), emp: empId, ts: ts || Date.now(), type: type, unit: emp ? emp.unit : x.user.unit, method: method || 'app', nsr: (window.Cloud && Cloud.orgId) ? null : x.punchSeq }; // com servidor, o NSR vem do Supabase
+      if (geo) rec.geo = geo;
       x.punches.push(rec);
     });
     if (window.Cloud && Cloud.orgId) Cloud.schedule(true); // ponto vai para o servidor na hora

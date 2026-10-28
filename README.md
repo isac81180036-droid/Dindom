@@ -114,3 +114,9 @@ Gerentes e administradores veem em **Vendas** (menu Gestão no computador; Perfi
 - **Estações** (`#estacoes`, `js/screens/estacoes.js`): o gerente cria estações, escolhe os responsáveis (um ou mais colaboradores) e os produtos de cada uma. Cada produto fica em uma estação só. "Criar estações sugeridas" monta Preparo, Montagem, Apoio e atendimento, e Embalagens e limpeza a partir do tipo e da categoria. **Produtos › Organizar** muda tipo e estação de vários produtos numa lista só.
 - **No fechamento**, quem tem estação abre em "Minha parte" e conta só os seus produtos; "Loja toda" mostra o andamento de cada estação. Quando tudo foi contado, qualquer pessoa finaliza e sai uma lista de compras única. Produto sem estação pode ser contado por qualquer pessoa.
 - A contagem é guardada produto a produto (coleção `counts`), para várias pessoas contarem ao mesmo tempo em aparelhos diferentes sem uma apagar a outra. Contagens em andamento no formato antigo são convertidas sozinhas.
+
+## Trava de localização do ponto
+
+Com a trava ligada (Perfil › Trava de localização do ponto, só o administrador), o colaborador só bate o ponto a até 30 m da loja (raio ajustável por unidade). O app soma uma folga de até 20 m conforme a precisão do GPS e recusa leituras com erro maior que 100 m. A distância fica gravada em cada marcação (`geo: { dist, acc }`) e aparece para o gerente no histórico de ponto da equipe. O local é definido com o administrador na loja ("usar a localização deste aparelho") ou colando as coordenadas. O computador ou tablet fixo do ponto por código é marcado como "aparelho da loja" e não passa pela trava. Código em `js/geo.js`.
+
+Limite: a conferência acontece no aparelho. Quem usa app de GPS falso consegue burlar; a distância registrada em cada marcação ajuda a conferir.

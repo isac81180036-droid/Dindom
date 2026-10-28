@@ -17,8 +17,32 @@
     return 'Você ainda não registrou o ponto hoje · seu horário: ' + esc(P.horarioLabel(emp));
   }
 
-  // Confirmação antes de gravar: a marcação não pode ser apagada depois.
+  // Antes de tudo, a trava de localização (js/geo.js): longe da loja, não dá para bater o ponto.
   function confirmPunch(empId, type, method, after) {
+    var emp = P.employee(empId);
+    var unit = DB.get().units.filter(function (u) { return u.id === emp.unit; })[0];
+    if (!unit || !unit.geo || Geo.trusted()) return askPunch(empId, type, method, after, unit && unit.geo ? { trusted: true } : null);
+    var cancelled = false;
+    var closeWait = UI.sheet('<div class="punch-confirm"><div class="tile info" style="margin:0 auto">' + icon('mapPin') + '</div>' +
+      '<h2>Conferindo sua localização…</h2><p class="muted">O ponto só pode ser batido a até ' + (unit.geo.radius || Geo.RADIUS) + ' m da loja.</p></div>' +
+      '<button type="button" class="btn block" data-close>Cancelar</button>', null, function () { cancelled = true; });
+    Geo.check(unit).then(function (r) {
+      if (cancelled) return;
+      cancelled = true; closeWait();
+      if (r.ok) return askPunch(empId, type, method, after, r.geo);
+      UI.buzz(60);
+      UI.sheet('<div class="punch-confirm"><div class="tile crit" style="margin:0 auto">' + icon('mapPin') + '</div>' +
+        '<h2>' + (r.far ? 'Fora da loja' : 'Localização necessária') + '</h2><p class="muted">' + esc(r.msg) + '</p></div>' +
+        '<button type="button" class="btn primary block" data-again style="min-height:56px">' + icon('refresh', 'sm') + 'Tentar de novo</button>' +
+        '<button type="button" class="btn block" data-close>Fechar</button>',
+        function (sheet, close) {
+          sheet.querySelector('[data-again]').addEventListener('click', function () { close(); confirmPunch(empId, type, method, after); });
+        });
+    });
+  }
+
+  // Confirmação antes de gravar: a marcação não pode ser apagada depois.
+  function askPunch(empId, type, method, after, geo) {
     var emp = P.employee(empId), now = new Date();
     UI.sheet('<div class="punch-confirm"><div class="eyebrow">' + esc(P.TYPES[type].label) + '</div>' +
       '<div class="punch-time num" data-ctime>' + clockParts(now).hm + '<small>:' + clockParts(now).s + '</small></div>' +
@@ -32,7 +56,7 @@
           if (ok.disabled) return;
           ok.disabled = true; // um toque só: evita duas marcações seguidas
           clearInterval(t);
-          var rec = P.punch(empId, type, method);
+          var rec = P.punch(empId, type, method, null, geo);
           close(); UI.buzz(30);
           receipt(rec, after);
         });
@@ -45,7 +69,8 @@
       '<h2>' + esc(P.TYPES[rec.type].label) + ' registrada</h2>' +
       '<div class="punch-time num">' + d.toLocaleTimeString('pt-BR') + '</div>' +
       '<div class="receipt-box num"><span>' + esc(P.employee(rec.emp).name) + '</span><span>' + d.toLocaleDateString('pt-BR') + ' · ' + esc(unitName(rec.unit)) + '</span>' +
-      '<span><span data-nsr-for="' + rec.id + '">' + (rec.nsr ? 'NSR ' + String(rec.nsr).padStart(9, '0') : 'NSR gerando…') + '</span>' + (rec.method === 'codigo' ? ' · por código' : '') + '</span></div></div>' +
+      '<span><span data-nsr-for="' + rec.id + '">' + (rec.nsr ? 'NSR ' + String(rec.nsr).padStart(9, '0') : 'NSR gerando…') + '</span>' + (rec.method === 'codigo' ? ' · por código' : '') + '</span>' +
+      (rec.geo ? '<span>' + (rec.geo.trusted ? 'No aparelho da loja' : 'A ' + rec.geo.dist + ' m da loja') + '</span>' : '') + '</div></div>' +
       '<button type="button" class="btn block" data-copy>' + icon('copy', 'sm') + 'Copiar comprovante</button>' +
       '<button type="button" class="btn primary block" data-close>Pronto</button>',
       function (sheet) {
@@ -135,6 +160,9 @@
         (early ? '<span class="pill warn no-dot">Saiu ' + P.dur(early) + ' antes</span>' : '') +
         (stale ? '<span class="pill crit no-dot">Sem saída</span>' : '') +
         (j.list.some(function (p) { return p.method === 'ajuste'; }) ? '<span class="pill info no-dot">Ajustado</span>' : '') +
+        // Para o gerente: de que distância da loja as marcações do dia foram feitas (trava de localização).
+        (!self && j.list.some(function (p) { return p.geo && p.geo.dist != null; }) ? '<span class="pill no-dot">' + icon('mapPin', 'sm') + 'até ' +
+          Math.max.apply(null, j.list.filter(function (p) { return p.geo && p.geo.dist != null; }).map(function (p) { return p.geo.dist; })) + ' m da loja</span>' : '') +
         (!m.saida && !stale ? '<span class="pill ok">Em andamento</span>' : '');
       return '<div class="row ponto-day"><div class="pd-date"><b>' + dayLabel(j.date).split(',')[0] + '</b><span class="num">' + dayLabel(j.date).split(', ')[1] + '</span></div>' +
         '<div class="grow"><div class="num pd-marks">' + P.ORDER.map(function (t) { return m[t] ? P.hhmm(m[t].ts) : '<span class="faint">--:--</span>'; }).join('<span class="faint"> · </span>') + '</div>' +

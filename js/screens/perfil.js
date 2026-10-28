@@ -32,6 +32,67 @@
       });
   }
 
+  // Trava de localização do ponto (js/geo.js): local e raio de cada unidade, e o aparelho fixo da loja.
+  function geoSheet() {
+    var d = DB.get();
+    function unitBlock(u) {
+      var g = u.geo;
+      return '<div class="card" style="box-shadow:none;background:var(--surface-2)" data-gu="' + esc(u.id) + '">' +
+        '<div class="card-row"><div class="tile ' + (g ? 'ok' : '') + '">' + icon('mapPin') + '</div><div class="grow"><div class="card-title">' + esc(u.name) + '</div>' +
+        '<div class="card-meta">' + (g ? 'Trava ligada: até ' + (g.radius || Geo.RADIUS) + ' m · <a href="' + Geo.mapLink(g) + '" target="_blank" rel="noopener">ver no mapa</a>' : 'Sem trava: o ponto pode ser batido de qualquer lugar') + '</div></div></div>' +
+        '<button type="button" class="btn primary block" data-here>' + icon('mapPin', 'sm') + 'Estou na loja: usar a localização deste aparelho</button>' +
+        '<div class="field"><label for="gc-' + esc(u.id) + '">Ou cole as coordenadas (latitude, longitude)</label>' +
+        '<input id="gc-' + esc(u.id) + '" class="input num" data-coords placeholder="Ex.: 0.0812672, -51.0640875" value="' + (g ? g.lat + ', ' + g.lng : '') + '"></div>' +
+        '<div class="field"><label for="gr-' + esc(u.id) + '">Distância máxima da loja</label><div class="qty-unit"><input id="gr-' + esc(u.id) + '" class="input num" data-radius inputmode="numeric" value="' + ((g && g.radius) || Geo.RADIUS) + '"><span>metros</span></div>' +
+        '<span class="hint">O GPS do celular erra alguns metros; o app dá uma folga de até 20 m conforme a precisão do aparelho.</span></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-save-geo>Salvar</button>' + (g ? '<button type="button" class="btn" data-off-geo style="color:var(--crit)">Desligar a trava</button>' : '') + '</div></div>';
+    }
+    UI.sheet('<h2>Trava de localização do ponto</h2><p class="muted">Com a trava ligada, o colaborador só consegue bater o ponto perto da loja. A distância fica registrada em cada marcação.</p>' +
+      d.units.map(unitBlock).join('') +
+      '<label class="row" for="geo-trusted" style="padding-inline:0"><div class="grow"><div class="card-title">Este aparelho fica na loja</div>' +
+      '<div class="card-meta">Marque no computador ou tablet do ponto por código: ele não tem GPS e não sai do estabelecimento, então não passa pela trava. Vale só para este aparelho.</div></div>' +
+      '<input id="geo-trusted" type="checkbox" class="switch"' + (Geo.trusted() ? ' checked' : '') + '></label>' +
+      '<button type="button" class="btn block" data-close>Fechar</button>',
+      function (sheet, close) {
+        function save(uid, geo) {
+          DB.update(function (x) { x.units.forEach(function (u) { if (u.id === uid) { if (geo) u.geo = geo; else delete u.geo; } }); });
+          close(); geoSheet();
+        }
+        sheet.querySelector('#geo-trusted').addEventListener('change', function (e) {
+          Geo.setTrusted(e.target.checked);
+          UI.toast(e.target.checked ? 'Este aparelho foi marcado como da loja' : 'Este aparelho passa pela trava de localização');
+        });
+        sheet.querySelectorAll('[data-gu]').forEach(function (box) {
+          var uid = box.dataset.gu;
+          function radius() { var r = parseInt(box.querySelector('[data-radius]').value, 10); return r >= 10 && r <= 1000 ? r : null; }
+          box.querySelector('[data-here]').addEventListener('click', function (e) {
+            var b = e.currentTarget; b.classList.add('busy'); b.disabled = true;
+            Geo.here().then(function (pos) {
+              b.classList.remove('busy'); b.disabled = false;
+              if (pos.acc > 50) {
+                UI.toast('Precisão baixa agora (erro de ' + pos.acc + ' m). Ligue o GPS em alta precisão, espere alguns segundos e tente de novo.', { tone: 'crit', ms: 6000 });
+                return;
+              }
+              save(uid, { lat: Math.round(pos.lat * 1e7) / 1e7, lng: Math.round(pos.lng * 1e7) / 1e7, radius: radius() || Geo.RADIUS });
+              UI.toast('Local da loja salvo (precisão de ' + pos.acc + ' m). A trava está ligada.', { ms: 4500 });
+            }, function (er) {
+              b.classList.remove('busy'); b.disabled = false;
+              UI.toast(er.reason === 'denied' ? 'Permita a localização para este site e tente de novo.' : 'Não consegui pegar a localização deste aparelho.', { tone: 'crit', ms: 5000 });
+            });
+          });
+          box.querySelector('[data-save-geo]').addEventListener('click', function () {
+            var c = Geo.parse(box.querySelector('[data-coords]').value), r = radius();
+            if (!c) return UI.toast('Coordenadas inválidas. Use o formato: 0.0812672, -51.0640875', { tone: 'crit', ms: 5000 });
+            if (!r) return UI.toast('Informe uma distância entre 10 e 1000 metros.', { tone: 'crit' });
+            save(uid, { lat: c.lat, lng: c.lng, radius: r });
+            UI.toast('Trava de localização salva');
+          });
+          var off = box.querySelector('[data-off-geo]');
+          if (off) off.addEventListener('click', function () { save(uid, null); UI.toast('Trava desligada: o ponto pode ser batido de qualquer lugar'); });
+        });
+      });
+  }
+
   Screens.perfil = function () {
     var d = DB.get();
     var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
@@ -64,6 +125,8 @@
         '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active && e.role !== 'contador'; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#parceiros" style="text-decoration:none;color:inherit"><div class="tile">' + icon('file') + '</div>' +
         '<div class="grow"><div class="card-title">Parceiros</div><div class="card-meta">Login da contabilidade · ' + d.employees.filter(function (e) { return e.active && e.role === 'contador'; }).length + ' com acesso</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<button type="button" class="row" data-geo><div class="tile">' + icon('mapPin') + '</div>' +
+        '<div class="grow"><div class="card-title">Trava de localização do ponto</div><div class="card-meta">' + (d.units.some(function (u) { return u.geo; }) ? 'Ligada: ponto só perto da loja' : 'Desligada: ponto de qualquer lugar') + (Geo.trusted() ? ' · este é o aparelho da loja' : '') + '</div></div>' + icon('chevronRight', 'sm') + '</button>' +
         '<button type="button" class="row" data-company><div class="tile">' + icon('store') + '</div>' +
         '<div class="grow"><div class="card-title">Dados da empresa</div><div class="card-meta">' + (d.org && d.org.cnpj ? esc(d.org.legalName || '') + ' · CNPJ ' + esc(fmtCnpj(d.org.cnpj)) : 'Razão social e CNPJ, usados no arquivo de ponto (AFD)') + '</div></div>' + icon('chevronRight', 'sm') + '</button>' : '') +
         '</div></section>' : '') +
@@ -89,6 +152,8 @@
         if (perm) perm.addEventListener('change', function () {
           DB.update(function (x) { x.settings.staffCanJustify = perm.checked; }); UI.toast('Permissão atualizada');
         });
+        var geo = root.querySelector('[data-geo]');
+        if (geo) geo.addEventListener('click', geoSheet);
         var company = root.querySelector('[data-company]');
         if (company) company.addEventListener('click', companySheet);
         var wipe = root.querySelector('[data-wipe]');
