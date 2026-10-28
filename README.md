@@ -120,3 +120,17 @@ Gerentes e administradores veem em **Vendas** (menu Gestão no computador; Perfi
 Com a trava ligada (Perfil › Trava de localização do ponto, só o administrador), o colaborador só bate o ponto a até 30 m da loja (raio ajustável por unidade). O app soma uma folga de até 20 m conforme a precisão do GPS e recusa leituras com erro maior que 100 m. A distância fica gravada em cada marcação (`geo: { dist, acc }`) e aparece para o gerente no histórico de ponto da equipe. O local é definido com o administrador na loja ("usar a localização deste aparelho") ou colando as coordenadas. O computador ou tablet fixo do ponto por código é marcado como "aparelho da loja" e não passa pela trava. Código em `js/geo.js`.
 
 Limite: a conferência acontece no aparelho. Quem usa app de GPS falso consegue burlar; a distância registrada em cada marcação ajuda a conferir.
+
+## Reservas pelo link público
+
+Um link aberto (`/reserva`, ex.: `https://seu-site/reserva`) para enviar a empresas e clientes. Eles preenchem o questionário (responsável, empresa, WhatsApp, e-mail, tipo de evento, homenageado, data, horário de início e término, pessoas, decoração, bolo/alimentação/bebidas, orçamento, observações e a confirmação "a reserva só é garantida após confirmação da equipe") sem login, e a reserva entra na hora na agenda de toda a equipe.
+
+**Como ligar (uma vez):** no Supabase, rode `supabase/005_reservas.sql` (a tela Reservas oferece o SQL pronto para copiar). Depois, em **Reservas › Copiar link de reserva**, copie e envie o link.
+
+**Como funciona:**
+- A página pública fica em `reserva/` e não carrega o app: só manda o questionário para `criar_reserva()`, que confere tudo de novo no servidor (campos obrigatórios, data a partir de hoje no fuso America/Fortaleza, horários, quantidade de pessoas). Proteção contra spam: campo escondido para robôs, envio rápido demais descartado, até 5 pedidos por hora por aparelho (IP, guardado só como código), 3 por dia por WhatsApp e 40 a cada 10 minutos no total.
+- A reserva fica na tabela `reservas` (status `pendente`, `confirmada`, `recusada` ou `cancelada`; origem `link_publico`; `evento_id` liga ao evento da agenda). O próprio banco cria o evento na agenda "Reservas e eventos" (título `🎉 Tipo – Responsável/empresa (X pessoas)`) e um aviso em Notificações. O evento chega em tempo real a todos os aparelhos.
+- Na agenda, reservas são douradas, com os selos RESERVA e o status (pendente amarelo, confirmada verde, recusada e cancelada em cinza e riscadas). Pendente que ninguém abriu pisca com o selo NOVA. Duas reservas ativas no mesmo dia e horário mostram CONFLITO e um aviso no topo da agenda. Festa que passa da meia-noite aparece até o fim do dia.
+- Tocar no evento abre o painel da reserva: todas as respostas, confirmar, recusar, cancelar, abrir o WhatsApp do cliente com a mensagem pronta (wa.me), editar os detalhes e anotações internas. Tudo grava direto na tabela, e o banco atualiza o evento.
+- **Reservas** (`#reservas`, `js/screens/reservas.js`): lista por status e período, com contador de pendentes no menu, no Início e no Perfil, e aviso na tela quando chega reserva nova.
+- Só a equipe logada lê e altera as reservas; o público só cria. A contabilidade não vê.

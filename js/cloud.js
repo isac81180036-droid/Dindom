@@ -80,20 +80,36 @@
     });
   }
 
+  // Aplica um item que veio do servidor. Retorna false se não mudou nada.
+  function receive(row) {
+    var key = k(row.collection, row.id), json = JSON.stringify(row.data);
+    if (!row.deleted && snapshot[key] === json) return false; // eco do que este aparelho mesmo enviou
+    var isNew = !snapshot[key];
+    DB.applyRemote(row);
+    if (row.deleted) delete snapshot[key]; else snapshot[key] = json;
+    if (row.collection === 'punches' && row.data) showNsr(row.data);
+    // Reserva nova pelo link público (supabase/005_reservas.sql): avisa quem está com o app aberto.
+    if (isNew && !row.deleted && row.collection === 'events' && row.data && row.data.reserva) {
+      try { window.dispatchEvent(new CustomEvent('dindom:reserva', { detail: row.data })); } catch (e) {}
+    }
+    return true;
+  }
+
   function subscribe() {
     if (channel) { client.removeChannel(channel); channel = null; }
     channel = client.channel('dindom-' + Cloud.orgId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: 'org_id=eq.' + Cloud.orgId }, function (p) {
         var row = p.new; if (!row || !row.collection) return;
-        var key = k(row.collection, row.id), json = JSON.stringify(row.data);
-        if (!row.deleted && snapshot[key] === json) return; // eco do que este aparelho mesmo enviou
-        DB.applyRemote(row);
-        if (row.deleted) delete snapshot[key]; else snapshot[key] = json;
-        if (row.collection === 'punches' && row.data) showNsr(row.data);
-        refreshSoon();
+        if (receive(row)) refreshSoon();
       })
       .subscribe();
   }
+
+  // Busca agora itens que o próprio servidor montou (ex.: o evento de uma reserva), sem esperar o tempo real.
+  Cloud.pull = function (col, ids) {
+    return client.from('records').select('collection,id,data,deleted').eq('org_id', Cloud.orgId).eq('collection', col).in('id', ids)
+      .then(function (r) { if (r.error) throw r.error; r.data.forEach(receive); });
+  };
 
   // Redesenha a tela com o que chegou de outro aparelho, sem atrapalhar quem está digitando.
   var refreshTimer = 0;

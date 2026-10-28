@@ -32,6 +32,8 @@ while ($listener.IsListening) {
     $path = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
     if ($path -eq '') { $path = 'index.html' }
     $full = [IO.Path]::GetFullPath((Join-Path $root $path))
+    # Pasta (ex.: /reserva): entrega o index.html de dentro dela.
+    if (Test-Path $full -PathType Container) { $full = Join-Path $full 'index.html' }
     # Só entrega arquivos de dentro da pasta do projeto.
     if (-not $full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -or -not (Test-Path $full -PathType Leaf)) {
       $res.StatusCode = 404

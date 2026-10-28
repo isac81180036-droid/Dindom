@@ -106,6 +106,9 @@
       '<div class="list">' +
       '<a class="row" href="#notificacoes" style="text-decoration:none;color:inherit"><div class="tile">' + icon('bell') + '</div><div class="grow card-title">Notificações</div>' +
       (unread ? '<span class="pill accent no-dot num">' + unread + ' novas</span>' : '') + icon('chevronRight', 'sm') + '</a>' +
+      (UI.isAccountant() ? '' : '<a class="row" href="#reservas" style="text-decoration:none;color:inherit"><div class="tile">' + icon('party') + '</div>' +
+        '<div class="grow"><div class="card-title">Reservas</div><div class="card-meta">Pedidos do link público · copiar o link</div></div>' +
+        (Reservas.pendingCount() ? '<span class="pill warn no-dot num">' + Reservas.pendingCount() + ' pendentes</span>' : '') + icon('chevronRight', 'sm') + '</a>') +
       '<div class="row"><div class="tile">' + icon('store') + '</div><div class="grow"><div class="card-title">Unidade</div><div class="card-meta">' + esc(unit.name) + '</div></div></div>' +
       '</div>' +
 
@@ -172,9 +175,11 @@
   Screens.notificacoes = function () {
     var d = DB.get();
     var html = '<main class="screen">' + UI.topbar('Notificações', { back: '#inicio', right: '<button type="button" class="btn ghost sm" data-all>Marcar lidas</button>' }) +
-      (d.notifications.length ? '<div class="list">' + d.notifications.map(function (n) {
-        return '<div class="row"><div class="tile ' + n.tone + '">' + icon(n.icon) + '</div><div class="grow"><div' + (n.read ? ' class="muted"' : ' class="card-title"') + '>' + esc(n.text) + '</div>' +
-          '<div class="card-meta">' + esc(n.at) + '</div></div>' + (n.read ? '' : '<span class="unread-dot" aria-label="Não lida"></span>') + '</div>';
+      // Mais recentes primeiro; avisos com destino (ex.: reserva nova) abrem a tela certa.
+      (d.notifications.length ? '<div class="list">' + d.notifications.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }).map(function (n) {
+        var inner = '<div class="tile ' + n.tone + '">' + icon(n.icon) + '</div><div class="grow"><div' + (n.read ? ' class="muted"' : ' class="card-title"') + '>' + esc(n.text) + '</div>' +
+          '<div class="card-meta">' + esc(n.at) + '</div></div>' + (n.read ? '' : '<span class="unread-dot" aria-label="Não lida"></span>');
+        return n.href ? '<a class="row" href="' + esc(n.href) + '" data-nid="' + esc(n.id) + '" style="text-decoration:none;color:inherit">' + inner + icon('chevronRight', 'sm') + '</a>' : '<div class="row">' + inner + '</div>';
       }).join('') + '</div>' : UI.empty('bell', 'Sem notificações', 'Avisos de chamados, compras e checklists aparecem aqui.')) +
       '</main>';
     return {
@@ -182,6 +187,12 @@
       mount: function (root) {
         root.querySelector('[data-all]').addEventListener('click', function () {
           DB.update(function (x) { x.notifications.forEach(function (n) { n.read = true; }); }); refresh();
+        });
+        // Abrir um aviso marca como lido.
+        root.querySelectorAll('[data-nid]').forEach(function (a) {
+          a.addEventListener('click', function () {
+            DB.update(function (x) { x.notifications.forEach(function (n) { if (String(n.id) === a.dataset.nid) n.read = true; }); });
+          });
         });
       }
     };

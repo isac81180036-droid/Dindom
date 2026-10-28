@@ -7,6 +7,7 @@
     { id: 'inicio', label: 'Início', icon: 'home' },
     { id: 'ponto', label: 'Ponto', icon: 'clock', desk: true },
     { id: 'agenda', label: 'Agenda', icon: 'calendar', desk: true },
+    { id: 'reservas', label: 'Reservas', icon: 'party', desk: true },
     { id: 'estoque', label: 'Estoque', icon: 'box' },
     { id: 'checklists', label: 'Checklists', icon: 'checklist' },
     { id: 'manutencao', label: 'Manutenção', icon: 'wrench' },
@@ -35,7 +36,7 @@
     var d = DB.get();
     var pendingTasks = d.checklists.reduce(function (n, c) { return n + (c.finishedAt ? 0 : 1); }, 0);
     var openMaint = d.maintenance.filter(function (m) { return m.status !== 'resolvida'; }).length;
-    return { checklists: pendingTasks, manutencao: openMaint };
+    return { checklists: pendingTasks, manutencao: openMaint, reservas: window.Reservas ? Reservas.pendingCount() : 0 };
   }
 
   function renderNav(tab, show) {

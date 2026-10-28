@@ -1,7 +1,8 @@
 {
-  "buildCommand": "rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img supabase dist/",
+  "buildCommand": "rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img supabase reserva dist/",
   "outputDirectory": "dist",
   "framework": null,
+  "rewrites": [{ "source": "/reserva", "destination": "/reserva/index.html" }],
   "headers": [
     { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
     { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },

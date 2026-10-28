@@ -9,6 +9,8 @@
   Form.detail = function (id, date) {
     var e = find(id);
     if (!e) return;
+    // Reserva pelo link público: abre o painel da reserva (status, respostas, WhatsApp), não o editor comum.
+    if (e.reserva && window.Reservas) return Reservas.open(e.reserva.id);
     var c = Cal.calendar(e.cal);
     var rep = Cal.repeatLabel(e);
     UI.sheet(

@@ -37,9 +37,11 @@
     var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
     var unread = d.notifications.some(function (n) { return !n.read; });
     var bell = '<a class="icon-btn" href="#notificacoes" aria-label="Notificações">' + icon('bell') + (unread ? '<span class="dot"></span>' : '') + '</a>';
+    var rv = Reservas.pendingCount();
+    var party = '<a class="icon-btn" href="#reservas" aria-label="Reservas' + (rv ? ': ' + rv + ' pendentes' : '') + '">' + icon('party') + (rv ? '<span class="nbadge num">' + rv + '</span>' : '') + '</a>';
     // Celular: assinatura da marca no topo, com agenda e notificações. Computador: a marca já está no menu lateral.
     return '<div class="home-brand mobile-only"><img class="logo-ink" src="icons/wordmark-black.png" alt="Dindom"><span class="grow"></span>' +
-      '<a class="icon-btn" href="#agenda" aria-label="Agenda">' + icon('calendar') + '</a>' + bell + '</div>' +
+      party + '<a class="icon-btn" href="#agenda" aria-label="Agenda">' + icon('calendar') + '</a>' + bell + '</div>' +
       '<header class="topbar">' +
       '<div style="flex:1;min-width:0">' +
       '<div class="sub">' + UI.greeting() + ',</div>' +
@@ -164,7 +166,7 @@
     return '<section class="section"><div class="section-head"><h2>Agenda de hoje</h2><a class="btn ghost sm" href="#agenda">Abrir agenda</a></div>' +
       '<div class="list">' + (list.length ? list.map(function (o) {
         var c = Cal.calendar(o.ev.cal);
-        return '<a class="row today-ev" href="#agenda" style="text-decoration:none;color:inherit;--c:var(--cal-' + Cal.colorOf(o.ev) + ')">' +
+        return '<a class="row today-ev" href="' + (o.ev.reserva ? '#reservas/' + o.ev.reserva.id : '#agenda') + '" style="text-decoration:none;color:inherit;--c:' + Cal.css(o.ev) + '">' +
           '<span class="time num">' + (o.ev.allDay ? 'Dia' : o.ev.start) + '</span><span class="ev-bar"></span>' +
           '<span class="grow"><span class="card-title">' + esc(o.ev.title) + '</span><span class="card-meta" style="display:block">' + Cal.timeRange(o.ev) + (o.ev.place ? ' · ' + esc(o.ev.place) : '') + '</span></span></a>';
       }).join('') : '<div class="row muted">Nada mais na agenda hoje.</div>') + '</div></section>';
@@ -206,8 +208,8 @@
     var manager = UI.isManager();
     // No celular as colunas viram uma pilha só, na ordem: coluna 1, depois coluna 2.
     var cols = manager
-      ? [startCard(d) + pontoCard() + CW.homeCard() + managerSummary(d) + closingCard(d), agendaSection() + stockSection(d)]
-      : [pontoCard() + closingCard(d) + tasksSection(d), agendaSection() + stockSection(d) + maintSection(d)];
+      ? [startCard(d) + pontoCard() + CW.homeCard() + managerSummary(d) + closingCard(d), Reservas.homeCard() + agendaSection() + stockSection(d)]
+      : [pontoCard() + closingCard(d) + tasksSection(d), Reservas.homeCard() + agendaSection() + stockSection(d) + maintSection(d)];
     var html = '<main class="screen wide">' + header(d) +
       '<div class="home-grid"><div class="col">' + cols[0] + '</div><div class="col">' + cols[1] + '</div></div>' +
       '</main>';

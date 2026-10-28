@@ -30,6 +30,8 @@
     // Cores que o evento pode ter; sem cor própria, o evento usa a cor da agenda.
     COLORS: [[1, 'Laranja'], [2, 'Azul'], [3, 'Roxo'], [4, 'Verde'], [5, 'Rosa'], [6, 'Vermelho'], [7, 'Amarelo'], [8, 'Grafite']],
     colorOf: function (e) { return e.color || Cal.calendar(e.cal).color; },
+    // Cor para o CSS. Reserva pelo link público tem cor própria (dourado), diferente de todas as agendas.
+    css: function (e) { return e.reserva ? 'var(--rv)' : 'var(--cal-' + Cal.colorOf(e) + ')'; },
 
     // Ocorrências visíveis entre duas datas (inclusive), já expandindo repetições.
     occurrences: function (from, to) {

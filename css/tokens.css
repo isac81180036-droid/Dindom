@@ -33,6 +33,10 @@
   --cal-6: #c93434;
   --cal-7: #a87b00;
   --cal-8: #59626e;
+  /* Reservas do link público: dourado próprio, diferente de todas as agendas; texto escuro por cima. */
+  --rv: #f2b230;
+  --rv-2: #d88a0c;
+  --rv-ink: #2a1a00;
 
   --font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
   --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -99,6 +103,9 @@
     --cal-6: #ff7b7b;
     --cal-7: #f0c64a;
     --cal-8: #a8b1bd;
+    --rv: #f5bb45;
+    --rv-2: #cf8610;
+    --rv-ink: #1f1400;
     color-scheme: dark;
   }
 }
@@ -133,6 +140,9 @@
   --cal-6: #ff7b7b;
   --cal-7: #f0c64a;
   --cal-8: #a8b1bd;
+  --rv: #f5bb45;
+  --rv-2: #cf8610;
+  --rv-ink: #1f1400;
   color-scheme: dark;
 }
 

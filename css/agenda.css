@@ -187,3 +187,78 @@
 .color-pick button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
 .color-pick button[aria-pressed="true"] .ico { opacity: 1; }
 .color-pick button.auto { width: auto; padding: 0 14px 0 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink); display: inline-flex; gap: 8px; font-size: var(--fs-sm); font-weight: 600; }
+
+/* ---------- Reservas do link público (js/screens/reservas.js) ---------- */
+/* Dourado com texto escuro: se destaca dos outros eventos, que são cor cheia com texto claro. */
+.ev.rv, .chip-ev.rv, .mg-ev.rv, .mg-ev.rv:not(.allday) { background: linear-gradient(135deg, var(--rv), var(--rv-2)); color: var(--rv-ink); }
+.ev.rv { box-shadow: 0 0 0 1px var(--surface), inset 0 0 0 1px rgba(255, 255, 255, .35); }
+.ev.rv span { color: color-mix(in srgb, var(--rv-ink) 78%, transparent); }
+.ev.rv.st-confirmada { box-shadow: 0 0 0 1px var(--surface), inset 4px 0 0 var(--ok); }
+.mg-ev.rv i { background: var(--rv-ink); }
+.mg-ev.rv .t { color: var(--rv-ink); }
+.ag-item.rv { background: color-mix(in srgb, var(--rv) 24%, var(--surface)); }
+.ag-item.rv .ev-bar { background: linear-gradient(var(--rv), var(--rv-2)); }
+
+/* Selos: RESERVA, status (pendente amarelo, confirmada verde, recusada/cancelada cinza), NOVA e conflito. */
+.rv em { font-style: normal; }
+.rv-tags { display: flex; flex-wrap: wrap; gap: 3px; font-style: normal; margin-bottom: 1px; }
+.rv-tag, .rv-st, .rv-new-tag, .rv-warn {
+  display: inline-block; padding: 0 5px; border-radius: 4px; white-space: nowrap; vertical-align: 1px;
+  font: 700 9.5px/16px var(--font-display); letter-spacing: .06em; text-transform: uppercase;
+}
+.rv-tag { background: var(--rv-ink); color: var(--rv); }
+.st-pendente .rv-st { background: #fff1b8; color: #6b4e00; }
+.st-confirmada .rv-st { background: var(--ok); color: var(--surface); }
+.st-recusada .rv-st, .st-cancelada .rv-st { background: var(--ink-3); color: var(--surface); }
+.rv-new-tag, .rv-warn { background: var(--crit); color: var(--surface); }
+:is(.mg-ev, .chip-ev, .ev.short) :is(.rv-new-tag, .rv-warn) { padding: 0 3px; margin-right: 3px; font-size: 8.5px; line-height: 13px; }
+
+/* Recusada ou cancelada: continua na agenda, em cinza e riscada. */
+:is(.ev, .chip-ev, .mg-ev, .ag-item).rv:is(.st-recusada, .st-cancelada) { background: var(--surface-2); color: var(--ink-3); box-shadow: 0 0 0 1px var(--surface); }
+:is(.ev, .chip-ev, .mg-ev, .ag-item).rv:is(.st-recusada, .st-cancelada) span { color: var(--ink-3); }
+:is(.ev, .ag-item).rv:is(.st-recusada, .st-cancelada) b, :is(.chip-ev, .mg-ev).rv:is(.st-recusada, .st-cancelada) { text-decoration: line-through; }
+.rv:is(.st-recusada, .st-cancelada) .rv-tag { background: var(--ink-3); color: var(--surface); }
+.ag-item.rv:is(.st-recusada, .st-cancelada) .ev-bar, .mg-ev.rv:is(.st-recusada, .st-cancelada) i { background: var(--ink-3); }
+
+/* Nova (pendente que ninguém abriu): borda vermelha piscando. Conflito: contorno tracejado. */
+.rv.rv-new { animation: rv-pulse 1.4s ease-in-out infinite; z-index: 2; }
+@keyframes rv-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--crit), 0 0 0 5px color-mix(in srgb, var(--crit) 30%, transparent); }
+  50% { box-shadow: 0 0 0 2px var(--crit), 0 0 0 0 transparent; }
+}
+.rv.rv-conflict { outline: 2px dashed var(--crit); outline-offset: -2px; }
+.rv-conflict-banner { flex: none; width: 100%; border: 0; text-align: left; cursor: pointer; }
+
+/* Painel da reserva */
+.rv-detail { display: flex; flex-direction: column; gap: var(--sp-3); }
+.rv-head, .rv-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pill.rv-pill { background: linear-gradient(135deg, var(--rv), var(--rv-2)); color: var(--rv-ink); text-transform: uppercase; letter-spacing: .06em; font-family: var(--font-display); }
+.rv-head .ico, .rv-pills .ico { width: 14px; height: 14px; }
+.pill.rv-status.off { text-decoration: line-through; }
+.rv-dl { margin: 0; display: flex; flex-direction: column; }
+.rv-dl > div { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--sp-3); padding: 9px 0; border-top: 1px solid var(--line); }
+.rv-dl > div:first-child { border-top: 0; }
+.rv-dl dt { color: var(--ink-2); font-size: var(--fs-sm); }
+.rv-dl dd { margin: 0; font-weight: 600; white-space: pre-line; overflow-wrap: anywhere; }
+.rv-actions { display: flex; flex-direction: column; gap: var(--sp-2); }
+.btn.rv-confirm { background: var(--ok); color: var(--surface); }
+.btn.rv-wa { background: #25d366; color: #06301a; }
+
+/* Tela Reservas, Início e menu */
+.rv-row { align-items: flex-start; }
+.rv-row .ev-bar { align-self: stretch; background: linear-gradient(var(--rv), var(--rv-2)); }
+.rv-row .grow { display: flex; flex-direction: column; gap: 3px; }
+.rv-row > .ico { align-self: center; color: var(--ink-3); }
+.rv-time { width: 44px; flex: none; font-weight: 650; font-size: var(--fs-sm); padding-top: 1px; }
+.rv-row:is(.st-recusada, .st-cancelada) .rv-title { text-decoration: line-through; color: var(--ink-3); }
+.rv-row:is(.st-recusada, .st-cancelada) .ev-bar { background: var(--ink-3); }
+.rv-row.rv-new { background: color-mix(in srgb, var(--crit) 7%, transparent); }
+.tile.rv-tile { background: linear-gradient(135deg, var(--rv), var(--rv-2)); color: var(--rv-ink); }
+.rv-url { overflow-wrap: anywhere; }
+.rv-link-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.rv-home.rv-new { box-shadow: 0 0 0 2px var(--crit), var(--shadow); }
+.rv-count { min-width: 30px; height: 30px; padding: 0 8px; border-radius: var(--r-pill); background: var(--warn); color: var(--surface); display: grid; place-items: center; font-weight: 700; }
+.icon-btn .nbadge {
+  position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pill);
+  background: var(--crit); color: var(--surface); font-size: 10.5px; font-weight: 700; line-height: 18px; text-align: center;
+}

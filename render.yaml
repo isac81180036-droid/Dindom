@@ -20,8 +20,14 @@ projects:
             autoDeployTrigger: commit
 
             # Publica só o app: README, render.yaml e o servidor local (serve.ps1) ficam de fora.
-            buildCommand: rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img supabase dist/ && echo "Dindom pronto em dist/" && ls dist
+            buildCommand: rm -rf dist && mkdir -p dist && cp -R index.html manifest.webmanifest sw.js css js icons img supabase reserva dist/ && echo "Dindom pronto em dist/" && ls dist
             staticPublishPath: ./dist
+
+            # Link público de reservas: /reserva (sem barra no fim) abre a página.
+            routes:
+              - type: rewrite
+                source: /reserva
+                destination: /reserva/index.html
 
             headers:
               # O service worker e a página principal sempre buscam a versão nova.

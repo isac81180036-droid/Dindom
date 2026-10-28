@@ -107,7 +107,7 @@
       '<div class="chips mobile-only" role="toolbar" aria-label="Visualização">' + views().map(function (v) {
         return '<button type="button" class="chip" data-view="' + v[0] + '" aria-pressed="' + (state.view === v[0]) + '">' + v[1] + '</button>';
       }).join('') + '</div>' +
-      hint() +
+      hint() + (window.Reservas ? Reservas.conflictBanner() : '') +
       '<div class="ag-view view-' + state.view + '" data-scroll>' + body() + '</div>' +
       '</section></div></main>' +
       '<button type="button" class="fab mobile-only" data-new aria-label="Criar evento">' + icon('plus') + '</button>';
@@ -136,6 +136,8 @@
           var t = e.target;
           var ev = t.closest('[data-ev]');
           if (ev) return CalForm.detail(ev.dataset.ev, ev.dataset.date);
+          var rv = t.closest('[data-rv]');
+          if (rv) return Reservas.open(rv.dataset.rv);
           var g = t.closest('[data-goday]');
           if (g) {
             state.cursor = g.dataset.goday; state.mini = state.cursor;

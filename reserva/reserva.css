@@ -1,0 +1,65 @@
+/* Página pública de reservas: uma coluna, pensada para abrir no celular pelo WhatsApp. */
+body::before { display: none; }
+.rp {
+  width: 100%; max-width: 600px; margin: 0 auto;
+  padding: calc(var(--safe-t) + var(--sp-5)) max(var(--gutter), var(--safe-r)) calc(var(--safe-b) + var(--sp-6)) max(var(--gutter), var(--safe-l));
+  display: flex; flex-direction: column; gap: var(--sp-5);
+}
+#rp-body, #rp-form { display: flex; flex-direction: column; gap: var(--sp-4); }
+.rp-head { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-block: var(--sp-2); }
+.rp-head .logo-ink { width: 132px; }
+.rp-head .since { font: 500 8.5px/1 var(--font-display); letter-spacing: .32em; margin-right: -.32em; color: var(--ink-2); }
+
+.rp-intro { display: flex; flex-direction: column; gap: var(--sp-2); text-align: center; }
+.rp-intro h1 { font-size: var(--fs-2xl); }
+.rp-legend { font-size: var(--fs-xs); }
+.req { color: var(--crit); font-weight: 700; }
+
+.rp .card { gap: var(--sp-4); padding: var(--sp-5) var(--sp-4); }
+.rp .card h2 { font-size: var(--fs-lg); }
+/* No celular, 16px nos campos evita o zoom automático do iPhone ao tocar. */
+.rp .input, .rp .textarea { font-size: 16px; }
+.rp .textarea { min-height: 88px; }
+.rp-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
+.rp-two .input { padding: 0 var(--sp-3); }
+.rp-midnight { margin: calc(-1 * var(--sp-2)) 0 0; font-size: var(--fs-xs); color: var(--ink-2); font-weight: 600; }
+.rp-midnight .ico { vertical-align: -4px; }
+
+/* Opções (tipo de evento, decoração): botões grandes, fáceis de tocar. */
+.rp-group { border: 0; margin: 0; padding: 0; min-width: 0; }
+.rp-group legend { padding: 0; margin-bottom: 6px; font-size: var(--fs-sm); font-weight: 600; }
+.rp-opts { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.rp-opt { position: relative; }
+.rp-opt input { position: absolute; opacity: 0; inset: 0; margin: 0; }
+.rp-opt span {
+  display: inline-flex; align-items: center; min-height: var(--tap); padding: 0 var(--sp-4);
+  border-radius: var(--r-pill); border: 1.5px solid var(--line); background: var(--surface);
+  font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); cursor: pointer;
+}
+.rp-opt input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.rp-opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.field.error .rp-opt span { border-color: var(--crit); }
+
+.rp-check { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow); font-size: var(--fs-sm); font-weight: 550; cursor: pointer; }
+.rp-check input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--ink); }
+.field.error .rp-check { box-shadow: 0 0 0 1.5px var(--crit); }
+
+/* Campo-isca para robôs: fora da tela, sem sumir do HTML. */
+.rp-hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+
+.rp-send { min-height: 56px; font-size: var(--fs-lg); }
+.rp-foot { text-align: center; font-size: var(--fs-xs); }
+
+/* Sucesso */
+.rp-done { align-items: center; text-align: center; }
+.rp-done h1 { font-size: var(--fs-xl); }
+.rp-ok { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--ok-soft); color: var(--ok); }
+.rp-sum { margin: 0; display: flex; flex-direction: column; }
+.rp-sum > div { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--sp-3); padding: 10px 0; border-top: 1px solid var(--line); }
+.rp-sum > div:first-child { border-top: 0; }
+.rp-sum dt { color: var(--ink-2); font-size: var(--fs-sm); }
+.rp-sum dd { margin: 0; font-weight: 600; white-space: pre-line; overflow-wrap: anywhere; }
+
+@media (max-width: 380px) {
+  .rp-sum > div { grid-template-columns: 1fr; gap: 2px; }
+}

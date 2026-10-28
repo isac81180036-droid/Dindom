@@ -3,7 +3,7 @@
   var esc = UI.esc;
   var HOUR = 48; // altura de uma hora na grade, em px (igual a --hour no CSS)
 
-  function color(e) { return 'var(--cal-' + Cal.colorOf(e) + ')'; }
+  function color(e) { return Cal.css(e); }
   function nowMins() { var n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
   function isPast(o) {
     var t = Cal.today();
@@ -11,7 +11,21 @@
     return !o.ev.allDay && Cal.mins(o.ev.end) < nowMins();
   }
   function evAttrs(o, cls) {
-    return 'class="' + cls + (isPast(o) ? ' past' : '') + '" data-ev="' + o.ev.id + '" data-date="' + o.date + '" style="--c:' + color(o.ev) + ';';
+    return 'class="' + cls + (isPast(o) ? ' past' : '') + rvCls(o.ev) + '" data-ev="' + o.ev.id + '" data-date="' + o.date + '" style="--c:' + color(o.ev) + ';';
+  }
+  // Reserva pelo link público: destaque por status, "nova" até alguém abrir e conflito de horário.
+  function rvCls(e) {
+    if (!e.reserva || !window.Reservas) return '';
+    return ' rv st-' + e.reserva.status + (Reservas.isNew(e) ? ' rv-new' : '') + (Reservas.conflicts(e).length ? ' rv-conflict' : '');
+  }
+  // Selos dentro do bloco: RESERVA, status, NOVA e conflito. "mini" = só o essencial (mês e blocos curtos).
+  function rvTags(e, mini) {
+    if (!e.reserva || !window.Reservas) return '';
+    var st = Reservas.STATUS[e.reserva.status] || Reservas.STATUS.pendente;
+    var conflict = Reservas.conflicts(e).length;
+    if (mini) return (Reservas.isNew(e) ? '<em class="rv-new-tag">NOVA</em>' : '') + (conflict ? '<em class="rv-warn" title="Conflito de horário">!</em>' : '');
+    return '<i class="rv-tags"><em class="rv-tag">RESERVA</em><em class="rv-st">' + st.label + '</em>' +
+      (Reservas.isNew(e) ? '<em class="rv-new-tag">NOVA</em>' : '') + (conflict ? '<em class="rv-warn">CONFLITO</em>' : '') + '</i>';
   }
 
   var Views = { HOUR: HOUR };
@@ -32,7 +46,7 @@
 
     var ad = allDay.length ? '<div class="tg-allday"><div class="tg-gutter"></div>' + days.map(function (d) {
       return '<div class="tg-ad-cell">' + allDay.filter(function (o) { return o.date === d; }).map(function (o) {
-        return '<button type="button" ' + evAttrs(o, 'chip-ev') + '">' + esc(o.ev.title) + '</button>';
+        return '<button type="button" ' + evAttrs(o, 'chip-ev') + '">' + rvTags(o.ev, true) + esc(o.ev.title) + '</button>';
       }).join('') + '</div>';
     }).join('') + '</div>' : '';
 
@@ -47,7 +61,7 @@
         var short = h < 40;
         return '<button type="button" ' + evAttrs(it.o, 'ev' + (short ? ' short' : '')) +
           'top:' + (it.s / 60 * HOUR) + 'px;height:' + (h - 2) + 'px;left:calc(' + it.col + ' * 100% / ' + it.cols + ');width:calc(100% / ' + it.cols + ' - 3px)">' +
-          '<b>' + esc(it.o.ev.title) + '</b>' + (short ? '<span>, ' + it.o.ev.start + '</span>' : '<span class="num">' + Cal.timeRange(it.o.ev) + '</span>') +
+          rvTags(it.o.ev, short) + '<b>' + esc(it.o.ev.title) + '</b>' + (short ? '<span>, ' + it.o.ev.start + '</span>' : '<span class="num">' + Cal.timeRange(it.o.ev) + '</span>') +
           (!short && h > 70 && it.o.ev.place ? '<span>' + esc(it.o.ev.place) + '</span>' : '') + '</button>';
       }).join('');
       var now = d === t ? '<div class="now-line" style="top:' + (nowMins() / 60 * HOUR) + 'px"></div>' : '';
@@ -80,7 +94,7 @@
         '<button type="button" class="mg-num num" data-goday="' + d + '" aria-label="' + esc(Cal.dayTitle(d)) + '">' + dt.getDate() + '</button>' +
         shown.map(function (o) {
           return '<button type="button" ' + evAttrs(o, 'mg-ev' + (o.ev.allDay ? ' allday' : '')) + '">' +
-            (o.ev.allDay ? '' : '<i></i><span class="num t">' + o.ev.start + '</span> ') + esc(o.ev.title) + '</button>';
+            (o.ev.allDay ? '' : '<i></i><span class="num t">' + o.ev.start + '</span> ') + rvTags(o.ev, true) + esc(o.ev.title) + '</button>';
         }).join('') +
         (list.length > maxChips ? '<button type="button" class="mg-more" data-goday="' + d + '">+' + (list.length - maxChips) + ' mais</button>' : '') +
         '</div>';
@@ -108,7 +122,7 @@
       return sep + '<section class="ag-day' + (d === t ? ' today' : '') + '" id="ag-' + d + '">' +
         '<button type="button" class="ag-date" data-goday="' + d + '"><span class="dow">' + Cal.WEEK_SHORT[dt.getDay()] + '</span><span class="dnum num">' + dt.getDate() + '</span></button>' +
         '<div class="ag-items">' + (byDate[d].length ? byDate[d].map(function (o) {
-          return '<button type="button" ' + evAttrs(o, 'ag-item') + '"><span class="ev-bar"></span><span class="grow"><b>' + esc(o.ev.title) + '</b>' +
+          return '<button type="button" ' + evAttrs(o, 'ag-item') + '"><span class="ev-bar"></span><span class="grow">' + rvTags(o.ev) + '<b>' + esc(o.ev.title) + '</b>' +
             '<span class="card-meta num">' + Cal.timeRange(o.ev) + (o.ev.place ? ' · ' + esc(o.ev.place) : '') + '</span></span></button>';
         }).join('') : '<div class="ag-none">Nada na agenda hoje</div>') + '</div></section>';
     }).join('') + '</div>';
