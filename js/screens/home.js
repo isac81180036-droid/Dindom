@@ -3,10 +3,16 @@
   var esc = UI.esc;
 
   window.Stats = {
-    closing: function (d) {
-      var total = d.products.length;
-      var counted = d.products.filter(function (p) { return d.closing.counts[p.id] != null; }).length;
-      return { total: total, counted: counted, pct: total ? counted / total * 100 : 0 };
+    // Progresso da contagem (de todos os produtos ou só de uma lista, ex.: a parte de uma estação).
+    closing: function (d, products) {
+      var ps = products || d.products;
+      var counted = ps.filter(function (p) { return DB.countOf(p.id) != null; }).length;
+      return { total: ps.length, counted: counted, pct: ps.length ? counted / ps.length * 100 : 0 };
+    },
+    // Produtos que cabem a quem está usando o app (das estações em que está); null se não está em nenhuma.
+    myProducts: function (d) {
+      var mine = DB.myStations().map(function (s) { return s.id; });
+      return mine.length ? d.products.filter(function (p) { return mine.indexOf(p.station) >= 0; }) : null;
     },
     checklist: function (c) {
       var done = c.tasks.filter(function (t) { return c.done[t.id]; }).length;
@@ -50,12 +56,20 @@
         '<div class="card-meta">' + (UI.isManager() ? 'Cadastre os produtos para começar a contar o estoque.' : 'O gerente ainda não cadastrou os produtos do estoque.') + '</div></div></div>' +
         (UI.isManager() ? '<a class="btn primary block" href="#produtos/novo">' + icon('plus', 'sm') + 'Cadastrar produtos</a>' : '') + '</section>';
     }
-    var s = Stats.closing(d);
+    // Quem tem estação vê o andamento da própria parte.
+    var mine = Stats.myProducts(d);
+    var s = Stats.closing(d, mine);
     var dl = d.deliveries.filter(function (x) { return x.id === d.closing.delivery; })[0] || { label: '', date: '' };
     var started = s.counted > 0;
+    if (mine && s.total && s.counted === s.total) {
+      var all = Stats.closing(d);
+      return '<section class="card"><div class="card-row"><div class="tile ok">' + icon('check') + '</div><div class="grow"><div class="card-title">Sua parte do fechamento está contada</div>' +
+        '<div class="card-meta num">' + s.total + ' produtos · loja toda: ' + all.counted + ' de ' + all.total + '</div></div>' +
+        '<a class="btn ghost sm" href="#estoque/fechamento">Ver</a></div></section>';
+    }
     return '<section class="card hero">' +
       '<div class="card-row"><div class="grow">' +
-      '<div class="eyebrow" style="color:inherit;opacity:.6">Fechamento de estoque</div>' +
+      '<div class="eyebrow" style="color:inherit;opacity:.6">' + (mine ? 'Sua parte do fechamento' : 'Fechamento de estoque') + '</div>' +
       '<h2 style="font-size:var(--fs-xl);margin-top:4px">' + (started ? 'Contagem em andamento' : 'Contagem não iniciada') + '</h2>' +
       '<p class="muted" style="margin-top:2px">Reposição de ' + esc(dl.label.toLowerCase()) + ', ' + esc(dl.date) + '</p>' +
       '</div><div class="ring" style="--p:' + s.pct + '"><span class="num">' + Math.round(s.pct) + '%</span></div></div>' +

@@ -15,7 +15,12 @@
     deliveryDays: [],
     categories: ['Queijos', 'Carnes e frios', 'Massas e farinhas', 'Molhos e conservas', 'Hortifrúti', 'Bebidas', 'Embalagens', 'Limpeza', 'Outros'],
     products: [],
-    closing: { delivery: null, counts: {}, updatedAt: null, finalizedAt: null },
+    // Estações do fechamento: cada uma reúne produtos e os colaboradores que contam esses produtos.
+    stations: [],
+    closing: { delivery: null, finalizedAt: null },
+    // Contagem do fechamento em andamento, um item por produto ({ id: produto, q, by, at }): várias
+    // pessoas contam ao mesmo tempo sem uma sobrescrever a outra.
+    counts: [],
     shopping: { fromClosing: '', items: [] },
     checklists: [],
     checkHistory: [],
@@ -81,6 +86,13 @@
     if (!d.calendars || !d.calendars.length) d.calendars = clone(defaults.calendars);
     d.deliveries = deliveries(d.deliveryDays);
     if (!d.deliveries.some(function (x) { return x.id === d.closing.delivery; })) d.closing.delivery = d.deliveries[0] ? d.deliveries[0].id : null;
+    // Versão anterior guardava a contagem dentro do fechamento: passa para a lista por produto.
+    if (d.closing.counts) {
+      Object.keys(d.closing.counts).forEach(function (pid) {
+        if (!d.counts.some(function (c) { return c.id === pid; })) d.counts.push({ id: pid, q: d.closing.counts[pid], by: null, at: d.closing.updatedAt || Date.now() });
+      });
+      delete d.closing.counts; delete d.closing.updatedAt;
+    }
 
     var today = businessDay();
     d.checklists.forEach(function (c) {
@@ -167,6 +179,33 @@
       var ps = load().products;
       for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i];
       return null;
+    },
+
+    // ---------- Fechamento por estação ----------
+    // Tipo do produto, acima da categoria: separa o que vai no preparo do que vai na montagem.
+    KINDS: [
+      { id: 'preparo', label: 'Preparo e produção', hint: 'Massas, molhos e o que é produzido na casa: farinha, óleo, fermento, colorau, cheiro-verde…' },
+      { id: 'montagem', label: 'Montagem das pizzas', hint: 'Vai direto na pizza: queijos, calabresa, catupiry e outros recheios.' },
+      { id: 'apoio', label: 'Apoio e outros', hint: 'Bebidas, sachês, descartáveis, embalagens e limpeza.' }
+    ],
+    kindOf: function (p) { return p.kind === 'preparo' || p.kind === 'montagem' ? p.kind : 'apoio'; },
+    // Quantidade contada no fechamento em andamento (null = ainda não contado).
+    countOf: function (pid) {
+      var cs = load().counts;
+      for (var i = 0; i < cs.length; i++) if (cs[i].id === pid) return cs[i].q;
+      return null;
+    },
+    // Grava (ou apaga, com null) a contagem de um produto, sem salvar ainda: quem chama salva com DB.update.
+    setCount: function (pid, q) {
+      var d = load();
+      d.counts = d.counts.filter(function (c) { return c.id !== pid; });
+      if (q != null) d.counts.push({ id: pid, q: q, by: d.user.empId, at: Date.now() });
+    },
+    station: function (id) { return load().stations.filter(function (s) { return s.id === id; })[0] || null; },
+    // Estações de quem está usando o app.
+    myStations: function () {
+      var d = load();
+      return d.stations.filter(function (s) { return (s.emps || []).indexOf(d.user.empId) >= 0; });
     }
   };
 })();

@@ -56,6 +56,8 @@
         '<div class="grow"><div class="card-title">Vendas</div><div class="card-meta">Pedidos da Cardápio Web · faturamento e mais vendidos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#produtos" style="text-decoration:none;color:inherit"><div class="tile">' + icon('box') + '</div>' +
         '<div class="grow"><div class="card-title">Produtos do estoque</div><div class="card-meta">' + d.products.length + ' cadastrados · estoque ideal e mínimo</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<a class="row" href="#estacoes" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
+        '<div class="grow"><div class="card-title">Estações do fechamento</div><div class="card-meta">' + (d.stations.length ? d.stations.length + ' estações · quem conta o quê' : 'Divida a contagem entre a equipe') + '</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#checklists/editar" style="text-decoration:none;color:inherit"><div class="tile">' + icon('checklist') + '</div>' +
         '<div class="grow"><div class="card-title">Modelos de checklist</div><div class="card-meta">' + d.checklists.length + ' rotinas · tarefas, prazos e fotos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         (UI.isAdmin() ? '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
