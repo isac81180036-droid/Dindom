@@ -66,6 +66,15 @@
   }
   function businessDay() { var d = new Date(Date.now() - DAY_START_HOUR * 3600000); return iso(d); }
 
+  // Dias da semana (0 = domingo) em que um checklist ou uma tarefa acontece. Sem dias marcados = todos os dias.
+  // Vale o "dia de trabalho": o fechamento depois da meia-noite ainda conta no dia em que começou.
+  function runsOn(days, date) {
+    if (!days || !days.length || days.length >= 7) return true;
+    var p = (date || businessDay()).split('-');
+    return days.indexOf(new Date(+p[0], p[1] - 1, +p[2]).getDay()) >= 0;
+  }
+  function tasksOn(c, date) { return c.tasks.filter(function (t) { return runsOn(t.days, date); }); }
+
   // Próximas datas de reposição a partir dos dias da semana configurados (ex.: terça e sexta).
   function deliveries(days) {
     var out = [], base = new Date(); base.setHours(0, 0, 0, 0);
@@ -99,7 +108,7 @@
       if (c.runDate === today) return;
       // Guarda como ficou o dia anterior e começa o checklist de hoje do zero.
       if (c.runDate && (Object.keys(c.done || {}).length || c.finishedAt)) {
-        d.checkHistory.push({ id: c.id, name: c.name, date: c.runDate, done: c.done, reason: c.reason, finishedAt: c.finishedAt, total: c.tasks.length });
+        d.checkHistory.push({ id: c.id, name: c.name, date: c.runDate, done: c.done, reason: c.reason, finishedAt: c.finishedAt, total: tasksOn(c, c.runDate).length });
         if (d.checkHistory.length > 400) d.checkHistory = d.checkHistory.slice(-400);
       }
       c.runDate = today; c.done = {}; c.photos = {}; c.reason = ''; c.finishedAt = null;
@@ -170,6 +179,35 @@
     DAY_START_HOUR: DAY_START_HOUR,
     deliveries: deliveries,
     WEEK: WEEK,
+
+    // ---------- Dias dos checklists ----------
+    runsOn: runsOn,
+    everyDay: function (days) { return !days || !days.length || days.length >= 7; },
+    // Tarefas do checklist que acontecem no dia (hoje, se não informar a data).
+    tasksOn: tasksOn,
+    // O checklist acontece no dia: o checklist cai no dia e tem pelo menos uma tarefa nele.
+    checklistOn: function (c, date) { return runsOn(c.days, date) && tasksOn(c, date).length > 0; },
+    todayChecklists: function () { return load().checklists.filter(function (c) { return runsOn(c.days) && tasksOn(c).length > 0; }); },
+    // Texto dos dias: "Todos os dias", "Segunda a sexta", "Ter e Sex"…
+    daysLabel: function (days) {
+      if (!days || !days.length || days.length >= 7) return 'Todos os dias';
+      var key = days.slice().sort().join('');
+      if (key === '12345') return 'Segunda a sexta';
+      if (key === '123456') return 'Segunda a sábado';
+      if (key === '06') return 'Sábado e domingo';
+      var names = [1, 2, 3, 4, 5, 6, 0].filter(function (n) { return days.indexOf(n) >= 0; }).map(function (n) { return WEEK[n].slice(0, 3); });
+      return names.length === 1 ? 'Só ' + WEEK[days[0]].toLowerCase() : names.slice(0, -1).join(', ') + ' e ' + names[names.length - 1];
+    },
+    // Próximo dia de trabalho (a partir de amanhã) em que o checklist acontece: "amanhã", "quinta"…
+    nextDay: function (c) {
+      var p = businessDay().split('-'), d = new Date(+p[0], p[1] - 1, +p[2]);
+      for (var i = 1; i <= 7; i++) {
+        d.setDate(d.getDate() + 1);
+        var x = iso(d);
+        if (runsOn(c.days, x) && tasksOn(c, x).length) return i === 1 ? 'amanhã' : WEEK[d.getDay()].toLowerCase();
+      }
+      return '';
+    },
     // Estoque atual de um produto na unidade selecionada.
     stockOf: function (pid, unit) {
       var d = load(); var s = d.stock[unit || d.user.unit] || {};

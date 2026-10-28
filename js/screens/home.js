@@ -14,9 +14,11 @@
       var mine = DB.myStations().map(function (s) { return s.id; });
       return mine.length ? d.products.filter(function (p) { return mine.indexOf(p.station) >= 0; }) : null;
     },
+    // Só as tarefas que acontecem hoje (cada tarefa pode ter os próprios dias da semana).
     checklist: function (c) {
-      var done = c.tasks.filter(function (t) { return c.done[t.id]; }).length;
-      return { done: done, total: c.tasks.length, pct: done / c.tasks.length * 100 };
+      var tasks = DB.tasksOn(c);
+      var done = tasks.filter(function (t) { return c.done[t.id]; }).length;
+      return { done: done, total: tasks.length, pct: tasks.length ? done / tasks.length * 100 : 0 };
     },
     critical: function (d) {
       return d.products.filter(function (p) {
@@ -82,10 +84,11 @@
 
   function tasksSection(d) {
     if (!d.checklists.length) return '';
-    var open = d.checklists.filter(function (c) { return !c.finishedAt; });
+    var today = DB.todayChecklists();
+    var open = today.filter(function (c) { return !c.finishedAt; });
     if (!open.length) {
       return '<section class="section"><div class="section-head"><h2>Suas tarefas</h2></div><div class="card">' +
-        UI.empty('check', 'Tudo em dia', 'Nenhum checklist pendente neste turno.') + '</div></section>';
+        (today.length ? UI.empty('check', 'Tudo em dia', 'Nenhum checklist pendente neste turno.') : UI.empty('checklist', 'Sem checklist hoje', 'Nenhuma rotina está marcada para hoje.')) + '</div></section>';
     }
     var next = open[0];
     var s = Stats.checklist(next);
@@ -129,7 +132,7 @@
   // Gerente: pendências, aprovações e ocorrências primeiro.
   function managerSummary(d) {
     var urgent = d.maintenance.filter(function (m) { return m.priority === 'urgente' && m.status !== 'resolvida'; });
-    var lateLists = d.checklists.filter(function (c) { return !c.finishedAt; });
+    var lateLists = DB.todayChecklists().filter(function (c) { return !c.finishedAt; });
     var pend = Stats.shoppingPending(d);
     var rows = [
       { href: '#manutencao', tone: 'crit', ic: 'alert', title: urgent.length + ' ocorrência' + (urgent.length === 1 ? '' : 's') + ' urgente' + (urgent.length === 1 ? '' : 's'), meta: urgent[0] ? urgent[0].title : 'Nenhuma no momento' },

@@ -34,7 +34,7 @@
 
   function badges() {
     var d = DB.get();
-    var pendingTasks = d.checklists.reduce(function (n, c) { return n + (c.finishedAt ? 0 : 1); }, 0);
+    var pendingTasks = DB.todayChecklists().reduce(function (n, c) { return n + (c.finishedAt ? 0 : 1); }, 0);
     var openMaint = d.maintenance.filter(function (m) { return m.status !== 'resolvida'; }).length;
     return { checklists: pendingTasks, manutencao: openMaint, reservas: window.Reservas ? Reservas.pendingCount() : 0 };
   }

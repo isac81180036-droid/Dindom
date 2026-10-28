@@ -17,7 +17,7 @@
     return '<a class="card tap" href="#checklists/' + c.id + '" style="text-decoration:none;color:inherit">' +
       '<div class="card-row"><div class="tile ' + (c.finishedAt ? 'ok' : 'accent') + '">' + icon(c.finishedAt ? 'check' : c.icon) + '</div>' +
       '<div class="grow"><div class="card-title">' + esc(c.name) + '</div>' +
-      '<div class="card-meta">' + esc(c.period) + ' · até ' + esc(c.due) + '</div></div>' +
+      '<div class="card-meta">' + esc(c.period) + ' · até ' + esc(c.due) + (DB.everyDay(c.days) ? '' : ' · ' + esc(DB.daysLabel(c.days))) + '</div></div>' +
       '<span class="pill ' + st[0] + '">' + st[1] + '</span></div>' +
       '<div class="card-row"><div class="grow">' + UI.bar(s.pct, c.finishedAt ? 'ok' : '') + '</div><span class="card-meta num">' + s.done + '/' + s.total + '</span></div>' +
       '</a>';
@@ -27,11 +27,21 @@
     var d = DB.get();
     var periods = ['Abertura', 'Durante o expediente', 'Fechamento'];
     var manager = UI.isManager();
-    var html = '<main class="screen wide">' + UI.topbar('Checklists', { sub: 'Hoje', right: manager ? '<a class="btn sm" href="#checklists/editar">' + icon('settings', 'sm') + 'Modelos</a>' : '' }) +
+    var today = DB.todayChecklists();
+    var other = d.checklists.filter(function (c) { return today.indexOf(c) < 0; });
+    var html = '<main class="screen wide">' + UI.topbar('Checklists', { sub: 'Hoje, ' + DB.WEEK[new Date(DB.businessDay() + 'T12:00').getDay()].toLowerCase(), right: manager ? '<a class="btn sm" href="#checklists/editar">' + icon('settings', 'sm') + 'Modelos</a>' : '' }) +
       (d.checklists.length ? periods.map(function (p) {
-        var cs = d.checklists.filter(function (c) { return c.period === p; });
+        var cs = today.filter(function (c) { return c.period === p; });
         return cs.length ? '<section class="section"><div class="eyebrow">' + p + '</div><div class="card-grid">' + cs.map(card).join('') + '</div></section>' : '';
-      }).join('') : '<div class="card">' + UI.empty('checklist', 'Nenhum checklist ainda', manager ? 'Crie as rotinas de abertura e fechamento. Dá para começar por um modelo pronto.' : 'O gerente ainda não criou as rotinas da loja.',
+      }).join('') +
+      (!today.length ? '<div class="card">' + UI.empty('check', 'Sem checklist hoje', 'Nenhuma rotina está marcada para hoje.') + '</div>' : '') +
+      // Rotinas de outros dias: só para saber quando voltam; não dá para executar hoje.
+      (other.length ? '<section class="section"><div class="eyebrow">Em outros dias</div><div class="list">' + other.map(function (c) {
+        var next = DB.nextDay(c);
+        return '<div class="row"><div class="tile">' + icon(c.icon) + '</div><div class="grow"><div class="card-title">' + esc(c.name) + '</div>' +
+          '<div class="card-meta">' + esc(DB.daysLabel(c.days)) + (next ? ' · próximo: ' + esc(next) : '') + '</div></div></div>';
+      }).join('') + '</div></section>' : '')
+      : '<div class="card">' + UI.empty('checklist', 'Nenhum checklist ainda', manager ? 'Crie as rotinas de abertura e fechamento. Dá para começar por um modelo pronto.' : 'O gerente ainda não criou as rotinas da loja.',
         manager ? '<a class="btn primary" href="#checklists/editar">Criar checklists</a>' : '') + '</div>') + '</main>';
     return { html: html, tab: 'checklists' };
   }
@@ -44,6 +54,8 @@
       '<span class="box">' + icon('check', 'sm') + '</span>' +
       '<span class="grow"><span class="task-text">' + esc(t.text) + '</span>' +
       '<span class="task-tags">' + (t.required ? '' : '<span class="pill no-dot">Opcional</span>') +
+      // Tarefa que não é de todo dia: mostra os dias, para a equipe saber por que hoje ela aparece.
+      (DB.everyDay(t.days) ? '' : '<span class="pill no-dot info">' + icon('calendar', 'sm') + esc(DB.daysLabel(t.days)) + '</span>') +
       (t.photo ? '<span class="pill no-dot ' + (photo ? 'ok' : 'accent') + '">' + icon('camera', 'sm') + (photo ? 'Foto anexada' : 'Exige foto') + '</span>' : '') +
       '</span></span></button>' +
       (t.photo ? (photo
@@ -54,7 +66,7 @@
   }
 
   function missing(c) {
-    return c.tasks.filter(function (t) { return t.required && (!c.done[t.id] || (t.photo && !c.photos[t.id])); });
+    return DB.tasksOn(c).filter(function (t) { return t.required && (!c.done[t.id] || (t.photo && !c.photos[t.id])); });
   }
 
   function dock(c) {
@@ -107,10 +119,10 @@
 
   function detail(id) {
     var c = find(id);
-    if (!c) return list();
+    if (!c || !DB.checklistOn(c)) return list(); // rotina de outro dia não é executada hoje
     var html = '<main class="screen has-dock">' + UI.topbar(c.name, { back: '#checklists', sub: c.period + ' · prazo ' + c.due }) +
       (c.reason ? '<div class="banner">' + icon('message', 'sm') + '<div class="grow">Motivo registrado: ' + esc(c.reason) + '</div></div>' : '') +
-      '<div class="list tasks">' + c.tasks.map(function (t) { return taskRow(c, t); }).join('') + '</div></main>' +
+      '<div class="list tasks">' + DB.tasksOn(c).map(function (t) { return taskRow(c, t); }).join('') + '</div></main>' +
       '<div class="dock" data-dock>' + dock(c) + '</div>';
 
     return {
@@ -118,7 +130,7 @@
       mount: function (root) {
         function redraw() {
           var cur = find(id);
-          root.querySelector('.tasks').innerHTML = cur.tasks.map(function (t) { return taskRow(cur, t); }).join('');
+          root.querySelector('.tasks').innerHTML = DB.tasksOn(cur).map(function (t) { return taskRow(cur, t); }).join('');
           root.querySelector('[data-dock]').innerHTML = dock(cur);
         }
         function attach(tid, cam) {

@@ -141,3 +141,22 @@
 .seg.sm button { min-height: 38px; padding: 0 10px; font-size: var(--fs-xs); }
 .select.sm { min-height: 38px; width: auto; min-width: 150px; padding: 0 var(--sp-3); font-size: var(--fs-sm); }
 @media (max-width: 599px) { .org-ctrl { flex-basis: 100%; } .org-ctrl .seg { flex: 1; } .org-ctrl .select { flex: 1; } }
+
+/* Dias da semana dos checklists (js/screens/checklist-edit.js) */
+.day-pick { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+.day-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; width: 100%; }
+.day-row button {
+  min-height: var(--tap); border-radius: var(--r-md); border: 1.5px solid var(--line); background: var(--surface);
+  font-size: var(--fs-sm); font-weight: 650; color: var(--ink-2); padding: 0;
+}
+.day-row button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+/* Em "todos os dias" os 7 aparecem marcados, mais claros: o primeiro toque escolhe só aquele dia. */
+.day-row button.soft[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--line); color: var(--ink); }
+.day-pick .hint { font-size: var(--fs-xs); color: var(--ink-2); font-weight: 600; }
+.te-days {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border-radius: var(--r-pill);
+  border: 1px dashed var(--line); background: transparent; color: var(--ink-2); font-size: var(--fs-sm); font-weight: 550;
+}
+.te-days .ico { width: 16px; height: 16px; }
+.te-days.on { border-style: solid; border-color: var(--info); background: var(--info-soft); color: var(--info); font-weight: 650; }
+.task-tags .pill .ico { width: 13px; height: 13px; }
