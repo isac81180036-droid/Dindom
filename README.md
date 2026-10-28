@@ -134,3 +134,7 @@ Um link aberto (`/reserva`, ex.: `https://seu-site/reserva`) para enviar a empre
 - Tocar no evento abre o painel da reserva: todas as respostas, confirmar, recusar, cancelar, abrir o WhatsApp do cliente com a mensagem pronta (wa.me), editar os detalhes e anotações internas. Tudo grava direto na tabela, e o banco atualiza o evento.
 - **Reservas** (`#reservas`, `js/screens/reservas.js`): lista por status e período, com contador de pendentes no menu, no Início e no Perfil, e aviso na tela quando chega reserva nova.
 - Só a equipe logada lê e altera as reservas; o público só cria. A contabilidade não vê.
+
+## Senha de colaborador definida pelo administrador
+
+Em **Colaboradores › (pessoa) › Definir senha**, o administrador escolhe a senha e passa para a pessoa, que entra direto com ela. Com o servidor, isso usa `definir_senha()` (`supabase/006_senha_colaborador.sql`, rodar uma vez; o app oferece o SQL quando falta). Além de gravar a senha, a função conserta o acesso que ficou pela metade: e-mail sem confirmação, conta de login sem vínculo com a equipe ou com e-mail diferente do cadastro. Se o e-mail nem tem login, o app cria a conta. "Enviar link para nova senha" continua disponível.

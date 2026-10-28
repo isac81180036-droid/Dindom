@@ -144,7 +144,8 @@
       '<div class="field"><label for="emp-adm">Data de admissão</label><input id="emp-adm" class="input" type="date" value="' + esc(v.admission) + '"></div>' +
       (e ? '<section class="section"><div class="eyebrow">Acesso</div><div class="list">' +
         '<div class="row"><div class="tile">' + icon('mail') + '</div><div class="grow"><div class="card-title">Entra com ' + esc(e.email || 'e-mail não cadastrado') + '</div><div class="card-meta">' + (e.mustChange ? 'Ainda com senha provisória' : (cloud || e.pass) ? 'Já criou a própria senha' : 'Sem senha: gere uma provisória') + '</div></div></div>' +
-        '<button type="button" class="row" data-temppass><div class="tile">' + icon('key') + '</div><div class="grow"><div class="card-title">' + (cloud ? 'Enviar link para nova senha' : 'Gerar senha provisória') + '</div><div class="card-meta">' + (cloud ? 'Vai por e-mail, para quem esqueceu a senha' : 'Para quem esqueceu a senha') + '</div></div></button>' +
+        '<button type="button" class="row" data-setpass><div class="tile accent">' + icon('key') + '</div><div class="grow"><div class="card-title">Definir senha</div><div class="card-meta">Você escolhe a senha e passa para ' + esc(e.name.split(' ')[0]) + '. Também conserta acesso que não entra.</div></div>' + icon('chevronRight', 'sm') + '</button>' +
+        '<button type="button" class="row" data-temppass><div class="tile">' + icon(cloud ? 'mail' : 'refresh') + '</div><div class="grow"><div class="card-title">' + (cloud ? 'Enviar link para nova senha' : 'Gerar senha provisória') + '</div><div class="card-meta">' + (cloud ? 'Vai por e-mail; a própria pessoa cria a senha' : 'Na primeira entrada, a pessoa cria a própria') + '</div></div></button>' +
         '<div class="row"><div class="tile">' + icon('clock') + '</div><div class="grow"><div class="card-title">Código do ponto</div><div class="card-meta">Para bater o ponto no celular da loja</div></div>' +
         '<b class="pin num">' + esc(e.pin) + '</b></div>' +
         '<button type="button" class="row" data-newpin><div class="tile">' + icon('refresh') + '</div><div class="grow card-title">Gerar novo código do ponto</div></button>' +
@@ -188,6 +189,8 @@
           UI.confirm({ title: 'Gerar novo código do ponto?', body: 'O código atual deixa de funcionar no celular da loja. Envie o novo para ' + esc(e.name.split(' ')[0]) + '.', ok: 'Gerar novo código',
             onOk: function () { var p = newPin(); DB.update(function () { find(id).pin = p; }); refresh(); UI.toast('Novo código do ponto: ' + p, { icon: 'key', ms: 4000 }); } });
         });
+        var setpass = $('[data-setpass]');
+        if (setpass) setpass.addEventListener('click', function () { passSheet(e); });
         var temp = $('[data-temppass]');
         if (temp && cloud) temp.addEventListener('click', function () {
           // Com servidor, a senha de outra pessoa só muda pelo link enviado ao e-mail dela.
@@ -283,11 +286,13 @@
   // ---------- Confirmação do cadastro ----------
   // Senha provisória só fica na memória desta tela, para mostrar uma vez; no aparelho fica guardado só o hash.
   var tempShown = {};
+  var defined = {}; // senha escolhida pelo admin (não é provisória: a pessoa entra direto com ela)
 
   // Parceiro: a senha é a que o admin definiu, não provisória.
   function accessText(e, pw) {
     if (e.role === 'contador') return 'Olá! O acesso de ' + e.name + ' ao app da Dindom está pronto.\nLink: ' + location.origin + location.pathname + '\nE-mail: ' + e.email + (pw ? '\nSenha: ' + pw : '') + '\nVocês vão ver o ponto de todos os colaboradores e baixar os relatórios.';
-    return 'Olá, ' + e.name.split(' ')[0] + '! Seu acesso ao app da Dindom está pronto.\nE-mail: ' + e.email + (pw ? '\nSenha provisória: ' + pw + ' (no primeiro acesso você cria a sua)' : '') + '\nCódigo do ponto: ' + e.pin;
+    return 'Olá, ' + e.name.split(' ')[0] + '! Seu acesso ao app da Dindom está pronto.\nLink: ' + location.origin + location.pathname + '\nE-mail: ' + e.email +
+      (pw ? (defined[e.id] ? '\nSenha: ' + pw : '\nSenha provisória: ' + pw + ' (no primeiro acesso você cria a sua)') : '') + '\nCódigo do ponto: ' + e.pin;
   }
 
   function done(id, reset) {
@@ -295,16 +300,18 @@
     if (!e) return list();
     var partner = e.role === 'contador';
     var pw = tempShown[id];
+    var chosen = partner || defined[id]; // senha definida pelo admin
     var html = '<main class="screen no-nav" style="justify-content:center;align-items:center;text-align:center">' +
       '<div class="success-mark">' + icon('check', 'lg') + '</div>' +
-      '<div class="section" style="align-items:center"><div class="eyebrow">' + (reset ? (partner ? 'Nova senha definida' : 'Senha provisória gerada') : partner ? 'Parceiro cadastrado' : 'Colaborador cadastrado') + '</div>' +
+      '<div class="section" style="align-items:center"><div class="eyebrow">' + (reset ? (chosen ? 'Nova senha definida' : 'Senha provisória gerada') : partner ? 'Parceiro cadastrado' : 'Colaborador cadastrado') + '</div>' +
       '<h1 style="font-size:var(--fs-2xl)">' + esc(e.name) + '</h1>' +
       '<p class="muted">' + (partner ? esc(e.contact ? 'Responsável: ' + e.contact + ' · ' : '') + 'Contabilidade · acesso ao ponto de todos os colaboradores' : esc(e.func) + ' · ' + esc(unitName(e.unit)) + ' · ' + UI.ROLES[e.role]) + '</p></div>' +
       '<div class="card access-card"><div class="eyebrow">Dados de acesso</div>' +
       '<div class="access-row"><span>E-mail</span><b>' + esc(e.email) + '</b></div>' +
-      (pw ? '<div class="access-row"><span>' + (partner ? 'Senha' : 'Senha provisória') + '</span><b class="num temp-pass">' + esc(pw) + '</b></div>' : '') +
+      (pw ? '<div class="access-row"><span>' + (chosen ? 'Senha' : 'Senha provisória') + '</span><b class="num temp-pass">' + esc(pw) + '</b></div>' : '') +
       (partner ? '' : '<div class="access-row"><span>Código do ponto</span><b class="num">' + esc(e.pin) + '</b></div>') +
       '<p class="card-meta">' + (partner ? (pw ? 'Anote ou copie agora: a senha não aparece de novo. Para trocar, use Senha de acesso no cadastro do parceiro.' : 'A senha já foi mostrada. Para trocar, use Senha de acesso no cadastro do parceiro.')
+        : chosen ? (pw ? 'Anote ou copie agora: a senha não aparece de novo. ' + esc(e.name.split(' ')[0]) + ' entra direto com ela. Para trocar, use Definir senha no cadastro.' : 'A senha já foi mostrada. Para trocar, use Definir senha no cadastro.')
         : pw ? 'Anote ou copie agora: a senha provisória não aparece de novo. No primeiro acesso, ' + esc(e.name.split(' ')[0]) + ' cria a própria senha.' : 'A senha provisória já foi mostrada. Se precisar, gere outra no cadastro.') + '</p></div>' +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner" style="flex-direction:column;gap:8px">' +
@@ -353,7 +360,7 @@
   function passInput(id, label) {
     return '<div class="field" id="f-' + id + '"><label for="' + id + '">' + label + '</label>' +
       '<div class="input-icon pass-wrap">' + icon('key', 'sm') +
-      '<input id="' + id + '" class="input" type="text" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ex.: Contab2026">' +
+      '<input id="' + id + '" class="input" type="text" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ex.: Dindom2026">' +
       '<button type="button" class="icon-btn plain pass-eye" data-eye="' + id + '" aria-label="Esconder senha">' + icon('eyeOff', 'sm') + '</button></div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span class="hint">8 caracteres ou mais, com letras e números.</span>' +
       '<button type="button" class="btn ghost sm" data-gen="' + id + '">' + icon('refresh', 'sm') + 'Gerar senha</button></div>' +
@@ -367,14 +374,18 @@
   }
 
   // Grava a senha definida pelo admin: no servidor (Supabase) ou, sem servidor, o hash neste aparelho.
-  function setPartnerPass(id, pw) {
-    if (window.Cloud && Cloud.orgId) return Cloud.setPartnerPassword(id, pw).then(function () { DB.update(function () { find(id).mustChange = false; }); });
-    return Auth.makePass(pw).then(function (pass) { DB.update(function () { var t = find(id); t.pass = pass; t.mustChange = false; }); });
+  // A pessoa entra direto com ela (não pede para trocar no primeiro acesso).
+  function setPass(e, pw) {
+    var cloud = window.Cloud && Cloud.orgId;
+    var server = !cloud ? null : e.role === 'contador' ? Cloud.setPartnerPassword(e.id, pw) : Cloud.setPassword(e.id, Auth.normEmail(e.email), pw, e.role);
+    if (server) return server.then(function () { DB.update(function () { find(e.id).mustChange = false; }); });
+    return Auth.makePass(pw).then(function (pass) { DB.update(function () { var t = find(e.id); t.pass = pass; t.mustChange = false; }); });
   }
 
   function passSheet(e) {
-    UI.sheet('<h2>Senha de acesso</h2><p class="muted">Nova senha de ' + esc(e.name) + '. A senha atual deixa de funcionar na hora.</p>' +
-      passInput('ps-pass', 'Nova senha') +
+    var partner = e.role === 'contador';
+    UI.sheet('<h2>' + (partner ? 'Senha de acesso' : 'Definir senha') + '</h2><p class="muted">Nova senha de ' + esc(e.name) + ', que entra com o e-mail <b>' + esc(e.email) + '</b>. A senha atual deixa de funcionar na hora.</p>' +
+      passInput('ps-pass', 'Nova senha') + '<div data-sqlbox hidden></div>' +
       '<button type="button" class="btn primary block" data-save>Salvar senha</button><button type="button" class="btn block" data-close>Cancelar</button>',
       function (sheet, close) {
         function setErr(fid, msg) { var f = sheet.querySelector('#' + fid); f.classList.toggle('error', !!msg); var er = f.querySelector('.err'); er.hidden = !msg; if (msg) er.textContent = msg; }
@@ -385,11 +396,17 @@
           var pw = inp.value, msg = Auth.passProblem(pw);
           setErr('f-ps-pass', msg); if (msg) return;
           save.classList.add('busy'); save.disabled = true;
-          setPartnerPass(e.id, pw).then(function () {
-            close(); tempShown[e.id] = pw; UI.buzz(20); go('parceiros/ok/' + e.id + '/senha', { replace: true });
+          setPass(e, pw).then(function () {
+            close(); tempShown[e.id] = pw; defined[e.id] = true; UI.buzz(20); go((partner ? 'parceiros' : 'equipe') + '/ok/' + e.id + '/senha', { replace: true });
           }, function (er) {
             save.classList.remove('busy'); save.disabled = false;
-            setErr('f-ps-pass', er.message || 'Não foi possível salvar a senha.');
+            var msg = er.message || 'Não foi possível salvar a senha.';
+            // Banco sem a atualização: passo a passo com o SQL pronto para copiar.
+            if (msg === Cloud.NEEDS_PASS_SQL) {
+              setErr('f-ps-pass', 'Falta uma atualização no banco (uma vez só). Siga os passos abaixo.');
+              return UI.sqlHelp(sheet.querySelector('[data-sqlbox]'), 'supabase/006_senha_colaborador.sql', 'Volte aqui e toque em <b>Salvar senha</b> de novo.');
+            }
+            setErr('f-ps-pass', msg);
           });
         });
       });

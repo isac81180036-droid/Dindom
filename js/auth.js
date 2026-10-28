@@ -85,12 +85,17 @@
   function cloudLogin(e, password, remember) {
     var offline = { error: 'Sem conexão com o servidor. Confira a internet e tente de novo.', field: 'pass' };
     return Cloud.client.auth.signInWithPassword({ email: e, password: password }).then(function (r) {
-      if (r.error) return r.error.status === 0 || /fetch|network/i.test(r.error.message) ? offline : fail();
+      if (r.error && (r.error.status === 0 || /fetch|network/i.test(r.error.message))) return offline;
+      // Senha certa, mas a conta ficou sem confirmar o e-mail: não é "senha incorreta".
+      if (r.error && /not confirmed|confirm/i.test(r.error.message)) {
+        return { error: 'Seu acesso ainda não foi liberado. Peça ao administrador para usar "Definir senha" no seu cadastro, em Colaboradores.', field: 'email' };
+      }
+      if (r.error) return fail();
       return Cloud.attach(r.data.user).then(function (a) {
         if (!a.ok) {
           Cloud.signOut();
           return { error: a.error === 'inactive' ? 'Seu acesso está desativado. Fale com o gerente da unidade.'
-            : a.error === 'network' ? offline.error : 'Esta conta não faz parte da equipe da pizzaria.', field: 'email' };
+            : a.error === 'network' ? offline.error : 'Esta conta não está ligada à equipe. Peça ao administrador para usar "Definir senha" no seu cadastro, em Colaboradores.', field: 'email' };
         }
         var d = DB.get();
         var emp = d.employees.filter(function (x) { return x.id === a.member.emp_id; })[0]

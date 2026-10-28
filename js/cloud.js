@@ -294,6 +294,23 @@
     });
   };
 
+  var NEEDS_PASS_SQL = Cloud.NEEDS_PASS_SQL = 'O servidor ainda não aceita definir senhas: rode o arquivo supabase/006_senha_colaborador.sql no Supabase e tente de novo.';
+
+  // O admin define a senha de alguém da equipe (supabase/006_senha_colaborador.sql). O servidor também conserta
+  // acesso pela metade (e-mail sem confirmação, login sem vínculo). Sem login para o e-mail, cria a conta e grava de novo.
+  Cloud.setPassword = function (empId, email, password, role) {
+    function call() {
+      return client.rpc('definir_senha', { p_emp_id: empId, p_email: email, p_password: password, p_role: role }).then(function (r) {
+        if (r.error) throw new Error(/definir_senha|schema cache|does not exist/i.test(r.error.message) ? NEEDS_PASS_SQL : netError(r.error) ? 'Sem conexão com o servidor. Confira a internet e tente de novo.' : r.error.message);
+        return r.data;
+      });
+    }
+    return call().then(function (res) {
+      if (res !== 'sem_conta') return;
+      return Cloud.createUser(email, password).then(function (uid) { return Cloud.addMember(uid, empId, role); }).then(call);
+    });
+  };
+
   Cloud.updateMember = function (empId, patch) {
     if (!Cloud.orgId) return Promise.resolve();
     return client.from('members').update(patch).eq('org_id', Cloud.orgId).eq('emp_id', empId).then(function (r) {
