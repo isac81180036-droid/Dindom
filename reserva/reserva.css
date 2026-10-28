@@ -1,21 +1,35 @@
-/* Página pública de reservas: uma coluna, pensada para abrir no celular pelo WhatsApp. */
+/* Página pública de reservas: uma coluna, pensada para abrir no celular pelo WhatsApp.
+   Mesma marca da tela de entrada (css/login.css): verde-escuro com a logo branca, questionário em cartões brancos. */
+:root { --rp-green: #1e6b4a; --rp-green-hi: #2a8560; }
 body::before { display: none; }
+body {
+  background: var(--rp-green) radial-gradient(110% 60% at 85% 0%, var(--rp-green-hi) 0%, var(--rp-green) 65%) no-repeat;
+  background-attachment: fixed;
+}
 .rp {
   width: 100%; max-width: 600px; margin: 0 auto;
   padding: calc(var(--safe-t) + var(--sp-5)) max(var(--gutter), var(--safe-r)) calc(var(--safe-b) + var(--sp-6)) max(var(--gutter), var(--safe-l));
   display: flex; flex-direction: column; gap: var(--sp-5);
 }
 #rp-body, #rp-form { display: flex; flex-direction: column; gap: var(--sp-4); }
-.rp-head { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-block: var(--sp-2); }
-.rp-head .logo-ink { width: 132px; }
-.rp-head .since { font: 500 8.5px/1 var(--font-display); letter-spacing: .32em; margin-right: -.32em; color: var(--ink-2); }
+.rp-head { display: flex; justify-content: center; padding-block: var(--sp-2) 0; }
+.rp-logo { width: 150px; height: auto; user-select: none; -webkit-user-drag: none; }
 
-.rp-intro { display: flex; flex-direction: column; gap: var(--sp-2); text-align: center; }
-.rp-intro h1 { font-size: var(--fs-2xl); }
-.rp-legend { font-size: var(--fs-xs); }
+.rp-intro { display: flex; flex-direction: column; gap: var(--sp-2); text-align: center; color: #fff; }
+.rp-intro h1 { font-size: var(--fs-2xl); color: #fff; }
+.rp-intro .muted { color: rgba(255, 255, 255, .82); }
+.rp-legend { font-size: var(--fs-xs); color: rgba(255, 255, 255, .72); }
+.rp-intro .req { color: #fff; }
 .req { color: var(--crit); font-weight: 700; }
 
-.rp .card { gap: var(--sp-4); padding: var(--sp-5) var(--sp-4); }
+.rp .card { gap: var(--sp-4); padding: var(--sp-5) var(--sp-4); background: #fff; box-shadow: 0 10px 30px rgba(0, 30, 15, .18); }
+
+/* Verde da marca nos destaques do formulário (botão, opção escolhida, foco, caixa marcada). */
+.rp .btn.primary { background: var(--rp-green); color: #fff; }
+.rp .btn.primary:hover { background: var(--rp-green-hi); filter: none; }
+.rp .input:focus, .rp .textarea:focus { border-color: var(--rp-green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rp-green) 14%, transparent); }
+.rp :focus-visible { outline-color: var(--rp-green); }
+.rp .btn:not(.primary) { background: #fff; }
 .rp .card h2 { font-size: var(--fs-lg); }
 /* No celular, 16px nos campos evita o zoom automático do iPhone ao tocar. */
 .rp .input, .rp .textarea { font-size: 16px; }
@@ -36,19 +50,25 @@ body::before { display: none; }
   border-radius: var(--r-pill); border: 1.5px solid var(--line); background: var(--surface);
   font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); cursor: pointer;
 }
-.rp-opt input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.rp-opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rp-opt input:checked + span { background: var(--rp-green); border-color: var(--rp-green); color: #fff; }
+.rp-opt input:focus-visible + span { outline: 2px solid var(--rp-green); outline-offset: 2px; }
 .field.error .rp-opt span { border-color: var(--crit); }
 
-.rp-check { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4); border-radius: var(--r-md); background: var(--surface); box-shadow: var(--shadow); font-size: var(--fs-sm); font-weight: 550; cursor: pointer; }
-.rp-check input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--ink); }
-.field.error .rp-check { box-shadow: 0 0 0 1.5px var(--crit); }
+.rp-check { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-4); border-radius: var(--r-md); background: #fff; box-shadow: 0 10px 30px rgba(0, 30, 15, .18); font-size: var(--fs-sm); font-weight: 550; cursor: pointer; }
+.rp-check input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--rp-green); }
+.field.error .rp-check { box-shadow: 0 0 0 2px var(--crit); }
+/* Mensagem de erro que fica fora dos cartões (aceite): pílula clara para ler bem sobre o verde. */
+#f-aceite > .err { align-self: flex-start; padding: 4px 10px; border-radius: var(--r-pill); background: #fff; }
 
 /* Campo-isca para robôs: fora da tela, sem sumir do HTML. */
 .rp-hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
 
-.rp-send { min-height: 56px; font-size: var(--fs-lg); }
-.rp-foot { text-align: center; font-size: var(--fs-xs); }
+/* O botão de enviar fica sobre o verde: branco com texto verde, para não sumir no fundo. */
+.rp .btn.primary.rp-send { min-height: 58px; font-size: var(--fs-lg); background: #fff; color: var(--rp-green); box-shadow: 0 10px 30px rgba(0, 30, 15, .22); }
+.rp .btn.primary.rp-send:hover { background: #f1f7f4; }
+.rp-foot { text-align: center; font-size: var(--fs-xs); color: rgba(255, 255, 255, .72); }
+.rp > #rp-body > .muted { color: rgba(255, 255, 255, .82); }
+.rp .banner { box-shadow: 0 10px 30px rgba(0, 30, 15, .14); }
 
 /* Sucesso */
 .rp-done { align-items: center; text-align: center; }
