@@ -147,7 +147,8 @@
   }
 
   // self: true no ponto da própria pessoa (mostra o botão de pedir ajuste).
-  function historyRows(empId, self) {
+  // edit: true para o gerente (mostra "Corrigir" em cada dia; js/screens/ponto-equipe.js).
+  function historyRows(empId, self, edit) {
     var emp = P.employee(empId);
     var from = Cal.add(Cal.today(), -13);
     var js = P.jornadas(empId).filter(function (j) { return j.date >= from; }).reverse();
@@ -167,7 +168,8 @@
       return '<div class="row ponto-day"><div class="pd-date"><b>' + dayLabel(j.date).split(',')[0] + '</b><span class="num">' + dayLabel(j.date).split(', ')[1] + '</span></div>' +
         '<div class="grow"><div class="num pd-marks">' + P.ORDER.map(function (t) { return m[t] ? P.hhmm(m[t].ts) : '<span class="faint">--:--</span>'; }).join('<span class="faint"> · </span>') + '</div>' +
         (flags ? '<div class="card-row" style="flex-wrap:wrap;gap:6px;margin-top:4px">' + flags + '</div>' : '') +
-        (stale && self ? '<button type="button" class="btn sm" data-fix="' + j.date + '" style="margin-top:6px">Solicitar ajuste da saída</button>' : '') + '</div>' +
+        (stale && self ? '<button type="button" class="btn sm" data-fix="' + j.date + '" style="margin-top:6px">Solicitar ajuste da saída</button>' : '') +
+        (edit ? '<button type="button" class="btn sm" data-edit-day="' + j.date + '" style="margin-top:6px">' + icon('settings', 'sm') + 'Corrigir horários</button>' : '') + '</div>' +
         '<div class="pd-total"><b class="num">' + P.dur(w) + '</b>' + (bal != null ? '<span class="num ' + (bal >= 0 ? 'pos' : 'neg') + '">' + P.signed(bal) + '</span>' : '') + '</div></div>';
     }).join('') + '</div>';
   }
@@ -209,7 +211,7 @@
 
       '<section class="section"><div class="section-head"><h2>Últimos 14 dias</h2><button type="button" class="btn ghost sm" data-adjust>Solicitar ajuste</button></div>' + historyRows(emp.id, true) + '</section>' +
       '<button type="button" class="btn block" data-code>' + icon('key', 'sm') + 'Ponto por código (celular da loja)</button>' +
-      '<p class="card-meta">Cada registro gera um comprovante com número sequencial (NSR). Registros não podem ser apagados; correções entram como ajuste aprovado pelo gerente.</p>' +
+      '<p class="card-meta">Cada registro gera um comprovante com número sequencial (NSR). Registros não podem ser apagados; correções entram como ajuste feito ou aprovado pelo gerente, e o original fica guardado.</p>' +
       '</main>';
 
     return {

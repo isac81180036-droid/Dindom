@@ -31,16 +31,88 @@
     var ts = day.getTime();
     var j = P.jornadas(a.emp).filter(function (x) { return x.date === a.date; })[0];
     if (j && a.type !== 'entrada' && ts < j.start) ts += 86400000; // saída depois da meia-noite pertence ao dia seguinte
+    var orig = j && j.marks[a.type]; // se já havia esse registro no dia, o ajuste toma o lugar dele na conta
     var rec = P.punch(a.emp, a.type, 'ajuste', ts);
     DB.update(function (x) {
       var p = x.punches.filter(function (y) { return y.id === rec.id; })[0]; p.adjust = { reason: a.reason, by: x.user.name, request: a.id };
+      if (orig) p.replaces = orig.id;
       var r = x.adjusts.filter(function (y) { return y.id === a.id; })[0]; r.status = 'aprovado'; r.by = x.user.name; r.decidedAt = Date.now();
     });
     refresh(); UI.toast('Ajuste aprovado e registrado' + (rec.nsr ? ' (NSR ' + rec.nsr + ')' : ''));
   }
 
+  function br2(ts) { var d = new Date(ts); return d.toLocaleDateString('pt-BR') + ' às ' + P.hhmm(ts); }
+  function canEdit() { return UI.isManager() && !UI.isAccountant(); }
+
+  // Gerente corrige os horários de um dia (ou lança um dia sem registro). A marcação original fica guardada.
+  function editDaySheet(emp, date) {
+    var j = P.jornadas(emp.id).filter(function (x) { return x.date === date; })[0];
+    var first = emp.name.split(' ')[0];
+    UI.sheet('<h2>' + (j ? 'Corrigir ponto' : 'Lançar ponto') + '</h2>' +
+      '<p class="muted">' + esc(first) + ' · ' + PontoUI.dayLabel(date) + '. ' + (j ? 'A marcação original continua guardada e o dia fica marcado como ajustado.' : 'Dia sem registro: os horários entram como ajuste.') + '</p>' +
+      '<div class="ideal-grid">' + P.ORDER.map(function (t) {
+        var v = j && j.marks[t] ? P.hhmm(j.marks[t].ts) : '';
+        return '<div class="field"><label for="ed-' + t + '">' + esc(P.TYPES[t].label) + '</label><div class="ed-time"><input id="ed-' + t + '" type="time" class="input num" value="' + v + '">' +
+          '<button type="button" class="icon-btn plain" data-clear="' + t + '" aria-label="Apagar ' + esc(P.TYPES[t].label.toLowerCase()) + '">' + icon('x', 'sm') + '</button></div></div>';
+      }).join('') + '</div>' +
+      '<p class="card-meta">Saída depois da meia-noite conta no dia seguinte, sozinha. Campo vazio anula aquela marcação' + (j ? '; todos vazios anulam o dia.' : '.') + '</p>' +
+      '<div class="field" id="f-ed-reason"><label for="ed-reason">Motivo</label><textarea id="ed-reason" class="textarea" style="min-height:64px" placeholder="Ex.: esqueceu de bater a saída; saiu às 23:40 (confirmado pelo gerente)."></textarea><span class="err" hidden>Explique o motivo: fica no histórico e vai para a contabilidade.</span></div>' +
+      '<p class="login-err" data-ed-err hidden></p>' +
+      '<button type="button" class="btn primary block" data-save>Salvar correção</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sheet, close) {
+        sheet.querySelectorAll('[data-clear]').forEach(function (b) { b.addEventListener('click', function () { sheet.querySelector('#ed-' + b.dataset.clear).value = ''; }); });
+        sheet.querySelector('[data-save]').addEventListener('click', function () {
+          var times = {}; P.ORDER.forEach(function (t) { times[t] = sheet.querySelector('#ed-' + t).value; });
+          var reason = sheet.querySelector('#ed-reason').value.trim(), fr = sheet.querySelector('#f-ed-reason'), er = sheet.querySelector('[data-ed-err]');
+          fr.classList.toggle('error', reason.length < 5); fr.querySelector('.err').hidden = reason.length >= 5;
+          if (reason.length < 5) return;
+          var r = P.editDay(emp.id, date, times, reason, DB.get().user.name);
+          if (r && r.error) { er.hidden = false; er.textContent = r.error; return; }
+          close();
+          if (!r) { UI.toast('Nada mudou: os horários são os mesmos.'); return detailSheet(emp); }
+          refresh(); UI.buzz(20); detailSheet(emp);
+          UI.toast('Ponto de ' + first + ' corrigido (' + r + (r === 1 ? ' marcação' : ' marcações') + ')');
+        });
+      });
+  }
+
+  function pickDaySheet(emp) {
+    UI.sheet('<h2>Corrigir outro dia</h2><p class="muted">Escolha o dia de ' + esc(emp.name.split(' ')[0]) + ' para corrigir ou lançar.</p>' +
+      '<div class="field"><label for="ed-day">Dia</label><input id="ed-day" type="date" class="input" max="' + Cal.today() + '" value="' + Cal.today() + '"></div>' +
+      '<button type="button" class="btn primary block" data-go>Continuar</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sheet, close) {
+        sheet.querySelector('[data-go]').addEventListener('click', function () {
+          var v = sheet.querySelector('#ed-day').value; if (!v) return;
+          close(); editDaySheet(emp, v);
+        });
+      });
+  }
+
+  // Zerar o banco de horas: fica registrado quem zerou, quando e o saldo que havia. Dá para desfazer.
+  function zeroSheet(emp) {
+    var total = P.bankTotal(emp.id), first = emp.name.split(' ')[0];
+    UI.sheet('<h2>Zerar banco de horas</h2>' +
+      '<p class="muted">Saldo atual de ' + esc(first) + ': <b class="num ' + (total >= 0 ? 'pos' : 'neg') + '">' + P.signed(total) + '</b>. Depois de zerar, o banco volta a contar do zero a partir de agora. As marcações e as horas trabalhadas continuam no histórico.</p>' +
+      '<div class="field"><label for="bz-reason">Motivo <span class="faint">(opcional)</span></label><input id="bz-reason" class="input" maxlength="120" placeholder="Ex.: horas pagas na folha de outubro"></div>' +
+      '<button type="button" class="btn dark block" data-ok>Zerar banco de horas</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sheet, close) {
+        sheet.querySelector('[data-ok]').addEventListener('click', function () {
+          var id = 'bz' + Date.now(), reason = sheet.querySelector('#bz-reason').value.trim();
+          DB.update(function (x) { x.adjusts.push({ id: id, kind: 'banco', emp: emp.id, ts: Date.now(), at: Date.now(), balance: total, reason: reason, by: x.user.name, status: 'aplicado' }); });
+          close(); refresh(); UI.buzz(20); detailSheet(emp);
+          UI.toast('Banco de horas de ' + first + ' zerado', { action: 'Desfazer', ms: 6000, onAction: function () { undoZero(id); detailSheet(emp); } });
+        });
+      });
+  }
+  function undoZero(id) {
+    DB.update(function (x) { var r = x.adjusts.filter(function (a) { return a.id === id; })[0]; if (r) { r.status = 'desfeito'; r.undoneBy = x.user.name; r.undoneAt = Date.now(); } });
+    document.querySelectorAll('.sheet-wrap').forEach(function (s) { s.remove(); }); document.body.style.overflow = '';
+    refresh(); UI.toast('O banco de horas voltou ao saldo anterior');
+  }
+
   function detailSheet(emp) {
     var s = P.summary(emp.id, Cal.today().slice(0, 8) + '01', Cal.today());
+    var bank = P.bankTotal(emp.id), zero = P.bankZero(emp.id), edit = canEdit();
     UI.sheet('<div class="card-row"><span class="avatar">' + esc(initials(emp.name)) + '</span><div class="grow"><h2 style="font-size:var(--fs-lg)">' + esc(emp.name) + '</h2>' +
       '<div class="card-meta">' + esc(emp.func) + ' · ' + esc(unitShort(emp.unit)) + '</div></div></div>' +
       '<div class="row" style="border:1px solid var(--line);border-radius:var(--r-md)"><div class="tile">' + icon('clock') + '</div><div class="grow"><div class="card-title num">' + esc(P.horarioLabel(emp)) + '</div>' +
@@ -49,10 +121,29 @@
       '<div class="stat-grid three"><div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num">' + P.dur(s.worked) + '</div><div class="card-meta">no mês</div></div>' +
       '<div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num ' + (s.balance >= 0 ? 'pos' : 'neg') + '">' + P.signed(s.balance) + '</div><div class="card-meta">banco</div></div>' +
       '<div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num">' + s.lateCount + '</div><div class="card-meta">atrasos</div></div></div>' +
-      PontoUI.historyRows(emp.id, false) + '<button type="button" class="btn block" data-close>Fechar</button>',
+      // Banco acumulado (não só do mês) e o "zerar banco".
+      '<div class="row" style="border:1px solid var(--line);border-radius:var(--r-md)"><div class="tile">' + icon('clock') + '</div><div class="grow">' +
+      '<div class="card-title">Banco de horas: <span class="num ' + (bank >= 0 ? 'pos' : 'neg') + '">' + P.signed(bank) + '</span></div>' +
+      '<div class="card-meta">' + (zero ? 'Zerado em ' + br2(zero.ts) + ' por ' + esc(zero.by || 'gerente') + ' (era ' + P.signed(zero.balance || 0) + ')' + (zero.reason ? ' · ' + esc(zero.reason) : '') : 'Acumulado desde o primeiro registro') + '</div>' +
+      (edit && zero ? '<button type="button" class="btn ghost sm" data-unzero style="padding-left:0">Desfazer o último zerar</button>' : '') + '</div>' +
+      (edit ? '<button type="button" class="btn sm" data-zero>Zerar</button>' : '') + '</div>' +
+      PontoUI.historyRows(emp.id, false, edit) +
+      (edit ? '<button type="button" class="btn block" data-otherday>' + icon('calendar', 'sm') + 'Corrigir ou lançar outro dia</button>' : '') +
+      '<button type="button" class="btn block" data-close>Fechar</button>',
       function (sheet, close) {
         var ed = sheet.querySelector('[data-horario-edit]');
         if (ed) ed.addEventListener('click', function () { close(); PontoUI.horarioSheet(emp); });
+        sheet.addEventListener('click', function (ev) {
+          var d = ev.target.closest('[data-edit-day]');
+          if (d) { close(); return editDaySheet(emp, d.dataset.editDay); }
+          if (ev.target.closest('[data-otherday]')) { close(); return pickDaySheet(emp); }
+          if (ev.target.closest('[data-zero]')) { close(); return zeroSheet(emp); }
+          if (ev.target.closest('[data-unzero]') && zero) {
+            close();
+            UI.confirm({ title: 'Desfazer o último zerar?', body: 'O banco de ' + esc(emp.name.split(' ')[0]) + ' volta a somar as horas de antes de ' + br2(zero.ts) + '.', ok: 'Desfazer',
+              onOk: function () { undoZero(zero.id); detailSheet(emp); } });
+          }
+        });
       });
   }
 

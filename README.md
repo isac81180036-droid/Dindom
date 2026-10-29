@@ -138,3 +138,9 @@ Um link aberto (`/reserva`, ex.: `https://seu-site/reserva`) para enviar a empre
 ## Senha de colaborador definida pelo administrador
 
 Em **Colaboradores › (pessoa) › Definir senha**, o administrador escolhe a senha e passa para a pessoa, que entra direto com ela. Com o servidor, isso usa `definir_senha()` (`supabase/006_senha_colaborador.sql`, rodar uma vez; o app oferece o SQL quando falta). Além de gravar a senha, a função conserta o acesso que ficou pela metade: e-mail sem confirmação, conta de login sem vínculo com a equipe ou com e-mail diferente do cadastro. Se o e-mail nem tem login, o app cria a conta. "Enviar link para nova senha" continua disponível.
+
+## Correção do ponto e zerar banco de horas (gerente)
+
+Em **Ponto da equipe**, toque no colaborador:
+- **Corrigir horários** (em cada dia) ou **Corrigir ou lançar outro dia**: entrada, intervalo, volta e saída, com motivo obrigatório. A marcação original não é apagada (exigência do registro de ponto): o ajuste entra como marcação nova, do tipo "ajuste", que substitui a original na conta (`replaces`); campo vazio anula aquela marcação e todos vazios anulam o dia (`removed`). Saída depois da meia-noite vai para o dia seguinte sozinha. O dia fica marcado como "Ajustado" e o motivo vai para as planilhas da contabilidade. Pedidos de ajuste aprovados também passam a substituir a marcação do mesmo tipo.
+- **Banco de horas: Zerar**: guarda quem zerou, quando, o saldo que havia e o motivo (em `adjusts`, tipo `banco`). O saldo passa a contar das jornadas que começam depois disso; horas trabalhadas e marcações continuam no histórico. Dá para desfazer.

@@ -48,9 +48,17 @@
   P.turnoOf = function (start) { var m = mins(start); return m < 12 * 60 ? 'Manhã' : m < 17 * 60 ? 'Tarde' : 'Noite'; };
   P.span = span;
 
+  // Marcações que valem para a conta. Um ajuste do gerente substitui (replaces) ou anula (removed) uma marcação:
+  // a original continua guardada, só sai da conta das horas.
+  P.active = function (empId) {
+    var all = DB.get().punches.filter(function (p) { return p.emp === empId; }), gone = {};
+    all.forEach(function (p) { if (p.replaces) gone[p.replaces] = true; });
+    return all.filter(function (p) { return !gone[p.id] && !p.removed; });
+  };
+
   // Agrupa as marcações em jornadas. A jornada pertence ao dia da entrada (a saída pode ser depois da meia-noite).
   P.jornadas = function (empId) {
-    var list = DB.get().punches.filter(function (p) { return p.emp === empId; }).sort(function (a, b) { return a.ts - b.ts; });
+    var list = P.active(empId).sort(function (a, b) { return a.ts - b.ts; });
     var out = [], cur = null;
     list.forEach(function (p) {
       if (p.type === 'entrada' || !cur || p.ts - cur.start > MAX_SHIFT) {
@@ -118,9 +126,16 @@
     return rec;
   };
 
+  // Última vez que o gerente zerou o banco de horas da pessoa (fica em "adjusts", tipo "banco"; desfeito não vale).
+  P.bankZero = function (empId) {
+    var list = (DB.get().adjusts || []).filter(function (a) { return a.kind === 'banco' && a.emp === empId && a.status === 'aplicado'; });
+    return list.sort(function (a, b) { return a.ts - b.ts; })[list.length - 1] || null;
+  };
+
   // Resumo de um período: dias trabalhados, horas, previsto, saldo e atrasos.
+  // O saldo (banco de horas) só conta as jornadas que começaram depois do último "zerar banco".
   P.summary = function (empId, from, to) {
-    var emp = P.employee(empId), hours = P.shift(emp).hours;
+    var emp = P.employee(empId), hours = P.shift(emp).hours, zero = P.bankZero(empId);
     var js = P.jornadas(empId).filter(function (j) { return j.date >= from && j.date <= to; });
     var worked = 0, late = 0, lateCount = 0, missing = 0;
     js.forEach(function (j) {
@@ -128,10 +143,56 @@
       var l = P.lateBy(j, emp); if (l) { late += l; lateCount++; }
       if (P.isStale(j)) missing++;
     });
-    var done = js.filter(function (j) { return j.marks.saida; }).length;
-    var expected = done * hours * 60;
-    var workedDone = js.filter(function (j) { return j.marks.saida; }).reduce(function (s, j) { return s + P.worked(j); }, 0);
-    return { days: js.length, worked: worked, expected: expected, balance: workedDone - expected, late: late, lateCount: lateCount, missing: missing, jornadas: js };
+    var done = js.filter(function (j) { return j.marks.saida; });
+    var expected = done.length * hours * 60;
+    var counted = done.filter(function (j) { return !zero || j.start >= zero.ts; });
+    var balance = counted.reduce(function (s, j) { return s + P.worked(j); }, 0) - counted.length * hours * 60;
+    return { days: js.length, worked: worked, expected: expected, balance: balance, late: late, lateCount: lateCount, missing: missing, jornadas: js, zero: zero };
+  };
+
+  // Banco de horas acumulado (desde o último "zerar banco", ou desde o primeiro registro).
+  P.bankTotal = function (empId) { return P.summary(empId, '0000-01-01', DB.iso(new Date())).balance; };
+
+  // Corrige um dia (gerente): times = { entrada: 'HH:MM' ou '', intervalo, retorno, saida }.
+  // Horário novo vira marcação "ajuste" que substitui a original; campo vazio anula a marcação daquele tipo.
+  // Devolve quantas marcações mudaram, ou { error }.
+  P.editDay = function (empId, date, times, reason, by) {
+    var j = P.jornadas(empId).filter(function (x) { return x.date === date; })[0];
+    var p = date.split('-'), base = new Date(+p[0], p[1] - 1, +p[2]);
+    function tsOf(hm) { var t = hm.split(':'), d = new Date(base); d.setHours(+t[0], +t[1], 0, 0); return d.getTime(); }
+    var ts = {};
+    // Todos os campos vazios: anula o dia inteiro (ex.: ponto batido por engano numa folga).
+    if (ORDER.some(function (t) { return times[t]; })) {
+      if (!times.entrada) return { error: 'Informe o horário de entrada.' };
+      if (times.retorno && !times.intervalo) return { error: 'Há volta do intervalo sem a saída para o intervalo.' };
+      var start = tsOf(times.entrada), last = start;
+      if (start > Date.now()) return { error: 'Essa entrada ainda não aconteceu.' };
+      for (var i = 0; i < ORDER.length; i++) {
+        var t = ORDER[i]; if (!times[t]) continue;
+        var v = tsOf(times[t]);
+        if (t !== 'entrada' && v <= start) v += 86400000; // depois da meia-noite: dia seguinte
+        if (t !== 'entrada' && v <= last) return { error: TYPES[t].label + ' precisa ser depois do registro anterior.' };
+        if (v - start > MAX_SHIFT) return { error: 'A jornada passa de 16 horas. Confira os horários.' };
+        ts[t] = v; last = v;
+      }
+    } else if (!j) return { error: 'Informe pelo menos a entrada.' };
+    var changes = [];
+    ORDER.forEach(function (t) {
+      var orig = j && j.marks[t];
+      if (ts[t] && (!orig || orig.ts !== ts[t])) changes.push({ type: t, ts: ts[t], replaces: orig ? orig.id : null });
+      else if (!ts[t] && orig) changes.push({ type: t, ts: orig.ts, replaces: orig.id, removed: true });
+    });
+    changes.forEach(function (c) {
+      var rec = P.punch(empId, c.type, 'ajuste', c.ts);
+      DB.update(function (x) {
+        var r = x.punches.filter(function (y) { return y.id === rec.id; })[0];
+        r.adjust = { reason: reason, by: by, at: Date.now() };
+        if (c.replaces) r.replaces = c.replaces;
+        if (c.removed) r.removed = true;
+      });
+    });
+    if (changes.length && window.Cloud && Cloud.orgId) Cloud.schedule(true);
+    return changes.length;
   };
 
   P.comprovante = function (rec) {
