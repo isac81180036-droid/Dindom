@@ -35,7 +35,7 @@
   function passField(id, label, autocomplete, placeholder) {
     return '<div class="field" id="f-' + id + '"><label for="' + id + '">' + label + '</label>' +
       '<div class="input-icon pass-wrap">' + icon('key', 'sm') +
-      '<input id="' + id + '" class="input" type="password" autocomplete="' + autocomplete + '" placeholder="' + placeholder + '">' +
+      '<input id="' + id + '" class="input" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="' + autocomplete + '" placeholder="' + placeholder + '">' +
       '<button type="button" class="icon-btn plain pass-eye" data-eye="' + id + '" aria-label="Mostrar senha">' + icon('eye', 'sm') + '</button></div></div>';
   }
 

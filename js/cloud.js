@@ -311,6 +311,21 @@
     });
   };
 
+  // Testa um acesso de verdade (como a pessoa faria no login), sem mexer na sessão de quem está usando o app.
+  // Devolve { ok, error, member: { emp_id, role, active } }.
+  Cloud.testLogin = function (email, password) {
+    var temp = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'dindom-test' }
+    });
+    return temp.auth.signInWithPassword({ email: email, password: password }).then(function (r) {
+      if (r.error) return { ok: false, error: r.error.message || 'erro desconhecido' };
+      return temp.from('members').select('emp_id,role,active').eq('user_id', r.data.user.id).limit(1).then(function (m) {
+        temp.auth.signOut({ scope: 'local' }).catch(function () {});
+        return { ok: true, member: (m.data && m.data[0]) || null };
+      });
+    }, function (er) { return { ok: false, error: (er && er.message) || 'sem conexão' }; });
+  };
+
   Cloud.updateMember = function (empId, patch) {
     if (!Cloud.orgId) return Promise.resolve();
     return client.from('members').update(patch).eq('org_id', Cloud.orgId).eq('emp_id', empId).then(function (r) {

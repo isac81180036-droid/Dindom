@@ -84,7 +84,13 @@
   // Login pelo Supabase: a senha é conferida no servidor; depois liga o aparelho à pizzaria.
   function cloudLogin(e, password, remember) {
     var offline = { error: 'Sem conexão com o servidor. Confira a internet e tente de novo.', field: 'pass' };
-    return Cloud.client.auth.signInWithPassword({ email: e, password: password }).then(function (r) {
+    function attempt(pw) { return Cloud.client.auth.signInWithPassword({ email: e, password: pw }); }
+    // Espaço sobrando no começo ou no fim (teclado do celular, senha colada do WhatsApp): tenta de novo sem ele.
+    var trimmed = password.trim();
+    return attempt(password).then(function (r) {
+      if (r.error && trimmed !== password && trimmed && /invalid login|credentials/i.test(r.error.message)) return attempt(trimmed);
+      return r;
+    }).then(function (r) {
       if (r.error && (r.error.status === 0 || /fetch|network/i.test(r.error.message))) return offline;
       // Senha certa, mas a conta ficou sem confirmar o e-mail: não é "senha incorreta".
       if (r.error && /not confirmed|confirm/i.test(r.error.message)) {

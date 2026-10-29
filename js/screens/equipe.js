@@ -310,6 +310,8 @@
       '<div class="access-row"><span>E-mail</span><b>' + esc(e.email) + '</b></div>' +
       (pw ? '<div class="access-row"><span>' + (chosen ? 'Senha' : 'Senha provisória') + '</span><b class="num temp-pass">' + esc(pw) + '</b></div>' : '') +
       (partner ? '' : '<div class="access-row"><span>Código do ponto</span><b class="num">' + esc(e.pin) + '</b></div>') +
+      (reset && tested[id] === true ? '<p class="card-meta" style="color:var(--ok);font-weight:650">' + icon('check', 'sm') + ' Testado agora: entra com este e-mail e esta senha.</p>' : '') +
+      (reset && tested[id] === 'off' ? '<p class="card-meta" style="color:var(--crit);font-weight:650">' + icon('alert', 'sm') + ' A senha funciona, mas o cadastro está desativado. Reative no cadastro para a pessoa entrar.</p>' : '') +
       '<p class="card-meta">' + (partner ? (pw ? 'Anote ou copie agora: a senha não aparece de novo. Para trocar, use Senha de acesso no cadastro do parceiro.' : 'A senha já foi mostrada. Para trocar, use Senha de acesso no cadastro do parceiro.')
         : chosen ? (pw ? 'Anote ou copie agora: a senha não aparece de novo. ' + esc(e.name.split(' ')[0]) + ' entra direto com ela. Para trocar, use Definir senha no cadastro.' : 'A senha já foi mostrada. Para trocar, use Definir senha no cadastro.')
         : pw ? 'Anote ou copie agora: a senha provisória não aparece de novo. No primeiro acesso, ' + esc(e.name.split(' ')[0]) + ' cria a própria senha.' : 'A senha provisória já foi mostrada. Se precisar, gere outra no cadastro.') + '</p></div>' +
@@ -377,9 +379,32 @@
   // A pessoa entra direto com ela (não pede para trocar no primeiro acesso).
   function setPass(e, pw) {
     var cloud = window.Cloud && Cloud.orgId;
-    var server = !cloud ? null : e.role === 'contador' ? Cloud.setPartnerPassword(e.id, pw) : Cloud.setPassword(e.id, Auth.normEmail(e.email), pw, e.role);
-    if (server) return server.then(function () { DB.update(function () { find(e.id).mustChange = false; }); });
-    return Auth.makePass(pw).then(function (pass) { DB.update(function () { var t = find(e.id); t.pass = pass; t.mustChange = false; }); });
+    if (!cloud) return Auth.makePass(pw).then(function (pass) { DB.update(function () { var t = find(e.id); t.pass = pass; t.mustChange = false; }); });
+    var mail = Auth.normEmail(e.email);
+    var server = e.role === 'contador' ? Cloud.setPartnerPassword(e.id, pw) : Cloud.setPassword(e.id, mail, pw, e.role);
+    return server.then(function () {
+      DB.update(function () { find(e.id).mustChange = false; });
+      return verify(e, mail, pw);
+    });
+  }
+
+  // Entra de verdade com o e-mail e a senha novos, como a pessoa faria. Conserta o que dá
+  // (acesso desligado no servidor com o cadastro ativo) e explica o resto, em vez de a pessoa só ver "senha incorreta".
+  var tested = {};
+  function verify(e, mail, pw) {
+    return Cloud.testLogin(mail, pw).then(function (t) {
+      var first = e.name.split(' ')[0];
+      if (!t.ok) {
+        throw new Error(/invalid login|credentials/i.test(t.error)
+          ? 'A senha foi gravada, mas o teste de entrada com ' + mail + ' falhou. Toque em Salvar senha de novo; se continuar, mande esta mensagem para o suporte.'
+          : 'A senha foi gravada, mas o servidor recusou a entrada: ' + t.error);
+      }
+      if (!t.member) throw new Error('A senha funciona, mas a conta de ' + mail + ' não ficou ligada à equipe. Toque em Salvar senha de novo.');
+      if (t.member.emp_id !== e.id) throw new Error('O e-mail ' + mail + ' entra no cadastro de outra pessoa da equipe. Confira se ' + first + ' não tem cadastro repetido em Colaboradores.');
+      tested[e.id] = true;
+      if (!t.member.active && e.active) return Cloud.updateMember(e.id, { active: true }); // estava desligado só no servidor
+      if (!t.member.active) tested[e.id] = 'off';
+    });
   }
 
   function passSheet(e) {
@@ -393,7 +418,8 @@
         bindPass(sheet, setErr);
         inp.addEventListener('input', function () { setErr('f-ps-pass', ''); });
         save.addEventListener('click', function () {
-          var pw = inp.value, msg = Auth.passProblem(pw);
+          var pw = inp.value.trim(), msg = Auth.passProblem(pw); // espaço sobrando no fim é o erro mais comum ao digitar
+          inp.value = pw;
           setErr('f-ps-pass', msg); if (msg) return;
           save.classList.add('busy'); save.disabled = true;
           setPass(e, pw).then(function () {
