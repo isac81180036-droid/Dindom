@@ -215,7 +215,8 @@
       '</section>' +
       (manager ? '<section class="section"><div class="eyebrow">Atualizar status</div><div class="seg">' + steps.map(function (s) {
         return '<button type="button" data-st="' + s + '" aria-pressed="' + (m.status === s) + '"><span style="font-size:var(--fs-xs)">' + S[s][1] + '</span></button>';
-      }).join('') + '</div></section>' : '') +
+      }).join('') + '</div>' +
+      '<button type="button" class="btn ghost sm" data-preview style="align-self:flex-start;padding-left:0">' + icon('eye', 'sm') + 'Ver o aviso que o colaborador recebe</button></section>' : '') +
       '<section class="section"><div class="eyebrow">Andamento</div><ol class="timeline">' +
       m.timeline.slice().reverse().map(function (t, i) {
         return '<li' + (i === 0 ? ' class="now"' : '') + '><span class="num faint">' + esc(t.at) + '</span><span>' + esc(t.text) + '</span></li>';
@@ -224,6 +225,8 @@
     return {
       html: html, tab: 'manutencao',
       mount: function (root) {
+        var pv = root.querySelector('[data-preview]');
+        if (pv) pv.addEventListener('click', function () { previewAck(find(id)); });
         root.querySelectorAll('[data-st]').forEach(function (b) {
           b.addEventListener('click', function () {
             if (b.dataset.st === m.status) return;
@@ -272,7 +275,15 @@
     if (document.querySelector('.ack-wrap') || !Auth.session() || UI.isAccountant() || /^(login|setup)/.test(route())) return;
     var m = unseen()[0];
     if (!m) return;
-    var c = m.change, s = S[c.to] || ['', c.to], before = S[c.from];
+    showAck(m, m.change, function () {
+      DB.update(function (d) { var x = d.maintenance.filter(function (y) { return String(y.id) === String(m.id); })[0]; if (x) x.seenAt = m.change.ts; });
+      checkAck(); // próximo chamado alterado, se houver
+    });
+  }
+
+  // Desenha a janela. onOk roda depois do "OK, obrigado" (na prévia do gerente, não grava nada).
+  function showAck(m, c, onOk) {
+    var s = S[c.to] || ['', c.to], before = S[c.from];
     var when = new Date(c.ts);
     var wrap = document.createElement('div');
     wrap.className = 'ack-wrap';
@@ -293,11 +304,16 @@
     // Teclas não passam para a tela de trás (Esc, Tab para fora…).
     wrap.addEventListener('keydown', function (e) { if (e.key === 'Tab') { e.preventDefault(); ok.focus(); } if (e.key === 'Escape') e.preventDefault(); });
     ok.addEventListener('click', function () {
-      DB.update(function (d) { var x = d.maintenance.filter(function (y) { return String(y.id) === String(m.id); })[0]; if (x) x.seenAt = c.ts; });
       wrap.remove();
       if (!document.querySelector('.sheet-wrap')) document.body.style.overflow = '';
-      checkAck(); // próximo chamado alterado, se houver
+      onOk();
     });
+  }
+
+  // Prévia para o gerente: a mesma janela que o colaborador recebe, com a última mudança (ou um exemplo).
+  function previewAck(m) {
+    var c = m.change || { ts: Date.now(), from: 'aberta', to: m.status === 'aberta' ? 'andamento' : m.status, by: DB.get().user.name };
+    showAck(m, c, function () { UI.toast('Assim o colaborador vê. Nada foi gravado.'); });
   }
 
   // Chegou alteração de outro aparelho: confere na hora, mesmo sem redesenhar a tela (js/cloud.js).
