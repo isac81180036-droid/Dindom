@@ -96,6 +96,8 @@
     renderNav(view.tab || parts[0], view.nav !== false);
     window.scrollTo(0, 0);
     if (view.mount) unmount = view.mount(host) || null;
+    // Chamado de manutenção com status alterado: aviso que trava o app até "OK, obrigado".
+    if (logged && window.Maint) Maint.checkAck();
   }
 
   window.go = function (path, opts) {

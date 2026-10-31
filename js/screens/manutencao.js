@@ -161,7 +161,7 @@
               var at = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ' · ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
               x.maintenance.unshift({
                 id: id, title: dr.title, place: dr.place, equipment: dr.equipment === 'Outro' ? dr.other : dr.equipment,
-                priority: dr.priority, status: 'aberta', date: at, notes: dr.notes || '',
+                priority: dr.priority, status: 'aberta', date: at, notes: dr.notes || '', by: x.user.empId,
                 media: media.length, photos: media.filter(function (m) { return !m.temp; }),
                 timeline: [{ at: at, text: 'Chamado aberto por ' + x.user.name }]
               });
@@ -228,11 +228,15 @@
           b.addEventListener('click', function () {
             if (b.dataset.st === m.status) return;
             var apply = function () {
-              DB.update(function () {
+              DB.update(function (d) {
                 var x = find(id);
                 var now = new Date();
+                var from = x.status;
                 x.status = b.dataset.st;
-                x.timeline.push({ at: String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ' · ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'), text: 'Status alterado para ' + S[b.dataset.st][1].toLowerCase() });
+                x.timeline.push({ at: String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ' · ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0'), text: 'Status alterado para ' + S[b.dataset.st][1].toLowerCase() + ' por ' + d.user.name });
+                // Última mudança de status: quem abriu o chamado vê um aviso até tocar em "OK, obrigado".
+                x.change = { ts: now.getTime(), from: from, to: x.status, by: d.user.name };
+                if (ownerOf(x) === d.user.empId) x.seenAt = now.getTime(); // mudou o próprio chamado: não precisa avisar
               });
               refresh(); UI.toast('Status atualizado');
             };
@@ -243,6 +247,62 @@
       }
     };
   }
+
+  // ---------- Aviso de status para quem abriu o chamado ----------
+
+  // Quem abriu: gravado no chamado (by); nos chamados antigos, pelo nome no primeiro registro do andamento.
+  function ownerOf(m) {
+    if (m.by) return m.by;
+    var first = m.timeline && m.timeline[0] && m.timeline[0].text || '';
+    var name = first.replace(/^Chamado aberto por\s*/, '').trim();
+    var e = name && DB.get().employees.filter(function (x) { return x.name === name; })[0];
+    return e ? e.id : null;
+  }
+
+  // Chamados meus com status alterado por outra pessoa e que eu ainda não confirmei.
+  function unseen() {
+    var d = DB.get(), me = d.user.empId;
+    if (!me) return [];
+    return d.maintenance.filter(function (m) { return m.change && m.change.ts > (m.seenAt || 0) && ownerOf(m) === me; })
+      .sort(function (a, b) { return a.change.ts - b.change.ts; });
+  }
+
+  // Janela que trava o app: só some no "OK, obrigado". Vários chamados alterados aparecem um de cada vez.
+  function checkAck() {
+    if (document.querySelector('.ack-wrap') || !Auth.session() || UI.isAccountant() || /^(login|setup)/.test(route())) return;
+    var m = unseen()[0];
+    if (!m) return;
+    var c = m.change, s = S[c.to] || ['', c.to], before = S[c.from];
+    var when = new Date(c.ts);
+    var wrap = document.createElement('div');
+    wrap.className = 'ack-wrap';
+    wrap.innerHTML = '<div class="ack" role="alertdialog" aria-modal="true" aria-labelledby="ack-title" aria-describedby="ack-text">' +
+      '<div class="tile ' + (s[0] || 'info') + ' ack-ico">' + icon(c.to === 'resolvida' ? 'check' : 'wrench', 'lg') + '</div>' +
+      '<div class="eyebrow">Chamado #' + esc(m.id) + '</div>' +
+      '<h2 id="ack-title">O status da sua manutenção mudou</h2>' +
+      '<p class="ack-what">' + esc(m.title) + '</p>' +
+      '<div class="ack-status" id="ack-text">' + (before ? '<span class="pill ' + before[0] + '">' + before[1] + '</span>' + icon('chevronRight', 'sm') : '') +
+      '<span class="pill ' + s[0] + '">' + s[1] + '</span></div>' +
+      '<p class="card-meta">Alterado por ' + esc(c.by || 'gerente') + ' em ' + when.toLocaleDateString('pt-BR') + ' às ' + String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0') + '</p>' +
+      '<button type="button" class="btn primary block" data-ack style="min-height:56px;font-size:var(--fs-lg)">OK, obrigado</button></div>';
+    document.body.appendChild(wrap);
+    document.body.style.overflow = 'hidden';
+    UI.buzz([40, 30, 40]);
+    var ok = wrap.querySelector('[data-ack]');
+    setTimeout(function () { ok.focus(); }, 60);
+    // Teclas não passam para a tela de trás (Esc, Tab para fora…).
+    wrap.addEventListener('keydown', function (e) { if (e.key === 'Tab') { e.preventDefault(); ok.focus(); } if (e.key === 'Escape') e.preventDefault(); });
+    ok.addEventListener('click', function () {
+      DB.update(function (d) { var x = d.maintenance.filter(function (y) { return String(y.id) === String(m.id); })[0]; if (x) x.seenAt = c.ts; });
+      wrap.remove();
+      if (!document.querySelector('.sheet-wrap')) document.body.style.overflow = '';
+      checkAck(); // próximo chamado alterado, se houver
+    });
+  }
+
+  // Chegou alteração de outro aparelho: confere na hora, mesmo sem redesenhar a tela (js/cloud.js).
+  window.addEventListener('dindom:changed', function (e) { if (e.detail === 'maintenance') checkAck(); });
+  window.Maint = { checkAck: checkAck };
 
   Screens.manutencao = function (params) {
     if (params[0] === 'nova') return form();

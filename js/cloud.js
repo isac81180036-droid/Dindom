@@ -92,6 +92,8 @@
     if (isNew && !row.deleted && row.collection === 'events' && row.data && row.data.reserva) {
       try { window.dispatchEvent(new CustomEvent('dindom:reserva', { detail: row.data })); } catch (e) {}
     }
+    // Outras telas reagem na hora ao que mudou (ex.: aviso de status da manutenção).
+    try { window.dispatchEvent(new CustomEvent('dindom:changed', { detail: row.collection })); } catch (e) {}
     return true;
   }
 
