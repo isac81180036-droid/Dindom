@@ -172,3 +172,16 @@ Em **Ponto › Equipe**, toque no colaborador e em **Dar férias** (ou **Férias
 (`kind: 'ferias'`, `from`/`to`), junto dos outros ajustes do ponto, e a contabilidade também vê. Nos dias de férias a pessoa
 aparece como "Férias" (não como atrasada), o espelho de ponto (CSV e TXT) mostra a linha "Férias" e o resumo traz os dias de férias.
 O banco de horas não muda: só conta os dias trabalhados.
+
+## Financeiro (só o administrador)
+
+Menu **Financeiro** no computador; no celular, **Perfil › Financeiro** (`#financeiro`). Antes do primeiro uso, rode
+`supabase/007_financeiro.sql` no Supabase (a própria tela mostra o passo a passo): os números ficam na tabela `financeiro`,
+que só o administrador lê e grava, fora da sincronização do resto do app.
+
+- **Custos e metas**: custos fixos do mês, folha (funcionários × salário médio + encargos + benefícios), custos variáveis em %
+  do faturamento (impostos, taxas, apps, entregadores), CMV (média das fichas técnicas, compras das notas do mês ou informado)
+  e metas de lucro, marketing e reserva.
+- **Resumo do mês**: faturamento (Cardápio Web ou lançado à mão), meta do mês, ponto de equilíbrio, quanto vender por dia,
+  projeção, resultado do mês (DRE) e quanto tirar de lucro, investir em marketing e guardar. Despesas extras por mês.
+- Contas em `js/fin-core.js`: equilíbrio = fixos ÷ (1 − variáveis); meta = fixos ÷ (1 − variáveis − lucro − marketing − reserva).

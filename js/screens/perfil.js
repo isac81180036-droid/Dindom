@@ -126,7 +126,9 @@
         '<div class="grow"><div class="card-title">Estações do fechamento</div><div class="card-meta">' + (d.stations.length ? d.stations.length + ' estações · quem conta o quê' : 'Divida a contagem entre a equipe') + '</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#checklists/editar" style="text-decoration:none;color:inherit"><div class="tile">' + icon('checklist') + '</div>' +
         '<div class="grow"><div class="card-title">Modelos de checklist</div><div class="card-meta">' + d.checklists.length + ' rotinas · tarefas, prazos e fotos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
-        (UI.isAdmin() ? '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
+        (UI.isAdmin() ? '<a class="row" href="#financeiro" style="text-decoration:none;color:inherit"><div class="tile">' + icon('tag') + '</div>' +
+        '<div class="grow"><div class="card-title">Financeiro</div><div class="card-meta">Custos, meta do mês, lucro e marketing · só o administrador</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<a class="row" href="#equipe" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
         '<div class="grow"><div class="card-title">Colaboradores</div><div class="card-meta">Cadastrar e gerenciar a equipe · ' + d.employees.filter(function (e) { return e.active && e.role !== 'contador'; }).length + ' ativos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#parceiros" style="text-decoration:none;color:inherit"><div class="tile">' + icon('file') + '</div>' +
         '<div class="grow"><div class="card-title">Parceiros</div><div class="card-meta">Login da contabilidade · ' + d.employees.filter(function (e) { return e.active && e.role === 'contador'; }).length + ' com acesso</div></div>' + icon('chevronRight', 'sm') + '</a>' +

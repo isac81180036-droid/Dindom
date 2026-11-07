@@ -65,3 +65,20 @@ button.ins-origin { border: 0; cursor: pointer; }
 /* Busca e lista de escolha nos painéis */
 .pick-list { max-height: 46vh; overflow-y: auto; }
 .pick-list .row { min-height: 48px; }
+
+/* ---------- Financeiro (js/screens/financeiro.js) ---------- */
+.fin-month { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.fin-month b { font-family: var(--font-display); font-size: var(--fs-lg); }
+.fin-month b::first-letter { text-transform: uppercase; }
+.fin-month .icon-btn[disabled] { opacity: .3; }
+.fin-hero .stat { font-size: var(--fs-2xl); margin: 4px 0; }
+.fin-hero .btn.sm { flex: none; }
+.fin-kpis, .fin-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.fin-kpis .stat, .fin-split .stat { font-size: var(--fs-xl); }
+@media (min-width: 900px) { .fin-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } .fin-split { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 599px) { .fin-split .cmv-kpi:first-child { grid-column: 1 / -1; } }
+.fin-dre td:first-child { min-width: 200px; }
+.fin-note { display: block; color: var(--ink-3); font-size: var(--fs-xs); margin: 2px 0 0; }
+.fin-folha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+.fin-folha .cmv-in { width: 100%; text-align: left; }
+@media (max-width: 599px) { .fin-folha { grid-template-columns: 1fr; } }
