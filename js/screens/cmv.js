@@ -146,13 +146,25 @@
     return u;
   }
   // Último preço de nota fiscal do produto do estoque ligado ao insumo, quando é diferente e mais novo.
+  // (As notas lançadas depois da ligação já atualizam o insumo sozinhas; isto cobre as notas de antes.)
   function notaPrice(x) {
-    if (!x.pid) return null;
+    var p = x.pid && DB.product(x.pid), conv = p && CMV.convOf(p, x);
+    if (!conv) return null;
     var best = null;
     DB.get().prices.forEach(function (r) { if (r.pid === x.pid && (!best || r.date > best.date)) best = r; });
-    if (!best || Math.abs(best.price - x.price) < 0.005 || best.date < DB.iso(new Date(x.updatedAt || 0))) return null;
-    return best;
+    if (!best) return null;
+    var price = Math.round(best.price / conv * 100) / 100;
+    if (Math.abs(price - x.price) < 0.005 || best.date < DB.iso(new Date(x.updatedAt || 0))) return null;
+    return { price: price, date: best.date, store: best.store };
   }
+  // Produto do estoque de onde vem o preço das notas.
+  function linkText(x) {
+    var p = x.pid && DB.product(x.pid);
+    if (!p) return 'sem produto do estoque';
+    var conv = CMV.convOf(p, x);
+    return 'estoque: ' + p.name + (conv == null ? ' (falta a conversão)' : conv !== 1 ? ' (1 ' + p.unit + ' = ' + UI.fmt(conv) + ' ' + x.unit + ')' : '');
+  }
+  function unlinked(d) { return d.insumos.filter(function (x) { var p = x.pid && DB.product(x.pid); return !p || !CMV.convOf(p, x); }); }
   function originBadge(x, m) {
     var nota = x.origin === 'nota', cls = 'pill no-dot ' + (nota ? 'ok' : 'warn'), label = nota ? 'Nota fiscal' : 'Estimativa';
     return m ? '<button type="button" class="' + cls + ' ins-origin" data-origin-toggle title="Tocar para trocar a origem do preço">' + label + '</button>'
@@ -163,7 +175,7 @@
     var store = nota && DB.get().stores.filter(function (s) { return s.id === nota.store; })[0];
     return '<div class="row ins-row" data-ins="' + esc(x.id) + '" data-name="' + esc(CMV.slug(x.name)) + '" data-origin="' + (x.origin === 'nota' ? 'nota' : 'estimativa') + '">' +
       '<div class="grow"><button type="button" class="ins-name" data-edit-ins>' + esc(x.name) + '</button>' +
-      '<div class="ins-meta">' + originBadge(x, m) + '<span class="card-meta">Atualizado em ' + dt(x.updatedAt) + ' · ' + (used[x.id] || 0) + ' itens</span></div>' +
+      '<div class="ins-meta">' + originBadge(x, m) + '<span class="card-meta">Atualizado em ' + dt(x.updatedAt) + ' · ' + (used[x.id] || 0) + ' itens · ' + esc(linkText(x)) + '</span></div>' +
       (nota ? '<div class="ins-nota">' + icon('receipt', 'sm') + 'Nota de ' + isoBr(nota.date) + (store ? ' (' + esc(store.name) + ')' : '') + ': <b class="num">' + money(nota.price) + '</b>' +
         (m ? '<button type="button" class="btn sm" data-use-nota="' + nota.price + '">Usar este preço</button>' : '') + '</div>' : '') +
       '</div>' +
@@ -220,7 +232,13 @@
     var d = DB.get(), m = can(), used = usage();
     var list = d.insumos.slice().sort(byName);
     var est = list.filter(function (x) { return x.origin !== 'nota'; }).length;
+    var loose = unlinked(d), nByName = 0;
+    if (m && loose.length) nByName = CMV.autoLink(clone({ insumos: d.insumos, products: d.products })); // só conta, numa cópia
     var body =
+      (loose.length ? '<div class="banner">' + icon('receipt', 'sm') + '<div class="grow">' + loose.length + (loose.length === 1 ? ' insumo não está ligado' : ' insumos não estão ligados') +
+        ' a um produto do estoque: o preço não atualiza sozinho quando o comprista escaneia a nota.' +
+        (m ? ' Toque no nome do insumo para escolher o produto.' : '') +
+        (nByName ? '<div style="margin-top:8px"><button type="button" class="btn sm" data-autolink>Ligar ' + nByName + ' com o mesmo nome no estoque</button></div>' : '') + '</div></div>' : '') +
       '<div class="field"><input class="input" type="search" data-q placeholder="Buscar insumo" value="' + esc(st.insQ) + '" aria-label="Buscar insumo"></div>' +
       '<div class="chips" data-ins-filter>' + [['todos', 'Todos', list.length], ['estimativa', 'Estimativa', est], ['nota', 'Nota fiscal', list.length - est]].map(function (f) {
         return '<button type="button" class="chip" data-f="' + f[0] + '" aria-pressed="' + (st.insF === f[0]) + '">' + f[1] + ' <span class="count">' + f[2] + '</span></button>';
@@ -274,6 +292,12 @@
             return apply();
           }
           if (e.target.closest('[data-new-ins]')) return insSheet(null);
+          if (e.target.closest('[data-autolink]')) {
+            var n = 0;
+            DB.update(function (dd) { n = CMV.autoLink(dd); });
+            UI.toast(n + (n === 1 ? ' insumo ligado' : ' insumos ligados') + ' ao estoque');
+            return refresh();
+          }
           if (e.target.closest('[data-impact-close]')) { st.impact = null; root.querySelector('[data-impact]').innerHTML = ''; return; }
           if (e.target.closest('[data-impact-nota]')) {
             var iid = st.impact.id;
@@ -304,7 +328,8 @@
     var hist = isNew ? [] : d.precoHist.filter(function (h) { return h.ins === x.id; }).sort(function (a, b) { return b.ts - a.ts; }).slice(0, 8);
     var usedBy = isNew ? [] : d.cardapio.filter(function (it) { return (it.lines || []).some(function (l) { return l.ins === x.id; }); });
     var histHtml = hist.length ? '<div class="section"><div class="eyebrow">Histórico de preço</div><div class="list">' + hist.map(function (h) {
-      return '<div class="row"><div class="grow"><div class="num">' + money(h.from) + ' → <b>' + money(h.to) + '</b></div><div class="card-meta">' + dt(h.ts) + (h.byName ? ' · ' + esc(h.byName) : '') + '</div></div></div>';
+      return '<div class="row"><div class="grow"><div class="num">' + money(h.from) + ' → <b>' + money(h.to) + '</b></div><div class="card-meta">' + dt(h.ts) + (h.source === 'nota' ? ' · nota fiscal' + (h.store ? ' de ' + esc(h.store) : '') : '') +
+        (h.byName ? ' · ' + esc(h.byName) : '') + '</div></div></div>';
     }).join('') + '</div></div>' : '';
     var usedHtml = usedBy.length ? '<p class="card-meta">Usado em: ' + usedBy.map(function (it) { return esc(it.name); }).join(', ') + '.</p>' : '';
     if (!m) {
@@ -313,8 +338,9 @@
       return;
     }
     function prodOptions() {
-      var ps = d.products.filter(function (p) { return String(p.unit || '').toLowerCase() === v.unit; }).sort(byName);
-      return '<option value="">Nenhum</option>' + ps.map(function (p) { return '<option value="' + esc(p.id) + '"' + (p.id === v.pid ? ' selected' : '') + '>' + esc(p.name) + '</option>'; }).join('');
+      return '<option value="">Nenhum</option>' + d.products.slice().sort(byName).map(function (p) {
+        return '<option value="' + esc(p.id) + '"' + (p.id === v.pid ? ' selected' : '') + '>' + esc(p.name) + ' (' + esc(p.unit) + ')</option>';
+      }).join('');
     }
     function seg(name, opts, cur) {
       return '<div class="seg" data-seg="' + name + '">' + opts.map(function (o) { return '<button type="button" data-v="' + o[0] + '" aria-pressed="' + (o[0] === cur) + '">' + o[1] + '</button>'; }).join('') + '</div>';
@@ -327,7 +353,11 @@
       '<input id="in-price" class="input num" inputmode="decimal" placeholder="0,00" value="' + (v.price != null ? CMV.num2(v.price) : '') + '"><span class="err" hidden>Informe o preço.</span></div>' +
       '<div class="field"><span class="label">Origem do preço</span>' + seg('origin', [['nota', 'Nota fiscal'], ['estimativa', 'Estimativa']], v.origin) + '</div>' +
       '<div class="field"><label for="in-pid">Produto do estoque</label><select id="in-pid" class="select">' + prodOptions() + '</select>' +
-      '<span class="hint">Ligado a um produto, o preço que chegar pelas notas lançadas aparece aqui para você aplicar.</span></div>' +
+      '<span class="hint">Ligado a um produto, o preço muda sozinho quando o comprista escaneia a nota e dá entrada no estoque.</span></div>' +
+      '<div class="field" id="f-in-conv" hidden><label for="in-conv" data-conv-label></label>' +
+      '<input id="in-conv" class="input num" inputmode="decimal" placeholder="Ex.: 6" value="' + val(v.conv) + '">' +
+      '<span class="hint">Ex.: o fardo de refrigerante tem 6 unidades; a bisnaga de catupiry tem 1,5 kg. O preço do insumo = preço da nota ÷ este número.</span>' +
+      '<span class="err" hidden>Informe quanto vem em cada unidade do produto.</span></div>' +
       usedHtml + histHtml +
       '<div class="section"><button type="button" class="btn primary block" data-save>' + (isNew ? 'Cadastrar insumo' : 'Salvar') + '</button>' +
       (!isNew && !usedBy.length ? '<button type="button" class="btn block" data-del>Excluir insumo</button>' : '') +
@@ -340,12 +370,23 @@
             v[g.dataset.seg] = b.dataset.v;
             g.querySelectorAll('[data-v]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
             if (g.dataset.seg === 'unit') {
-              v.pid = null;
-              sheet.querySelector('#in-pid').innerHTML = prodOptions();
               sheet.querySelector('[data-price-label]').textContent = 'Preço por ' + (v.unit === 'kg' ? 'kg' : 'unidade') + ' (R$)';
+              syncConv();
             }
           });
         });
+        // Produto em outra unidade (caixa, fardo, bisnaga…): pede quanto de insumo vem em cada uma.
+        function convProduct() {
+          var p = DB.product(sheet.querySelector('#in-pid').value);
+          return p && String(p.unit || '').toLowerCase() !== v.unit ? p : null;
+        }
+        function syncConv() {
+          var p = convProduct();
+          sheet.querySelector('#f-in-conv').hidden = !p;
+          if (p) sheet.querySelector('[data-conv-label]').textContent = '1 ' + p.unit + ' de ' + p.name + ' tem quantos ' + (v.unit === 'kg' ? 'kg' : 'unidades') + '?';
+        }
+        sheet.querySelector('#in-pid').addEventListener('change', syncConv);
+        syncConv();
         var del = sheet.querySelector('[data-del]');
         if (del) del.addEventListener('click', function () {
           close();
@@ -367,13 +408,17 @@
           fn.querySelector('.err').textContent = dup ? 'Já existe um insumo com este nome.' : 'Informe o nome.';
           fp.classList.toggle('error', price == null || price < 0);
           fp.querySelector('.err').hidden = !(price == null || price < 0);
-          if (!name || dup || price == null || price < 0) return;
+          var cp = convProduct(), conv = cp ? CMV.parse(sheet.querySelector('#in-conv').value) : null, fc = sheet.querySelector('#f-in-conv');
+          var badConv = !!cp && !(conv > 0);
+          fc.classList.toggle('error', badConv);
+          fc.querySelector('.err').hidden = !badConv;
+          if (!name || dup || price == null || price < 0 || badConv) return;
           price = Math.round(price * 100) / 100;
           var pid = sheet.querySelector('#in-pid').value || null;
           if (isNew) {
             var id = 'in-' + CMV.slug(name);
             if (insOf(id)) id = uid('in-');
-            DB.update(function (dd) { dd.insumos.push({ id: id, name: name, unit: v.unit, price: price, origin: v.origin, pid: pid, updatedAt: Date.now(), by: dd.user.empId }); });
+            DB.update(function (dd) { dd.insumos.push({ id: id, name: name, unit: v.unit, price: price, origin: v.origin, pid: pid, conv: conv, updatedAt: Date.now(), by: dd.user.empId }); });
             close(); UI.toast('Insumo cadastrado'); refresh();
             return;
           }
@@ -381,7 +426,7 @@
           var r = setPrice(x.id, price, v.origin);
           DB.update(function (dd) {
             var y = dd.insumos.filter(function (i) { return i.id === x.id; })[0];
-            y.name = name; y.unit = v.unit; y.pid = pid;
+            y.name = name; y.unit = v.unit; y.pid = pid; y.conv = conv;
             if (unitChanged) y.updatedAt = Date.now();
           });
           if (r) st.impact = r;

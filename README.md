@@ -158,3 +158,9 @@ Os dados ficam na mesma tabela `records` do resto do app, sem SQL novo: coleçõ
 da ficha, os custos extras e, no combo, os componentes) e `precoHist` (histórico de preço do insumo), e `meta/cmv` (meta de CMV,
 tamanhos e preços das categorias). Um insumo pode ser ligado a um produto do estoque: o preço que chegar pelas notas lançadas
 aparece na lista de insumos com o botão **Usar este preço**. Gerente e administrador editam; o resto da equipe só consulta.
+
+**Preço pela nota fiscal.** Quando o comprista escaneia a nota e dá entrada no estoque (`js/screens/nota.js`), o preço pago
+por produto vai também para os insumos ligados a ele (`CMV.fromNota`): o preço muda, a origem vira "Nota fiscal", entra no
+histórico e todo o CMV recalcula; o gerente recebe uma notificação com o impacto no cardápio. Insumo sem ligação, mas com o
+mesmo nome e a mesma unidade de um produto do estoque, é ligado sozinho na primeira nota. Produto em outra unidade (fardo,
+caixa, bisnaga) precisa da conversão no cadastro do insumo ("1 fardo tem 6 unidades"): preço do insumo = preço da nota ÷ conversão.

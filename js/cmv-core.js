@@ -125,6 +125,54 @@
     });
   }
 
+  // ---------- Preço vindo das notas fiscais (Estoque › Nota) ----------
+  function slugOf(s) { return window.CMV && CMV.slug ? CMV.slug(s) : String(s).toLowerCase(); }
+  function sameUnit(p, x) { return String(p.unit || '').toLowerCase() === x.unit; }
+  // Quanto de insumo vem em 1 unidade do produto do estoque (1 kg = 1 kg; 1 fardo = 6 un). null = sem conversão.
+  function convOf(p, x) { return sameUnit(p, x) ? 1 : (+x.conv > 0 ? +x.conv : null); }
+  // Insumos que recebem o preço do produto: os ligados a ele e, sem ligação, o de mesmo nome e mesma unidade.
+  function insumosOf(d, pid) {
+    var p = (d.products || []).filter(function (q) { return q.id === pid; })[0];
+    if (!p) return [];
+    var linked = (d.insumos || []).filter(function (x) { return x.pid === pid; });
+    if (linked.length) return linked;
+    return (d.insumos || []).filter(function (x) { return !x.pid && sameUnit(p, x) && slugOf(x.name) === slugOf(p.name); });
+  }
+  // Liga por nome os insumos sem produto do estoque. Devolve quantos ligou.
+  function autoLink(d) {
+    var n = 0;
+    (d.products || []).forEach(function (p) {
+      insumosOf(d, p.id).forEach(function (x) { if (!x.pid) { x.pid = p.id; n++; } });
+    });
+    return n;
+  }
+  // Chamado dentro do DB.update da entrada da nota: items = [{ pid, price }] com o preço por unidade do produto.
+  // Atualiza os insumos, grava o histórico e devolve [{ id, name, from, to }] dos preços que mudaram.
+  function fromNota(d, items, info) {
+    var out = [], now = Date.now();
+    d.precoHist = d.precoHist || [];
+    items.forEach(function (it) {
+      var p = (d.products || []).filter(function (q) { return q.id === it.pid; })[0];
+      if (!p) return;
+      insumosOf(d, it.pid).forEach(function (x) {
+        var conv = convOf(p, x);
+        if (!conv) return; // unidades diferentes sem conversão cadastrada: não dá para saber o preço
+        x.pid = it.pid;
+        var price = Math.round(it.price / conv * 100) / 100;
+        if (Math.abs(price - x.price) >= 0.005) {
+          d.precoHist.push({ id: 'ph-' + now.toString(36) + Math.random().toString(36).slice(2, 6), ins: x.id, from: x.price, to: price, ts: now,
+            by: d.user.empId, byName: d.user.name, source: 'nota', store: info.store, nota: info.key });
+          out.push({ id: x.id, name: x.name, from: x.price, to: price });
+          x.price = price;
+        }
+        x.origin = 'nota';
+        x.updatedAt = now;
+        x.by = d.user.empId;
+      });
+    });
+    return out;
+  }
+
   // ---------- Formatos ----------
   // Feitos à mão (sem toLocaleString) para sair igual em qualquer celular: 1.234,56 · R$ 16,91 · 31,5%.
   function num2(n) {
@@ -148,6 +196,7 @@
     lineCost: lineCost, base: base, extra: extra, cost: cost, price: price, pct: pct, status: status,
     catAvg: catAvg, suggestCat: suggestCat, suggest: suggest, rows: rows, group: group, groupKey: groupKey,
     sizeName: sizeName, usesIns: usesIns, ceilR: ceilR,
+    convOf: convOf, insumosOf: insumosOf, autoLink: autoLink, fromNota: fromNota,
     money: money, num2: num2, fmtPct: fmtPct, parse: parse
   };
 })();

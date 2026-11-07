@@ -44,6 +44,13 @@
       '<div class="card-meta num nota-key">' + esc(NFCe.formatKey(p.key)) + '</div></section>';
   }
 
+  // Insumos da Ficha técnica que vão receber o preço deste produto ao dar entrada.
+  function cmvTag(p) {
+    if (!window.CMV) return '';
+    var ins = CMV.insumosOf(DB.get(), p.id).filter(function (x) { return CMV.convOf(p, x); });
+    return ins.length ? '<span class="pill no-dot accent">' + icon('pizza', 'sm') + 'Atualiza o CMV: ' + esc(ins.map(function (x) { return x.name; }).join(', ')) + '</span>' : '';
+  }
+
   function row(r, i) {
     var p = r.pid && DB.product(r.pid);
     return '<div class="nota-row' + (r.include ? '' : ' off') + '" data-i="' + i + '">' +
@@ -51,7 +58,7 @@
       '<div class="grow">' +
       '<div class="nota-desc">' + esc(r.desc) + ' <span class="num">· ' + fmt(r.qty) + ' ' + esc(r.unit) + ' × ' + money(r.unitPrice) + '</span></div>' +
       (p ? '<button type="button" class="nota-prod" data-pick>' + icon('box', 'sm') + '<b>' + esc(p.name) + '</b>' + icon('chevronDown', 'sm') + '</button>' +
-          '<div class="card-row nota-tags">' + (r.learned ? '<span class="pill no-dot info">Reconhecido pelo histórico</span>' : '') + (onList(r.pid) ? '<span class="pill no-dot ok">Na lista de compras</span>' : '') + '</div>'
+          '<div class="card-row nota-tags">' + (r.learned ? '<span class="pill no-dot info">Reconhecido pelo histórico</span>' : '') + (onList(r.pid) ? '<span class="pill no-dot ok">Na lista de compras</span>' : '') + cmvTag(p) + '</div>'
         : '<button type="button" class="btn sm" data-pick>' + icon('plus', 'sm') + 'Associar a um produto</button><div class="card-meta">Não reconhecido. Se não for do estoque, deixe de fora.</div>') +
       '</div>' +
       (p ? '<label class="nota-qty"><span class="sr-only">Quantidade a somar</span><input class="input num" inputmode="decimal" data-qty value="' + String(r.addQty).replace('.', ',') + '"><span class="unit">' + esc(p.unit) + '</span></label>' : '') +
@@ -129,11 +136,39 @@
       });
   }
 
+  // Passa os preços da nota aos insumos da Ficha técnica & CMV e avisa o gerente do impacto no cardápio.
+  // Roda dentro do DB.update da entrada (x = estado do app).
+  function cmvFromNota(x, priced, info) {
+    var before = x.cmv ? CMV.rows(CMV.env(x)) : null;
+    var changes = CMV.fromNota(x, priced, info);
+    if (!changes.length) return { changes: changes };
+    var moved = {}, high = {}, nMoved = 0, nHigh = 0;
+    if (before) {
+      var old = {};
+      before.forEach(function (r) { old[r.item.id + '|' + r.size] = r.pct; });
+      CMV.rows(CMV.env(x)).forEach(function (r) {
+        var o = old[r.item.id + '|' + r.size];
+        if (o != null && r.pct != null && Math.abs(o - r.pct) > 1e-9 && !moved[r.item.id]) { moved[r.item.id] = 1; nMoved++; }
+        if (r.status === 'high' && !high[r.item.id]) { high[r.item.id] = 1; nHigh++; }
+      });
+    }
+    var list = changes.slice(0, 3).map(function (ch) { return ch.name + ' ' + CMV.money(ch.from) + ' → ' + CMV.money(ch.to); }).join(', ') +
+      (changes.length > 3 ? ' e mais ' + (changes.length - 3) : '');
+    var now = new Date(), pad = function (n) { return String(n).padStart(2, '0'); };
+    x.notifications.push({
+      id: 'n' + now.getTime().toString(36), icon: 'receipt', tone: nHigh ? 'warn' : 'info', ts: now.getTime(), read: false, href: '#cmv/insumos',
+      at: pad(now.getDate()) + '/' + pad(now.getMonth() + 1) + '/' + now.getFullYear() + ' ' + pad(now.getHours()) + ':' + pad(now.getMinutes()),
+      text: 'Nota de ' + info.store + ' atualizou ' + changes.length + (changes.length === 1 ? ' preço' : ' preços') + ' no CMV: ' + list + '.' +
+        (nMoved ? ' ' + nMoved + (nMoved === 1 ? ' item do cardápio mudou' : ' itens do cardápio mudaram') + ' de CMV' + (nHigh ? '; ' + nHigh + ' acima de ' + CMV.fmtPct(x.cmv.max) : '') + '.' : '')
+    });
+    return { changes: changes };
+  }
+
   function apply(c) {
     var d = DB.get();
     var rows = c.rows.filter(function (r) { return r.include && r.pid && r.addQty > 0; });
     var by = d.user.name;
-    var result = [];
+    var result = [], priced = [];
     DB.update(function (x) {
       var store = x.stores.filter(function (s) { return s.cnpj === c.data.store.cnpj; })[0];
       if (!store) { store = { id: 's' + Date.now(), name: c.data.store.name || c.storeName, kind: 'Loja', cnpj: c.data.store.cnpj, dist: '' }; x.stores.push(store); }
@@ -149,9 +184,12 @@
         var noteQty = NFCe.convert(r.qty, r.unit, DB.product(r.pid));
         var perUnit = noteQty ? r.total / noteQty : r.unitPrice;
         x.prices.push({ pid: r.pid, store: store.id, price: Math.round(perUnit * 100) / 100, date: c.data.date, source: 'nota' });
+        priced.push({ pid: r.pid, price: perUnit });
       });
+      // O mesmo preço vai para os insumos da Ficha técnica & CMV ligados a estes produtos.
+      var cmv = window.CMV ? cmvFromNota(x, priced, { key: c.parsed.key, store: store.name }) : null;
       x.notas.push({ key: c.parsed.key, number: c.parsed.number, uf: c.parsed.uf, store: store.id, storeName: store.name, date: c.data.date,
-        total: total(c), unit: c.unit, by: by, at: Date.now(), items: result });
+        total: total(c), unit: c.unit, by: by, at: Date.now(), items: result, cmv: cmv ? cmv.changes : [] });
     });
     UI.buzz(25);
     go('estoque/nota/ok/' + c.parsed.key, { replace: true });
@@ -242,7 +280,12 @@
         var p = DB.product(i.pid);
         return '<div class="row"><div class="tile ok">' + icon('plus', 'sm') + '</div><div class="grow"><div class="card-title">' + esc(p.name) + '</div>' +
           '<div class="card-meta num">Agora: ' + fmt(i.total) + ' ' + esc(p.unit) + '</div></div><b class="num">+' + fmt(i.add) + ' ' + esc(p.unit) + '</b></div>';
-      }).join('') + '</div></main>' +
+      }).join('') + '</div>' +
+      (n.cmv && n.cmv.length ? '<section class="section"><div class="eyebrow">Preços atualizados na Ficha técnica & CMV</div><div class="list">' + n.cmv.map(function (ch) {
+        return '<a class="row" href="#cmv/insumos" style="text-decoration:none;color:inherit"><div class="tile accent">' + icon('pizza', 'sm') + '</div><div class="grow"><div class="card-title">' + esc(ch.name) + '</div>' +
+          '<div class="card-meta num">' + CMV.money(ch.from) + ' → ' + CMV.money(ch.to) + '</div></div>' + icon('chevronRight', 'sm') + '</a>';
+      }).join('') + '</div></section>' : '') +
+      '</main>' +
       '<div class="dock no-nav"><div class="dock-inner" style="flex-direction:column;gap:8px">' +
       '<a class="btn primary block" href="#estoque/nota">' + icon('scan', 'sm') + 'Escanear outra nota</a>' +
       '<div style="display:flex;gap:8px;width:100%"><a class="btn block" href="#estoque/compras">Lista de compras</a><a class="btn block" href="#estoque">Estoque</a></div></div></div>';
