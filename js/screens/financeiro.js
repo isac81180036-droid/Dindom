@@ -71,12 +71,27 @@
       if (done) done();
     }, function () { cw[key] = { at: Date.now(), data: cw[key] && cw[key].data }; if (done) done(); });
   }
+  // Canais da Cardápio Web. Alguns (ex.: 99Food) não informam o valor certo: o administrador tira da conta
+  // e, se quiser, soma à mão o valor real (m.added).
+  var CHANNELS = { catalog: 'Cardápio digital', store_front_catalog: 'Cardápio da loja', portal: 'Balcão', whatsapp_extension: 'WhatsApp',
+    ifood: 'iFood', food99: '99Food', '99food': '99Food', keeta: 'Keeta', rappi: 'Rappi', aiqfome: 'aiqfome' };
+  function channelName(k) { return CHANNELS[k] || (/99/.test(k) ? '99Food' : k ? k.replace(/_/g, ' ') : 'Sem canal'); }
+  function excluded(k) { return (store.cfg.cwExclude || []).indexOf(k) >= 0; }
+  function channelsOf(auto) {
+    return ((auto && auto.by_channel) || []).map(function (c) { return { k: c.k == null ? '' : String(c.k), n: +c.n || 0, v: +c.v || 0 }; });
+  }
+
   function revenueOf(key) {
     var m = store.months[key] || {}, c = cw[key] && cw[key].data;
     var auto = c && c.status && c.status.connected ? c : null;
-    if (m.revenue != null) return { value: +m.revenue, orders: m.orders || null, source: 'manual', auto: auto };
-    if (auto) return { value: +auto.revenue || 0, orders: +auto.orders || 0, source: 'cw', auto: auto };
-    return { value: 0, orders: null, source: cw[key] && cw[key].loading ? 'loading' : 'none', auto: null };
+    if (m.revenue != null) return { value: +m.revenue, orders: m.orders || null, source: 'manual', auto: auto, channels: [] };
+    if (auto) {
+      var ch = channelsOf(auto), inc = ch.filter(function (x) { return !excluded(x.k); });
+      var v = inc.reduce(function (s, x) { return s + x.v; }, 0), n = inc.reduce(function (s, x) { return s + x.n; }, 0);
+      return { value: v + (+m.added || 0), orders: n + (+m.addedOrders || 0), cwValue: v, cwOrders: n, added: +m.added || 0,
+        ticket: n ? v / n : null, source: 'cw', auto: auto, channels: ch, out: ch.filter(function (x) { return excluded(x.k); }) };
+    }
+    return { value: 0, orders: null, source: cw[key] && cw[key].loading ? 'loading' : 'none', auto: null, channels: [] };
   }
 
   // CMV usado na conta: média das fichas técnicas, compras das notas do mês ÷ faturamento, ou o informado.
@@ -105,7 +120,7 @@
     var rv = revenueOf(key), m = store.months[key] || {}, di = dayInfo(key);
     var R = revenueOverride != null ? revenueOverride : rv.value;
     var cm = cmvInfo(key, rv.value);
-    return Fin.calc(store.cfg, { revenue: R, cmvPct: cm.pct, team: teamCount(), extras: m.extras || [], orders: rv.orders, ticket: store.cfg.ticket || null, day: di.day, days: di.days });
+    return Fin.calc(store.cfg, { revenue: R, cmvPct: cm.pct, team: teamCount(), extras: m.extras || [], orders: rv.orders, ticket: store.cfg.ticket || rv.ticket || null, day: di.day, days: di.days });
   }
 
   function patch(root, html) {
@@ -177,12 +192,13 @@
       '<b>' + esc(Fin.monthLabel(key)) + '</b>' +
       '<button type="button" class="icon-btn" data-mon="1" aria-label="Próximo mês"' + (key >= cur ? ' disabled' : '') + '>' + icon('chevronRight') + '</button></div>';
 
-    var srcLine = rv.source === 'cw' ? 'Cardápio Web · ' + rv.orders + ' pedidos' + (rv.orders ? ' · ticket médio ' + money(rv.value / rv.orders) : '')
+    var srcLine = rv.source === 'cw' ? 'Cardápio Web: ' + money(rv.cwValue) + ' em ' + rv.cwOrders + ' pedidos' + (rv.ticket ? ' · ticket médio ' + money(rv.ticket) : '') +
+        (rv.out.length ? ' · sem ' + rv.out.map(function (x) { return channelName(x.k); }).join(', ') : '') + (rv.added ? ' · + ' + money(rv.added) + ' lançado à mão' : '')
       : rv.source === 'manual' ? 'Lançado por você' + (rv.orders ? ' · ' + rv.orders + ' pedidos' : '') + (rv.auto ? ' · Cardápio Web marca ' + money(rv.auto.revenue) : '')
       : rv.source === 'loading' ? 'Buscando as vendas da Cardápio Web…' : 'Nenhum faturamento lançado neste mês';
     var hero = '<section class="card hero fin-hero"><div class="card-row"><div class="grow"><div class="eyebrow">Faturamento' + (di.current ? ' até hoje' : '') + '</div>' +
       '<div class="stat num">' + money(base.revenue) + '</div><div class="muted">' + esc(srcLine) + '</div></div>' +
-      '<button type="button" class="btn sm" data-rev>' + (rv.source === 'manual' ? 'Corrigir' : 'Lançar') + '</button></div>' +
+      '<button type="button" class="btn sm" data-rev>' + (rv.source === 'manual' ? 'Corrigir' : rv.source === 'cw' ? 'Somar' : 'Lançar') + '</button></div>' +
       (base.goal ? UI.bar(Math.min(100, (base.progress || 0) * 100), (base.progress || 0) >= 1 ? 'ok' : '') +
         '<div class="muted num">' + pct(base.progress) + ' da meta de ' + money(base.goal) + '</div>' : '') + '</section>';
 
@@ -239,7 +255,7 @@
 
     var body = nav +
       (empty ? '<a class="banner" href="#financeiro/custos" style="text-decoration:none">' + icon('alert', 'sm') + '<div class="grow">Comece cadastrando os custos fixos, a folha e as metas em <b>Custos e metas</b>. Sem eles não dá para calcular a meta nem o lucro.</div>' + icon('chevronRight', 'sm') + '</a>' : '') +
-      hero + kpis + advice + dreHtml + extras;
+      hero + channelsHtml(rv) + kpis + advice + dreHtml + extras;
 
     return {
       html: shell('', body), tab: 'financeiro',
@@ -251,6 +267,12 @@
           var v = e.target.closest('[data-view] [data-v]');
           if (v) { st.view = v.dataset.v; return refresh(); }
           if (e.target.closest('[data-rev]')) return revenueSheet(key);
+          var ch = e.target.closest('[data-ch]');
+          if (ch) {
+            var k = ch.dataset.ch, ex = store.cfg.cwExclude = store.cfg.cwExclude || [];
+            if (ex.indexOf(k) >= 0) ex.splice(ex.indexOf(k), 1); else ex.push(k);
+            save('config'); return refresh();
+          }
           if (e.target.closest('[data-add-extra]')) return extraSheet(key);
           var rm = e.target.closest('[data-rm-extra]');
           if (rm) { month(key).extras.splice(+rm.dataset.rmExtra, 1); save('m-' + key); return refresh(); }
@@ -260,7 +282,23 @@
     };
   }
 
+  // Filtro de canais de venda: cada canal com valor e pedidos do mês; tocar tira ou põe na conta.
+  function channelsHtml(rv) {
+    if (rv.source !== 'cw' || !rv.channels.length) return '';
+    var list = rv.channels.slice().sort(function (a, b) { return b.v - a.v; });
+    return '<section class="section"><div class="section-head"><h2>Canais de venda</h2><span class="card-meta">' + (rv.channels.length - rv.out.length) + ' de ' + rv.channels.length + ' na conta</span></div>' +
+      '<div class="fin-channels">' + list.map(function (c) {
+        var on = !excluded(c.k);
+        return '<button type="button" class="chip" data-ch="' + esc(c.k) + '" aria-pressed="' + on + '">' + icon(on ? 'check' : 'x', 'sm') + esc(channelName(c.k)) +
+          ' <span class="count num">' + money(c.v) + ' · ' + c.n + '</span></button>';
+      }).join('') + '</div>' +
+      '<p class="card-meta">Toque para tirar ou pôr um canal no faturamento, na projeção e na meta por dia. A escolha vale para todos os meses. ' +
+      'Canal que não passa o valor certo (como o 99Food): tire daqui e some o valor real em <b>Somar</b>, lá em cima.</p></section>';
+  }
+
   function revenueSheet(key) {
+    var rv0 = revenueOf(key);
+    if (rv0.source === 'cw') return addSheet(key, rv0);
     var m = month(key), rv = revenueOf(key);
     UI.sheet('<h2>Faturamento de ' + esc(Fin.monthLabel(key)) + '</h2>' +
       (rv.auto ? '<p class="muted">A Cardápio Web marca ' + money(rv.auto.revenue) + ' em ' + rv.auto.orders + ' pedidos. Lance aqui só se quiser somar as vendas de fora (balcão, mesas) ou corrigir.</p>'
@@ -279,6 +317,31 @@
         });
         var a = sheet.querySelector('[data-auto]');
         if (a) a.addEventListener('click', function () { m.revenue = null; m.orders = null; save('m-' + key); close(); refresh(); });
+      });
+  }
+
+  // Com a Cardápio Web ligada, o que se lança à mão SOMA às vendas dos canais escolhidos
+  // (balcão fora do sistema, o valor real repassado pelo 99Food…).
+  function addSheet(key, rv) {
+    var m = month(key);
+    UI.sheet('<h2>Somar ao faturamento de ' + esc(Fin.monthLabel(key)) + '</h2>' +
+      '<p class="muted">A Cardápio Web marca ' + money(rv.cwValue) + ' em ' + rv.cwOrders + ' pedidos' +
+      (rv.out.length ? ', sem ' + esc(rv.out.map(function (x) { return channelName(x.k); }).join(', ')) : '') + '. O valor abaixo é somado a isso.</p>' +
+      '<div class="field"><label for="add-v">Valor a somar no mês (R$)</label><input id="add-v" class="input num" inputmode="decimal" placeholder="0,00" value="' + (m.added ? CMV.num2(m.added) : '') + '" autofocus>' +
+      '<span class="hint">Ex.: o que o 99Food realmente repassou, ou vendas de balcão que não passam pela Cardápio Web.</span></div>' +
+      '<div class="field"><label for="add-o">Pedidos a somar <span class="faint">(opcional)</span></label><input id="add-o" class="input num" inputmode="numeric" value="' + (m.addedOrders || '') + '"></div>' +
+      '<div class="section"><button type="button" class="btn primary block" data-ok>Salvar</button>' +
+      (m.added ? '<button type="button" class="btn block" data-zero>Tirar o valor somado</button>' : '') +
+      '<button type="button" class="btn block" data-close>Voltar</button></div>',
+      function (sheet, close) {
+        sheet.querySelector('[data-ok]').addEventListener('click', function () {
+          var v = CMV.parse(sheet.querySelector('#add-v').value), o = CMV.parse(sheet.querySelector('#add-o').value);
+          if (v != null && v < 0) { UI.toast('O valor não pode ser negativo.', { tone: 'crit' }); return; }
+          m.added = v ? Math.round(v * 100) / 100 : 0; m.addedOrders = o > 0 ? Math.round(o) : 0;
+          save('m-' + key); close(); refresh(); UI.toast(m.added ? money(m.added) + ' somado ao faturamento' : 'Nada somado');
+        });
+        var z = sheet.querySelector('[data-zero]');
+        if (z) z.addEventListener('click', function () { m.added = 0; m.addedOrders = 0; save('m-' + key); close(); refresh(); });
       });
   }
 

@@ -82,3 +82,6 @@ button.ins-origin { border: 0; cursor: pointer; }
 .fin-folha { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
 .fin-folha .cmv-in { width: 100%; text-align: left; }
 @media (max-width: 599px) { .fin-folha { grid-template-columns: 1fr; } }
+.fin-channels { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.fin-channels .chip[aria-pressed="false"] { text-decoration: line-through; opacity: .75; }
+.fin-channels .chip[aria-pressed="false"] .count { text-decoration: line-through; }

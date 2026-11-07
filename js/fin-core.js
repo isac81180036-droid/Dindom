@@ -22,7 +22,8 @@
     ],
     cmv: { source: 'fichas', pct: 0.32 },
     metas: { lucro: 0.10, marketing: 0.03, reserva: 0.05 },
-    ticket: null
+    ticket: null,
+    cwExclude: [] // canais da Cardápio Web fora da conta (ex.: o 99Food, que não informa o valor certo)
   };
 
   function sum(a, f) { var s = 0; (a || []).forEach(function (x) { s += f ? f(x) : x; }); return s; }
