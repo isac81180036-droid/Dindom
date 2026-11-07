@@ -132,6 +132,37 @@
     return list.sort(function (a, b) { return a.ts - b.ts; })[list.length - 1] || null;
   };
 
+  // Férias (gerente): ficam em "adjusts", tipo "ferias", de "from" a "to" (AAAA-MM-DD, os dois dias inclusive).
+  // Cancelada não vale. Nos dias de férias a pessoa não aparece como atrasada e o espelho mostra "Férias".
+  function isoDate(iso) { var p = iso.split('-'); return new Date(+p[0], p[1] - 1, +p[2]); }
+  P.br = function (iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
+  P.addDays = function (iso, n) { var d = isoDate(iso); d.setDate(d.getDate() + n); return DB.iso(d); };
+  P.daysBetween = function (from, to) { return Math.round((isoDate(to) - isoDate(from)) / 864e5) + 1; };
+  P.vacations = function (empId) {
+    return (DB.get().adjusts || []).filter(function (a) { return a.kind === 'ferias' && a.emp === empId && a.status === 'aplicado'; })
+      .sort(function (a, b) { return a.from < b.from ? -1 : a.from > b.from ? 1 : 0; });
+  };
+  P.vacationOn = function (empId, date) {
+    date = date || DB.iso(new Date());
+    return P.vacations(empId).filter(function (v) { return v.from <= date && date <= v.to; })[0] || null;
+  };
+  // Férias marcadas que ainda vão começar.
+  P.nextVacation = function (empId) {
+    var t = DB.iso(new Date());
+    return P.vacations(empId).filter(function (v) { return v.from > t; })[0] || null;
+  };
+  // Dias de férias dentro do período (lista de datas AAAA-MM-DD).
+  P.vacationDates = function (empId, from, to) {
+    var out = [];
+    P.vacations(empId).forEach(function (v) {
+      var a = v.from > from ? v.from : from, b = v.to < to ? v.to : to;
+      for (var d = a; d <= b; d = P.addDays(d, 1)) out.push(d);
+    });
+    return out;
+  };
+  // "De férias até 30/11/2026 · volta em 01/12".
+  P.vacationLabel = function (v) { var back = P.addDays(v.to, 1); return 'De férias até ' + P.br(v.to) + ' · volta em ' + P.br(back).slice(0, 5); };
+
   // Resumo de um período: dias trabalhados, horas, previsto, saldo e atrasos.
   // O saldo (banco de horas) só conta as jornadas que começaram depois do último "zerar banco".
   P.summary = function (empId, from, to) {

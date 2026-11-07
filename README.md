@@ -164,3 +164,11 @@ por produto vai também para os insumos ligados a ele (`CMV.fromNota`): o preço
 histórico e todo o CMV recalcula; o gerente recebe uma notificação com o impacto no cardápio. Insumo sem ligação, mas com o
 mesmo nome e a mesma unidade de um produto do estoque, é ligado sozinho na primeira nota. Produto em outra unidade (fardo,
 caixa, bisnaga) precisa da conversão no cadastro do insumo ("1 fardo tem 6 unidades"): preço do insumo = preço da nota ÷ conversão.
+
+## Férias (Ponto)
+
+Em **Ponto › Equipe**, toque no colaborador e em **Dar férias** (ou **Férias**, se já houver). O gerente marca o primeiro e o
+último dia; dá para encerrar antes ("Voltou hoje") ou cancelar as que ainda não começaram. As férias ficam em `adjusts`
+(`kind: 'ferias'`, `from`/`to`), junto dos outros ajustes do ponto, e a contabilidade também vê. Nos dias de férias a pessoa
+aparece como "Férias" (não como atrasada), o espelho de ponto (CSV e TXT) mostra a linha "Férias" e o resumo traz os dias de férias.
+O banco de horas não muda: só conta os dias trabalhados.

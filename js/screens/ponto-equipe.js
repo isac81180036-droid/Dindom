@@ -14,11 +14,13 @@
     if (st.status === 'trabalhando') return { key: 'on', label: 'Trabalhando desde ' + P.hhmm(j.marks.entrada ? j.marks.entrada.ts : j.start) + ' · sai às ' + sh.end, late: P.lateBy(j, emp), j: j };
     if (st.status === 'intervalo') return { key: 'pause', label: 'Em intervalo desde ' + P.hhmm(j.marks.intervalo.ts) + ' · sai às ' + sh.end, late: P.lateBy(j, emp), j: j };
     if (j && j.marks.saida) return { key: 'done', label: 'Saiu às ' + P.hhmm(j.marks.saida.ts) + ' · horário ' + sh.end, late: P.lateBy(j, emp), early: P.earlyBy(j, emp), j: j };
+    var vac = P.vacationOn(emp.id);
+    if (vac) return { key: 'vac', label: P.vacationLabel(vac) };
     var start = shiftStartTs(emp);
     if (now > start + P.TOLERANCE * 60000) return { key: 'missing', label: 'Não chegou · entrada ' + sh.start, late: Math.round((now - start) / 60000) };
     return { key: 'later', label: 'Entra às ' + sh.start + ' · sai às ' + sh.end };
   }
-  var PILL = { on: ['ok', 'Trabalhando'], pause: ['info', 'Intervalo'], done: ['', 'Encerrou'], off: ['', 'Folga'], missing: ['crit', 'Atrasado'], later: ['', 'Mais tarde'] };
+  var PILL = { on: ['ok', 'Trabalhando'], pause: ['info', 'Intervalo'], done: ['', 'Encerrou'], off: ['', 'Folga'], missing: ['crit', 'Atrasado'], later: ['', 'Mais tarde'], vac: ['info', 'Férias'] };
 
   function approve(a, ok) {
     var emp = P.employee(a.emp);
@@ -110,6 +112,87 @@
     refresh(); UI.toast('O banco de horas voltou ao saldo anterior');
   }
 
+  function vacNote(empId, from, to) {
+    var n = P.vacationDates(empId, from, to).length;
+    return n ? ' · ' + n + (n === 1 ? ' dia' : ' dias') + ' de férias' : '';
+  }
+
+  // Linha das férias no detalhe do colaborador: em andamento, marcadas ou nenhuma, com o botão para o gerente.
+  function vacRow(emp, edit) {
+    var cur = P.vacationOn(emp.id), next = P.nextVacation(emp.id), v = cur || next;
+    return '<div class="row" style="border:1px solid var(--line);border-radius:var(--r-md)"><div class="tile' + (cur ? ' info' : '') + '">' + icon('sun') + '</div><div class="grow">' +
+      '<div class="card-title">' + (cur ? 'De férias' : next ? 'Férias marcadas' : 'Férias') + '</div>' +
+      '<div class="card-meta num">' + (v ? P.br(v.from) + ' a ' + P.br(v.to) + ' · ' + P.daysBetween(v.from, v.to) + ' dias' + (cur ? ' · volta em ' + P.br(P.addDays(v.to, 1)) : '') : 'Nenhuma férias marcada') + '</div></div>' +
+      (edit ? '<button type="button" class="btn sm" data-vac>' + icon('sun', 'sm') + (v ? 'Férias' : 'Dar férias') + '</button>' : '') + '</div>';
+  }
+
+  // Marcar, encerrar antes ou cancelar férias. Nada some: cancelada fica guardada com quem cancelou.
+  function vacationSheet(emp) {
+    var first = emp.name.split(' ')[0], today = DB.iso(new Date());
+    var list = P.vacations(emp.id).filter(function (v) { return v.to >= P.addDays(today, -400); }).reverse();
+    UI.sheet('<h2>Férias de ' + esc(first) + '</h2>' +
+      (list.length ? '<div class="list">' + list.map(function (v) {
+        var cur = v.from <= today && today <= v.to, fut = v.from > today;
+        return '<div class="row"><div class="grow"><div class="card-title num">' + P.br(v.from) + ' a ' + P.br(v.to) + '</div>' +
+          '<div class="card-meta">' + P.daysBetween(v.from, v.to) + ' dias · ' + (cur ? 'em andamento' : fut ? 'marcadas' : 'concluídas') + (v.note ? ' · ' + esc(v.note) : '') + (v.by ? ' · por ' + esc(v.by) : '') + '</div></div>' +
+          (cur ? '<button type="button" class="btn sm" data-end="' + v.id + '">Voltou hoje</button>' : fut ? '<button type="button" class="btn sm" data-cancel="' + v.id + '">Cancelar</button>' : '') + '</div>';
+      }).join('') + '</div>' : '') +
+      '<div class="eyebrow">Marcar férias</div>' +
+      '<div class="ev-when" style="grid-template-columns:1fr 1fr"><div class="field"><label for="vac-from">Primeiro dia</label><input id="vac-from" type="date" class="input" value="' + today + '"></div>' +
+      '<div class="field"><label for="vac-to">Último dia</label><input id="vac-to" type="date" class="input" value="' + P.addDays(today, 29) + '"></div></div>' +
+      '<p class="card-meta num" data-vac-days></p>' +
+      '<div class="field"><label for="vac-note">Observação <span class="faint">(opcional)</span></label><input id="vac-note" class="input" maxlength="120" placeholder="Ex.: período aquisitivo 2025/2026"></div>' +
+      '<p class="login-err" data-vac-err hidden></p>' +
+      '<button type="button" class="btn primary block" data-save>' + icon('sun', 'sm') + 'Marcar férias</button><button type="button" class="btn block" data-close>Voltar</button>',
+      function (sheet, close) {
+        var fromIn = sheet.querySelector('#vac-from'), toIn = sheet.querySelector('#vac-to'), info = sheet.querySelector('[data-vac-days]'), err = sheet.querySelector('[data-vac-err]');
+        function days() {
+          var a = fromIn.value, b = toIn.value;
+          info.textContent = a && b && b >= a ? P.daysBetween(a, b) + ' dias de férias · volta ao trabalho em ' + P.br(P.addDays(b, 1)) : '';
+        }
+        var prevFrom = fromIn.value;
+        fromIn.addEventListener('change', function () {
+          // Mudou o primeiro dia: mantém a mesma quantidade de dias.
+          if (fromIn.value && prevFrom && toIn.value >= prevFrom) toIn.value = P.addDays(fromIn.value, P.daysBetween(prevFrom, toIn.value) - 1);
+          prevFrom = fromIn.value;
+          days();
+        });
+        toIn.addEventListener('change', days);
+        days();
+        function setStatus(id, fn, msg) {
+          DB.update(function (x) { var r = x.adjusts.filter(function (a) { return a.id === id; })[0]; if (r) fn(r, x); });
+          close(); refresh(); detailSheet(P.employee(emp.id)); UI.toast(msg);
+        }
+        sheet.addEventListener('click', function (e) {
+          var end = e.target.closest('[data-end]'), cancel = e.target.closest('[data-cancel]');
+          if (end) {
+            // Voltou antes: as férias terminam ontem (se começaram hoje, ficam canceladas).
+            return setStatus(end.dataset.end, function (r, x) {
+              var y = P.addDays(today, -1);
+              if (r.from > y) { r.status = 'cancelado'; r.cancelledBy = x.user.name; r.cancelledAt = Date.now(); }
+              else { r.endedEarly = { was: r.to, by: x.user.name, at: Date.now() }; r.to = y; }
+            }, first + ' voltou das férias');
+          }
+          if (cancel) {
+            return setStatus(cancel.dataset.cancel, function (r, x) { r.status = 'cancelado'; r.cancelledBy = x.user.name; r.cancelledAt = Date.now(); }, 'Férias canceladas');
+          }
+          if (!e.target.closest('[data-save]')) return;
+          var a = fromIn.value, b = toIn.value, note = sheet.querySelector('#vac-note').value.trim();
+          var clash = P.vacations(emp.id).filter(function (v) { return v.from <= b && a <= v.to; })[0];
+          var msg = !a || !b ? 'Informe o primeiro e o último dia.' : b < a ? 'O último dia precisa ser depois do primeiro.'
+            : P.daysBetween(a, b) > 60 ? 'Mais de 60 dias seguidos. Confira as datas.'
+            : clash ? 'Já há férias de ' + P.br(clash.from) + ' a ' + P.br(clash.to) + ' nesse período.' : '';
+          err.hidden = !msg; err.textContent = msg;
+          if (msg) return;
+          DB.update(function (x) {
+            x.adjusts.push({ id: 'vac' + Date.now(), kind: 'ferias', emp: emp.id, from: a, to: b, note: note, by: x.user.name, ts: Date.now(), at: Date.now(), status: 'aplicado' });
+          });
+          close(); refresh(); UI.buzz(20); detailSheet(P.employee(emp.id));
+          UI.toast('Férias de ' + first + ' marcadas: ' + P.br(a) + ' a ' + P.br(b));
+        });
+      });
+  }
+
   function detailSheet(emp) {
     var s = P.summary(emp.id, Cal.today().slice(0, 8) + '01', Cal.today());
     var bank = P.bankTotal(emp.id), zero = P.bankZero(emp.id), edit = canEdit();
@@ -127,6 +210,7 @@
       '<div class="card-meta">' + (zero ? 'Zerado em ' + br2(zero.ts) + ' por ' + esc(zero.by || 'gerente') + ' (era ' + P.signed(zero.balance || 0) + ')' + (zero.reason ? ' · ' + esc(zero.reason) : '') : 'Acumulado desde o primeiro registro') + '</div>' +
       (edit && zero ? '<button type="button" class="btn ghost sm" data-unzero style="padding-left:0">Desfazer o último zerar</button>' : '') + '</div>' +
       (edit ? '<button type="button" class="btn sm" data-zero>Zerar</button>' : '') + '</div>' +
+      vacRow(emp, edit) +
       PontoUI.historyRows(emp.id, false, edit) +
       (edit ? '<button type="button" class="btn block" data-otherday>' + icon('calendar', 'sm') + 'Corrigir ou lançar outro dia</button>' : '') +
       '<button type="button" class="btn block" data-close>Fechar</button>',
@@ -138,6 +222,7 @@
           if (d) { close(); return editDaySheet(emp, d.dataset.editDay); }
           if (ev.target.closest('[data-otherday]')) { close(); return pickDaySheet(emp); }
           if (ev.target.closest('[data-zero]')) { close(); return zeroSheet(emp); }
+          if (ev.target.closest('[data-vac]')) { close(); return vacationSheet(emp); }
           if (ev.target.closest('[data-unzero]') && zero) {
             close();
             UI.confirm({ title: 'Desfazer o último zerar?', body: 'O banco de ' + esc(emp.name.split(' ')[0]) + ' volta a somar as horas de antes de ' + br2(zero.ts) + '.', ok: 'Desfazer',
@@ -200,7 +285,7 @@
     var emps = all.filter(function (e) { return e.active; });
     var rows = emps.map(function (e) { return { e: e, t: today(e) }; });
     var count = function (k) { return rows.filter(function (x) { return x.t.key === k; }).length; };
-    var order = { missing: 0, on: 1, pause: 2, later: 3, done: 4, off: 5 };
+    var order = { missing: 0, on: 1, pause: 2, later: 3, done: 4, off: 5, vac: 6 };
     rows.sort(function (a, b) { return order[a.t.key] - order[b.t.key] || a.e.name.localeCompare(b.e.name); });
     var pend = d.adjusts.filter(function (a) { return a.status === 'pendente'; });
     // Na tabela entram também quem saiu da empresa mas tem registro no período.
@@ -228,7 +313,7 @@
       }).join('') + '</div></section>' : '') +
 
       (!rows.length ? '<div class="card">' + UI.empty('users', 'Ninguém batendo ponto ainda', 'Os colaboradores cadastrados aparecem aqui com a situação do dia.', UI.isAdmin() ? '<a class="btn primary" href="#equipe/novo">Cadastrar colaborador</a>' : '') + '</div>' : '') +
-      '<section class="section"' + (rows.length ? '' : ' hidden') + '><div class="section-head"><h2>Agora</h2></div><div class="card-grid">' + rows.map(function (x) {
+      '<section class="section"' + (rows.length ? '' : ' hidden') + '><div class="section-head"><h2>Agora</h2>' + (count('vac') ? '<span class="card-meta">' + count('vac') + ' de férias</span>' : '') + '</div><div class="card-grid">' + rows.map(function (x) {
         var pill = PILL[x.t.key];
         return '<button type="button" class="card tap team-card" data-emp="' + x.e.id + '"><div class="card-row"><span class="avatar sm">' + esc(initials(x.e.name)) + '</span>' +
           '<div class="grow"><div class="card-title">' + esc(x.e.name) + '</div><div class="card-meta">' + esc(x.e.func) + ' · ' + esc(unitShort(x.e.unit)) + ' · <span class="num">' + esc(P.horarioLabel(x.e)) + '</span></div></div>' +
@@ -243,7 +328,7 @@
       '<div class="table-wrap"><table class="ponto-table"><thead><tr><th>Colaborador</th><th>Dias</th><th>Horas</th><th>Banco</th><th>Atrasos</th></tr></thead><tbody>' +
       (table.length ? table.map(function (e) {
         var s = P.summary(e.id, from, to);
-        return '<tr data-emp="' + e.id + '"><td><b>' + esc(e.name) + '</b><span class="card-meta">' + esc(e.func) + (e.active ? '' : ' · inativo') + '</span></td><td class="num">' + s.days + '</td><td class="num">' + P.dur(s.worked) + '</td>' +
+        return '<tr data-emp="' + e.id + '"><td><b>' + esc(e.name) + '</b><span class="card-meta">' + esc(e.func) + (e.active ? '' : ' · inativo') + vacNote(e.id, from, to) + '</span></td><td class="num">' + s.days + '</td><td class="num">' + P.dur(s.worked) + '</td>' +
           '<td class="num ' + (s.balance >= 0 ? 'pos' : 'neg') + '">' + (P.signed(s.balance) || '0') + '</td><td class="num">' + s.lateCount + (s.missing ? ' <span class="pill crit no-dot">' + s.missing + ' sem saída</span>' : '') + '</td></tr>';
       }).join('') : '<tr><td colspan="5" class="muted">Nenhum registro no período.</td></tr>') + '</tbody></table></div></section></main>';
 

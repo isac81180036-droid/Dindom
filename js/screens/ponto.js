@@ -14,6 +14,8 @@
     if (st.status === 'trabalhando') return 'Trabalhando desde ' + P.hhmm(j.marks.entrada ? j.marks.entrada.ts : j.start) + ' · <span data-worked>' + P.dur(P.worked(j)) + '</span> hoje';
     if (st.status === 'intervalo') return 'Em intervalo desde ' + P.hhmm(j.marks.intervalo.ts) + ' · <span data-worked>' + P.dur(P.worked(j)) + '</span> trabalhadas';
     if (j && j.marks.saida) return 'Expediente encerrado às ' + P.hhmm(j.marks.saida.ts) + ' · ' + P.dur(P.worked(j)) + ' hoje';
+    var vac = P.vacationOn(emp.id);
+    if (vac) return esc(P.vacationLabel(vac)) + '. Bom descanso!';
     return 'Você ainda não registrou o ponto hoje · seu horário: ' + esc(P.horarioLabel(emp));
   }
 
@@ -43,8 +45,9 @@
 
   // Confirmação antes de gravar: a marcação não pode ser apagada depois.
   function askPunch(empId, type, method, after, geo) {
-    var emp = P.employee(empId), now = new Date();
-    UI.sheet('<div class="punch-confirm"><div class="eyebrow">' + esc(P.TYPES[type].label) + '</div>' +
+    var emp = P.employee(empId), now = new Date(), vac = P.vacationOn(empId);
+    UI.sheet((vac ? '<div class="banner" style="background:var(--info-soft);color:var(--info)">' + icon('sun', 'sm') + '<div class="grow">' + esc(emp.name.split(' ')[0]) + ' está de férias até ' + P.br(vac.to) + '. Confirme só se estiver mesmo trabalhando hoje.</div></div>' : '') +
+      '<div class="punch-confirm"><div class="eyebrow">' + esc(P.TYPES[type].label) + '</div>' +
       '<div class="punch-time num" data-ctime>' + clockParts(now).hm + '<small>:' + clockParts(now).s + '</small></div>' +
       '<p class="muted">' + esc(emp.name) + ' · ' + esc(unitName(emp.unit)) + '</p></div>' +
       '<button type="button" class="btn primary block" data-ok style="min-height:56px">Confirmar ' + esc(P.TYPES[type].label.toLowerCase()) + '</button>' +

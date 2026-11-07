@@ -56,13 +56,20 @@
   X.espelho = function (from, to, unit) {
     var rows = [];
     people(unit).forEach(function (e) {
-      var prev = P.shift(e).hours * 60;
+      var prev = P.shift(e).hours * 60, days = [];
       jornadas(e, from, to).forEach(function (j) {
         var m = j.marks, w = P.worked(j);
-        rows.push([br(j.date), WD[Cal.parse(j.date).getDay()], e.name, cpf(e.cpf), pis(e.pis), unitName(e.unit), P.horarioLabel(e),
+        days.push([br(j.date), WD[Cal.parse(j.date).getDay()], e.name, cpf(e.cpf), pis(e.pis), unitName(e.unit), P.horarioLabel(e),
           m.entrada ? timeOf(m.entrada.ts) : '', m.intervalo ? timeOf(m.intervalo.ts) : '', m.retorno ? timeOf(m.retorno.ts) : '', m.saida ? timeOf(m.saida.ts) : '',
-          hm(w), m.saida ? hm(prev) : '', m.saida ? hm(w - prev, true) : '', P.lateBy(j, e) || '', P.earlyBy(j, e) || '', situacao(j)]);
+          hm(w), m.saida ? hm(prev) : '', m.saida ? hm(w - prev, true) : '', P.lateBy(j, e) || '', P.earlyBy(j, e) || '', situacao(j) + (P.vacationOn(e.id, j.date) ? ' (nas férias)' : ''), j.date]);
       });
+      // Dias de férias sem marcação entram como uma linha "Férias".
+      var worked = {}; days.forEach(function (r) { worked[r[17]] = 1; });
+      P.vacationDates(e.id, from, to).forEach(function (dt) {
+        if (!worked[dt]) days.push([br(dt), WD[Cal.parse(dt).getDay()], e.name, cpf(e.cpf), pis(e.pis), unitName(e.unit), P.horarioLabel(e), '', '', '', '', '', '', '', '', '', 'Férias', dt]);
+      });
+      days.sort(function (a, b) { return a[17] < b[17] ? -1 : 1; });
+      days.forEach(function (r) { rows.push(r.slice(0, 17)); });
     });
     return csv(['Data', 'Dia', 'Colaborador', 'CPF', 'PIS', 'Unidade', 'Horário', 'Entrada', 'Saída para intervalo', 'Volta do intervalo', 'Saída',
       'Horas trabalhadas', 'Horas previstas', 'Saldo do dia', 'Atraso (min)', 'Saída antecipada (min)', 'Situação'], rows);
@@ -74,10 +81,10 @@
       var s = P.summary(e.id, from, to);
       var nAdj = adj.filter(function (a) { return a.emp === e.id && a.status === 'aprovado' && a.date >= from && a.date <= to; }).length;
       return [e.name, cpf(e.cpf), pis(e.pis), e.func, unitName(e.unit), P.horarioLabel(e, true), e.active ? 'Ativo' : 'Inativo',
-        s.days, hm(s.worked), hm(s.expected), hm(s.balance, true), s.lateCount, s.late, s.missing, nAdj];
+        s.days, hm(s.worked), hm(s.expected), hm(s.balance, true), s.lateCount, s.late, s.missing, nAdj, P.vacationDates(e.id, from, to).length];
     });
     return csv(['Colaborador', 'CPF', 'PIS', 'Função', 'Unidade', 'Horário', 'Situação', 'Dias trabalhados', 'Horas trabalhadas', 'Horas previstas',
-      'Banco de horas', 'Atrasos', 'Atrasos (min)', 'Dias sem saída', 'Ajustes aprovados'], rows);
+      'Banco de horas', 'Atrasos', 'Atrasos (min)', 'Dias sem saída', 'Ajustes aprovados', 'Dias de férias'], rows);
   };
 
   // ---------- TXT ----------
@@ -134,17 +141,21 @@
       out.push(rpad('Funcao: ' + e.func, 40) + ' Horario: ' + rpad(P.shift(e).start + '-' + P.shift(e).end + (P.shift(e).pause ? ' int ' + P.shift(e).pause + 'min' : ''), 22) + ' Unidade: ' + ascii(unitName(e.unit)));
       out.push(line);
       out.push(rpad('Data', 11) + rpad('Dia', 5) + rpad('Entrada', 9) + rpad('Interv.', 9) + rpad('Volta', 9) + rpad('Saida', 9) + rpad('Trab.', 8) + rpad('Saldo', 8) + rpad('Atraso', 8) + 'Situacao');
-      if (!js.length) out.push('  Nenhuma marcacao no periodo.');
+      var vac = P.vacationDates(e.id, from, to), days = [], seen = {};
+      if (!js.length && !vac.length) out.push('  Nenhuma marcacao no periodo.');
       js.forEach(function (j) {
         var m = j.marks, w = P.worked(j), late = P.lateBy(j, e);
-        out.push(rpad(br(j.date), 11) + rpad(WD[Cal.parse(j.date).getDay()], 5) +
+        seen[j.date] = 1;
+        days.push({ d: j.date, t: rpad(br(j.date), 11) + rpad(WD[Cal.parse(j.date).getDay()], 5) +
           rpad(m.entrada ? timeOf(m.entrada.ts) : '--:--', 9) + rpad(m.intervalo ? timeOf(m.intervalo.ts) : '--:--', 9) +
           rpad(m.retorno ? timeOf(m.retorno.ts) : '--:--', 9) + rpad(m.saida ? timeOf(m.saida.ts) : '--:--', 9) +
-          rpad(hm(w), 8) + rpad(m.saida ? hm(w - prev, true) : '', 8) + rpad(late ? late + ' min' : '', 8) + ascii(situacao(j)));
+          rpad(hm(w), 8) + rpad(m.saida ? hm(w - prev, true) : '', 8) + rpad(late ? late + ' min' : '', 8) + ascii(situacao(j)) });
       });
+      vac.forEach(function (dt) { if (!seen[dt]) days.push({ d: dt, t: rpad(br(dt), 11) + rpad(WD[Cal.parse(dt).getDay()], 5) + rpad('', 52) + 'Ferias' }); });
+      days.sort(function (a, b) { return a.d < b.d ? -1 : 1; }).forEach(function (x) { out.push(x.t); });
       out.push(line);
       out.push('Dias: ' + s.days + '   Trabalhadas: ' + hm(s.worked) + '   Previstas: ' + hm(s.expected) + '   Banco de horas: ' + hm(s.balance, true) +
-        '   Atrasos: ' + s.lateCount + (s.late ? ' (' + s.late + ' min)' : '') + '   Dias sem saida: ' + s.missing);
+        '   Atrasos: ' + s.lateCount + (s.late ? ' (' + s.late + ' min)' : '') + '   Dias sem saida: ' + s.missing + (vac.length ? '   Ferias: ' + vac.length + ' dias' : ''));
     });
     out.push(''); out.push('Assinatura do colaborador: ______________________________   Assinatura do empregador: ______________________________');
     return out.join('\r\n') + '\r\n';
