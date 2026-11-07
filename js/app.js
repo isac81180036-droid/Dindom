@@ -9,6 +9,7 @@
     { id: 'agenda', label: 'Agenda', icon: 'calendar', desk: true },
     { id: 'reservas', label: 'Reservas', icon: 'party', desk: true },
     { id: 'estoque', label: 'Estoque', icon: 'box' },
+    { id: 'cmv', label: 'Ficha técnica', icon: 'pizza', desk: true },
     { id: 'checklists', label: 'Checklists', icon: 'checklist' },
     { id: 'manutencao', label: 'Manutenção', icon: 'wrench' },
     { id: 'perfil', label: 'Perfil', icon: 'user' }

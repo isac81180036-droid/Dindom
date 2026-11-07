@@ -1,0 +1,67 @@
+/* ---------- Ficha técnica & CMV (js/screens/cmv.js) ---------- */
+.cmv [hidden] { display: none !important; }
+.cmv-tabs .chip { text-decoration: none; }
+.cmv-tabs .chip[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+.tone-high { color: var(--crit); }
+.tone-ok { color: var(--ok); }
+.tone-low { color: var(--info); }
+
+/* Painel */
+.cmv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cmv-kpi { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: inherit; }
+.cmv-kpi:first-child { grid-column: 1 / -1; }
+.cmv-kpi .stat { font-size: var(--fs-2xl); }
+@media (min-width: 900px) {
+  .cmv-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .cmv-kpi:first-child { grid-column: auto; }
+}
+
+/* Tabelas: largas rolam dentro do próprio quadro, sem empurrar a página. */
+.cmv-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.cmv-table.wide { min-width: 560px; }
+.cmv-table.res { min-width: 760px; }
+.cmv-table th { text-align: left; font: 500 11px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); padding: var(--sp-3); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cmv-table td { padding: 8px var(--sp-3); border-bottom: 1px solid var(--line); vertical-align: middle; }
+.cmv-table .n { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cmv-table td small { color: var(--ink-3); margin-left: 2px; }
+.cmv-table tr.sub td { background: var(--surface-2); font-weight: 600; }
+.cmv-table tr.fx td { color: var(--ink-2); }
+.cmv-table tr.tot td { font-weight: 700; border-top: 2px solid var(--line); }
+.cmv-table tr:last-child td { border-bottom: 0; }
+.cmv-table tbody tr[data-go] { cursor: pointer; }
+.cmv-table tbody tr[data-go]:hover td { background: var(--surface-2); }
+.cmv-table td:first-child { min-width: 140px; }
+.cmv-table .icon-btn { width: 32px; height: 32px; }
+
+/* Campos dentro da tabela e das linhas */
+.cmv-in { width: 76px; min-height: 36px; padding: 0 8px; border-radius: var(--r-md); border: 1.5px solid var(--line); background: var(--surface); text-align: right; font-variant-numeric: tabular-nums; }
+.cmv-in:focus { outline: none; border-color: var(--ink); }
+.cmv-in.bad { border-color: var(--crit); }
+.cmv-in.text { width: 100%; min-width: 120px; text-align: left; }
+.cmv-qty { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Insumos */
+.ins-row { align-items: center; flex-wrap: wrap; }
+.ins-name { background: none; border: 0; padding: 0; font: inherit; font-weight: 650; color: inherit; text-align: left; cursor: pointer; }
+.ins-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+button.ins-origin { border: 0; cursor: pointer; }
+.ins-price { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.ins-price .cmv-in { width: 104px; }
+.ins-nota { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: var(--fs-sm); color: var(--ok); }
+.cmv-impact ul { margin: 6px 0 0; padding-left: 18px; }
+.cmv-impact li { margin: 2px 0; }
+
+/* Fichas */
+.cmv-sizes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.cmv-sz { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); color: var(--ink-3); }
+.cmv-sale { flex-wrap: wrap; }
+.cmv-sale .field { flex: none; }
+.cmv-sale .cmv-in { width: 110px; }
+.cmv-acts { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cmv-cmp { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.cmv-cmp > div { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+
+/* Busca e lista de escolha nos painéis */
+.pick-list { max-height: 46vh; overflow-y: auto; }
+.pick-list .row { min-height: 48px; }

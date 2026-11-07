@@ -144,3 +144,17 @@ Em **Colaboradores › (pessoa) › Definir senha**, o administrador escolhe a s
 Em **Ponto da equipe**, toque no colaborador:
 - **Corrigir horários** (em cada dia) ou **Corrigir ou lançar outro dia**: entrada, intervalo, volta e saída, com motivo obrigatório. A marcação original não é apagada (exigência do registro de ponto): o ajuste entra como marcação nova, do tipo "ajuste", que substitui a original na conta (`replaces`); campo vazio anula aquela marcação e todos vazios anulam o dia (`removed`). Saída depois da meia-noite vai para o dia seguinte sozinha. O dia fica marcado como "Ajustado" e o motivo vai para as planilhas da contabilidade. Pedidos de ajuste aprovados também passam a substituir a marcação do mesmo tipo.
 - **Banco de horas: Zerar**: guarda quem zerou, quando, o saldo que havia e o motivo (em `adjusts`, tipo `banco`). O saldo passa a contar das jornadas que começam depois disso; horas trabalhadas e marcações continuam no histórico. Dá para desfazer.
+
+## Ficha técnica & CMV
+
+Menu **Ficha técnica** no computador; no celular, **Perfil › Ficha técnica & CMV** (`#cmv`). Na primeira vez, o gerente toca em
+**Carregar dados da Dindom**: entram os parâmetros, os 48 insumos, as 22 pizzas, os itens únicos, as bebidas e os combos da planilha.
+
+- `js/cmv-core.js`: as contas (custo da linha, custo por tamanho, CMV, preço sugerido da categoria, do sabor e dos outros itens).
+- `js/cmv-seed.js`: os dados iniciais, com ids fixos tirados do nome (carregar duas vezes não duplica nada).
+- `js/screens/cmv.js`: Painel, Insumos, Fichas técnicas, Resumo CMV (com exportação CSV), Simulador e Parâmetros.
+
+Os dados ficam na mesma tabela `records` do resto do app, sem SQL novo: coleções `insumos`, `cardapio` (cada item com as linhas
+da ficha, os custos extras e, no combo, os componentes) e `precoHist` (histórico de preço do insumo), e `meta/cmv` (meta de CMV,
+tamanhos e preços das categorias). Um insumo pode ser ligado a um produto do estoque: o preço que chegar pelas notas lançadas
+aparece na lista de insumos com o botão **Usar este preço**. Gerente e administrador editam; o resto da equipe só consulta.

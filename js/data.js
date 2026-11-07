@@ -54,6 +54,11 @@
     punches: [],
     punchSeq: 0,
     adjusts: [],
+    // Ficha técnica & CMV (js/cmv-core.js). Os parâmetros (d.cmv) só existem depois de carregar os dados
+    // iniciais: ficam fora daqui para um aparelho sem eles nunca enviar um vazio por cima do servidor.
+    insumos: [],
+    cardapio: [],
+    precoHist: [],
     session: null,
     loginGuard: { fails: 0 }
   };

@@ -109,6 +109,8 @@
       (UI.isAccountant() ? '' : '<a class="row" href="#reservas" style="text-decoration:none;color:inherit"><div class="tile">' + icon('party') + '</div>' +
         '<div class="grow"><div class="card-title">Reservas</div><div class="card-meta">Pedidos do link público · copiar o link</div></div>' +
         (Reservas.pendingCount() ? '<span class="pill warn no-dot num">' + Reservas.pendingCount() + ' pendentes</span>' : '') + icon('chevronRight', 'sm') + '</a>') +
+      (UI.isAccountant() ? '' : '<a class="row" href="#cmv" style="text-decoration:none;color:inherit"><div class="tile">' + icon('pizza') + '</div>' +
+        '<div class="grow"><div class="card-title">Ficha técnica & CMV</div><div class="card-meta">Custo de cada pizza, CMV e preço sugerido</div></div>' + icon('chevronRight', 'sm') + '</a>') +
       '<div class="row"><div class="tile">' + icon('store') + '</div><div class="grow"><div class="card-title">Unidade</div><div class="card-meta">' + esc(unit.name) + '</div></div></div>' +
       '</div>' +
 

@@ -6,10 +6,11 @@
   var cfg = window.DINDOM_CONFIG || {};
   // Listas sincronizadas item a item e o campo que identifica cada item.
   var ITEMS = { employees: 'id', products: 'id', checklists: 'id', events: 'id', maintenance: 'id', notifications: 'id',
-    stores: 'id', punches: 'id', adjusts: 'id', notas: 'key', units: 'id', calendars: 'id', stations: 'id', counts: 'id' };
+    stores: 'id', punches: 'id', adjusts: 'id', notas: 'key', units: 'id', calendars: 'id', stations: 'id', counts: 'id',
+    insumos: 'id', cardapio: 'id', precoHist: 'id' };
   // Documentos únicos, sincronizados inteiros.
   var META = ['org', 'deliveryDays', 'categories', 'closing', 'shopping', 'checkHistory', 'nextMaintenanceId', 'settings',
-    'functions', 'prices', 'stock', 'matchMemory', 'shifts'];
+    'functions', 'prices', 'stock', 'matchMemory', 'shifts', 'cmv'];
   var PAGE = 1000;
   var LAST = 'dindom:member'; // último vínculo usado, para abrir sem internet
 
