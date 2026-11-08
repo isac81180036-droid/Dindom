@@ -180,3 +180,7 @@
 .ack .btn { margin-top: var(--sp-2); }
 /* Filtro de canal de venda (js/screens/vendas.js) */
 .cw-channels .chip[aria-pressed="false"] { text-decoration: line-through; opacity: .75; }
+/* Aviso de pedido cancelado (js/alerts.js): o motivo em destaque */
+.cx-reason { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); background: var(--crit-soft); color: var(--crit); text-align: center; }
+.cx-reason span { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.cx-reason b { font-size: var(--fs-lg); line-height: 1.25; }

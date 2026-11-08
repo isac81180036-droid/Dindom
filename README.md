@@ -190,3 +190,15 @@ que só o administrador lê e grava, fora da sincronização do resto do app.
 o canal (ex.: o 99Food) da conta, só neste aparelho. Com `supabase/008_vendas_canais.sql` rodado, o filtro vale para todo o
 relatório (faturamento, pedidos, cancelados, mais vendidos, sabores, tipos, pagamentos e pedidos em andamento); sem ele, o
 app filtra só faturamento, pedidos e ticket e mostra o botão **Filtrar tudo** com o passo a passo do SQL.
+
+## Aviso de pedido cancelado
+
+`supabase/009_avisos_cancelamento.sql` cria um gatilho em `cw_orders`: quando a sincronização traz um pedido cancelado
+(já com o motivo, `cancellation_reason`, traduzido quando é código do iFood), entra uma notificação `kind: 'cancel'` só para
+gerentes e administradores (`roles`). Com o app aberto, `js/alerts.js` mostra uma janela com o motivo que fecha no
+**OK, entendi** (o "já vi" fica em cada aparelho); em segundo plano, um aviso do sistema.
+
+Com o app fechado (Web Push): publique `supabase/functions/dindom-push/index.ts` em Supabase › Edge Functions com o nome
+`dindom-push` e **Verify JWT** desligado; depois, cada gerente liga em **Perfil › Avisos de cancelamento › Ligar neste celular**.
+No iPhone, o app precisa estar na Tela de Início (iOS 16.4+). O banco chama a função (pg_net) com o segredo de `push_config`;
+a função cria as chaves VAPID na primeira vez e apaga inscrições que deixaram de existir.

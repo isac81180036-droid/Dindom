@@ -97,7 +97,7 @@
     var d = DB.get();
     var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
     var manager = UI.isManager();
-    var unread = d.notifications.filter(function (n) { return !n.read; }).length;
+    var unread = UI.notes().filter(function (n) { return !n.read; }).length;
     var html = '<main class="screen">' + UI.topbar('Perfil') +
       '<section class="card"><div class="card-row"><div class="avatar">' + esc(d.user.name.charAt(0)) + '</div>' +
       '<div class="grow"><div class="card-title" style="font-size:var(--fs-lg)">' + esc(d.user.name) + '</div>' +
@@ -120,6 +120,8 @@
       (manager ? '<section class="section"><div class="eyebrow">Administração</div><div class="list">' +
         '<a class="row" href="#vendas" style="text-decoration:none;color:inherit"><div class="tile">' + icon('receipt') + '</div>' +
         '<div class="grow"><div class="card-title">Vendas</div><div class="card-meta">Pedidos da Cardápio Web · faturamento e mais vendidos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<button type="button" class="row" data-cx-alerts><div class="tile">' + icon('bell') + '</div>' +
+        '<div class="grow"><div class="card-title">Avisos de cancelamento</div><div class="card-meta">Janela com o motivo e aviso no celular, mesmo com o app fechado</div></div>' + icon('chevronRight', 'sm') + '</button>' +
         '<a class="row" href="#produtos" style="text-decoration:none;color:inherit"><div class="tile">' + icon('box') + '</div>' +
         '<div class="grow"><div class="card-title">Produtos do estoque</div><div class="card-meta">' + d.products.length + ' cadastrados · estoque ideal e mínimo</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<a class="row" href="#estacoes" style="text-decoration:none;color:inherit"><div class="tile">' + icon('users') + '</div>' +
@@ -163,6 +165,8 @@
         if (geo) geo.addEventListener('click', geoSheet);
         var company = root.querySelector('[data-company]');
         if (company) company.addEventListener('click', companySheet);
+        var cx = root.querySelector('[data-cx-alerts]');
+        if (cx) cx.addEventListener('click', function () { CancelAlert.sheet(); });
         var wipe = root.querySelector('[data-wipe]');
         if (wipe) wipe.addEventListener('click', function () {
           UI.confirm({ title: 'Apagar todos os dados deste aparelho?', body: 'Produtos, colaboradores, estoque, pontos, checklists, chamados e agenda salvos aqui serão apagados de vez. Não dá para desfazer.', ok: 'Apagar tudo', danger: true,
@@ -177,10 +181,10 @@
   };
 
   Screens.notificacoes = function () {
-    var d = DB.get();
+    var notes = UI.notes();
     var html = '<main class="screen">' + UI.topbar('Notificações', { back: '#inicio', right: '<button type="button" class="btn ghost sm" data-all>Marcar lidas</button>' }) +
       // Mais recentes primeiro; avisos com destino (ex.: reserva nova) abrem a tela certa.
-      (d.notifications.length ? '<div class="list">' + d.notifications.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }).map(function (n) {
+      (notes.length ? '<div class="list">' + notes.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); }).map(function (n) {
         var inner = '<div class="tile ' + n.tone + '">' + icon(n.icon) + '</div><div class="grow"><div' + (n.read ? ' class="muted"' : ' class="card-title"') + '>' + esc(n.text) + '</div>' +
           '<div class="card-meta">' + esc(n.at) + '</div></div>' + (n.read ? '' : '<span class="unread-dot" aria-label="Não lida"></span>');
         return n.href ? '<a class="row" href="' + esc(n.href) + '" data-nid="' + esc(n.id) + '" style="text-decoration:none;color:inherit">' + inner + icon('chevronRight', 'sm') + '</a>' : '<div class="row">' + inner + '</div>';

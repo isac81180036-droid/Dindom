@@ -125,6 +125,11 @@
   UI.isManager = function () { var r = DB.get().user.role; return r === 'gerente' || r === 'admin'; };
   UI.isAdmin = function () { return DB.get().user.role === 'admin'; };
   UI.isAccountant = function () { return DB.get().user.role === 'contador'; };
+  // Notificações que a pessoa pode ver: algumas são só de alguns níveis (ex.: pedido cancelado, para gerentes).
+  UI.notes = function () {
+    var d = DB.get();
+    return d.notifications.filter(function (n) { return !n.roles || n.roles.indexOf(d.user.role) >= 0; });
+  };
 
   // Banco sem uma atualização: passo a passo com o SQL pronto para copiar e colar no Supabase.
   // "last" é o último passo (HTML), dizendo o que fazer ao voltar para o app.

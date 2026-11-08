@@ -100,6 +100,8 @@
     if (view.mount) unmount = view.mount(host) || null;
     // Chamado de manutenção com status alterado: aviso que trava o app até "OK, obrigado".
     if (logged && window.Maint) Maint.checkAck();
+    // Pedido cancelado na Cardápio Web: janela com o motivo para gerentes (js/alerts.js).
+    if (logged && window.CancelAlert) CancelAlert.check();
   }
 
   window.go = function (path, opts) {

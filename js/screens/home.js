@@ -37,7 +37,7 @@
 
   function header(d) {
     var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
-    var unread = d.notifications.some(function (n) { return !n.read; });
+    var unread = UI.notes().some(function (n) { return !n.read; });
     var bell = '<a class="icon-btn" href="#notificacoes" aria-label="Notificações">' + icon('bell') + (unread ? '<span class="dot"></span>' : '') + '</a>';
     var rv = Reservas.pendingCount();
     var party = '<a class="icon-btn" href="#reservas" aria-label="Reservas' + (rv ? ': ' + rv + ' pendentes' : '') + '">' + icon('party') + (rv ? '<span class="nbadge num">' + rv + '</span>' : '') + '</a>';

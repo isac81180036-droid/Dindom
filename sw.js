@@ -1,5 +1,5 @@
 // Service worker: guarda a casca do app para abrir rápido e funcionar sem internet.
-var CACHE = 'dindom-v37';
+var CACHE = 'dindom-v38';
 var SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -8,7 +8,7 @@ var SHELL = [
   './js/agenda/core.js', './js/agenda/views.js', './js/agenda/form.js', './js/agenda/drag.js', './js/screens/agenda.js', './js/screens/reservas.js', './js/screens/equipe.js',
   './js/vendor/supabase.js', './js/config.js', './js/cloud.js', './js/nfce.js', './js/scanner.js', './js/vendor/jsQR.js', './js/screens/nota-scan.js', './js/screens/nota.js', './js/screens/precos.js',
   './js/ponto-core.js', './js/ponto-export.js', './js/screens/ponto.js', './js/screens/ponto-equipe.js', './js/auth.js', './js/screens/login.js', './js/screens/setup.js', './js/screens/produtos.js', './js/screens/estacoes.js', './js/screens/checklist-edit.js', './js/screens/vendas-insights.js', './js/screens/vendas.js', './js/cmv-core.js', './js/cmv-seed.js', './js/screens/cmv.js', './js/fin-core.js', './js/screens/financeiro.js',
-  './js/icons.js', './js/data.js', './js/ui.js', './js/geo.js', './js/media.js', './js/app.js',
+  './js/icons.js', './js/data.js', './js/ui.js', './js/alerts.js', './js/geo.js', './js/media.js', './js/app.js',
   './js/screens/home.js', './js/screens/fechamento.js', './js/screens/estoque.js',
   './js/screens/checklists.js', './js/screens/manutencao.js', './js/screens/perfil.js'
 ];
@@ -21,6 +21,26 @@ self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
     return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
+});
+
+// Aviso que chega com o app fechado (Web Push, supabase/functions/dindom-push): mostra na barra do celular.
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Dindom', {
+    body: d.body || '', tag: d.tag, renotify: true, requireInteraction: true,
+    icon: './icons/icon-192.png', badge: './icons/icon-64.png', data: { url: d.url || '#vendas' }
+  }));
+});
+
+// Toque no aviso: volta para o app aberto ou abre na tela certa (lá aparece a janela com o motivo).
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = new URL('./' + ((e.notification.data && e.notification.data.url) || ''), self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    for (var i = 0; i < list.length; i++) if ('focus' in list[i]) return list[i].focus();
+    return self.clients.openWindow(url);
+  }));
 });
 
 // Rede primeiro (para receber atualizações); se falhar, usa o cache.
