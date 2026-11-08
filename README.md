@@ -185,3 +185,8 @@ que só o administrador lê e grava, fora da sincronização do resto do app.
 - **Resumo do mês**: faturamento (Cardápio Web ou lançado à mão), meta do mês, ponto de equilíbrio, quanto vender por dia,
   projeção, resultado do mês (DRE) e quanto tirar de lucro, investir em marketing e guardar. Despesas extras por mês.
 - Contas em `js/fin-core.js`: equilíbrio = fixos ÷ (1 − variáveis); meta = fixos ÷ (1 − variáveis − lucro − marketing − reserva).
+
+**Filtro de canal nas Vendas.** Em **Vendas › Resumo**, os canais aparecem como botões abaixo do período: tocar tira ou põe
+o canal (ex.: o 99Food) da conta, só neste aparelho. Com `supabase/008_vendas_canais.sql` rodado, o filtro vale para todo o
+relatório (faturamento, pedidos, cancelados, mais vendidos, sabores, tipos, pagamentos e pedidos em andamento); sem ele, o
+app filtra só faturamento, pedidos e ticket e mostra o botão **Filtrar tudo** com o passo a passo do SQL.

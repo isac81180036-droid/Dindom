@@ -178,3 +178,5 @@
 .ack-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .ack-status .ico { color: var(--ink-3); }
 .ack .btn { margin-top: var(--sp-2); }
+/* Filtro de canal de venda (js/screens/vendas.js) */
+.cw-channels .chip[aria-pressed="false"] { text-decoration: line-through; opacity: .75; }

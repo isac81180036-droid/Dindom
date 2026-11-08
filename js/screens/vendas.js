@@ -21,7 +21,8 @@
     canceled: ['crit', 'Cancelado']
   };
   var TYPES = { delivery: 'Entrega', takeout: 'Retirada', onsite: 'No local', closed_table: 'Mesa ou comanda' };
-  var CHANNELS = { catalog: 'Cardápio digital', store_front_catalog: 'Cardápio da loja', portal: 'Balcão', whatsapp_extension: 'WhatsApp', ifood: 'iFood' };
+  var CHANNELS = { catalog: 'Cardápio digital', store_front_catalog: 'Cardápio da loja', portal: 'Balcão', whatsapp_extension: 'WhatsApp', ifood: 'iFood',
+    food99: '99Food', '99food': '99Food', keeta: 'Keeta', rappi: 'Rappi', aiqfome: 'aiqfome' };
   var PAY = { money: 'Dinheiro', credit_card: 'Crédito', debit_card: 'Débito', pix: 'Pix', pix_auto: 'Pix', meal_voucher: 'Vale-refeição',
     food_voucher: 'Vale-alimentação', bank_transfer: 'Transferência', bank_slip: 'Boleto', picpay: 'PicPay', debt_book: 'Fiado',
     online_credit_card: 'Cartão online', ifood: 'iFood', ifood_voucher: 'Vale iFood', food99: '99Food', food99_voucher: 'Vale 99Food' };
@@ -55,15 +56,26 @@
     return [today, add(1)];
   }
 
+  // Canais tirados da conta neste aparelho (ex.: o 99Food, que não passa o valor certo).
+  var CHANNEL_SQL = 'supabase/008_vendas_canais.sql';
+  var noFilterSql = false; // banco ainda sem o 008: filtra só faturamento, pedidos e ticket, aqui no app
+  function excl() { return (DB.get().prefs.cwExclude || []).slice(); }
+  function chName(k) { return CHANNELS[k] || (/99/.test(k) ? '99Food' : k ? k.replace(/_/g, ' ') : 'Outros'); }
+
   // Busca o resumo do período no servidor e chama "done" quando chega.
   function load(p, done) {
     if (!ready() || loading[p]) return;
     loading[p] = true;
-    var r = range(p);
-    Cloud.client.rpc('cw_report', { p_from: r[0].toISOString(), p_to: r[1].toISOString() }).then(function (res) {
+    var r = range(p), ex = excl(), args = { p_from: r[0].toISOString(), p_to: r[1].toISOString() };
+    if (ex.length && !noFilterSql) args.p_exclude = ex;
+    Cloud.client.rpc('cw_report', args).then(function (res) {
       loading[p] = false;
+      // Banco sem o filtro por canal: busca sem ele e filtra o que dá aqui.
+      if (res.error && args.p_exclude && !netError(res.error)) { noFilterSql = true; return load(p, done); }
       if (res.error) cache[p] = { at: Date.now(), error: missingSql(res.error) ? 'sql' : netError(res.error) ? 'network' : res.error.message, data: cache[p] && cache[p].data };
       else cache[p] = { at: Date.now(), data: res.data };
+      // O filtro mudou enquanto buscava: busca de novo com o filtro atual.
+      if (excl().join('|') !== ex.join('|')) { cache[p].at = 0; return load(p, done); }
       if (done) done();
     }, function () {
       loading[p] = false;
@@ -164,8 +176,35 @@
     }).join('') + '</div>';
   }
 
+  // Filtro de canal: o servidor já filtra tudo (008); sem ele, recalcula aqui só faturamento e pedidos.
+  function filtered(d) {
+    var ex = excl(), key = function (a) { return a.slice().sort().join('|'); };
+    // Já veio do servidor com este mesmo filtro (ou não há filtro nenhum): usa como está.
+    if (d.excluded ? key(d.excluded) === key(ex) : !ex.length) return d;
+    var x = {};
+    Object.keys(d).forEach(function (k) { x[k] = d[k]; });
+    var inc = (d.by_channel || []).filter(function (c) { return ex.indexOf(c.k == null ? '' : String(c.k)) < 0; });
+    x.revenue = inc.reduce(function (s, c) { return s + (+c.v || 0); }, 0);
+    x.orders = inc.reduce(function (s, c) { return s + (+c.n || 0); }, 0);
+    x.partial = !d.excluded; // com o 008, é só o instante até chegar a busca nova com o filtro
+    return x;
+  }
+
+  function channelChips(all) {
+    var ex = excl();
+    if (!all || (all.length < 2 && !ex.length)) return '';
+    return '<div class="chips cw-channels" role="toolbar" aria-label="Canais de venda">' + all.map(function (c) {
+      var k = c.k == null ? '' : String(c.k), on = ex.indexOf(k) < 0;
+      return '<button type="button" class="chip" data-ch="' + esc(k) + '" aria-pressed="' + on + '" title="' + (on ? 'Tirar da conta' : 'Pôr de volta') + '">' +
+        icon(on ? 'check' : 'x', 'sm') + esc(chName(k)) + ' <span class="count num">' + c.n + '</span></button>';
+    }).join('') + '</div>';
+  }
+
   function report(e) {
-    var d = e.data, st = d.status;
+    var d = filtered(e.data), st = d.status, ex = excl();
+    var partial = d.partial ? '<div class="banner">' + icon('alert', 'sm') + '<div class="grow">Sem ' + esc(ex.map(chName).join(', ')) + ': faturamento, pedidos e ticket já estão filtrados. ' +
+      'Mais vendidos, sabores, pagamentos e pedidos em andamento ainda incluem todos os canais' + (UI.isAdmin() ? '.' : ': peça ao administrador para atualizar o banco.') + '</div>' +
+      (UI.isAdmin() ? '<button type="button" class="btn sm" data-sql-canais>Filtrar tudo</button>' : '') + '</div><div data-sqlhelp-canais hidden></div>' : '';
     var ticket = d.orders ? d.revenue / d.orders : 0;
     var kpis = '<div class="stat-grid four cw-kpis">' +
       kpi(UI.money(d.revenue), 'faturamento' + (d.pending ? ' · ' + d.pending + ' ainda somando' : '')) +
@@ -177,10 +216,10 @@
       rank('Mais vendidos', d.top_items, { name: function (r) { return r.name; }, value: function (r) { return UI.fmt(r.q); }, meta: function (r) { return UI.money(r.v); }, bar: function (r) { return r.q; } });
     var col2 = rank('Sabores e complementos', d.top_options, { name: function (r) { return r.name; }, value: function (r) { return UI.fmt(r.q); }, meta: function (r) { return esc(r.grp || ''); }, bar: function (r) { return r.q; } }) +
       rank('Tipo de pedido', d.by_type, { name: function (r) { return TYPES[r.k] || r.k || 'Outros'; }, value: money, meta: function (r) { return plural(r.n, 'pedido', 'pedidos'); }, bar: function (r) { return r.v; } }) +
-      rank('Canal de venda', d.by_channel, { name: function (r) { return CHANNELS[r.k] || r.k || 'Outros'; }, value: money, meta: function (r) { return plural(r.n, 'pedido', 'pedidos'); }, bar: function (r) { return r.v; } }) +
+      rank('Canal de venda', d.by_channel, { name: function (r) { return chName(r.k == null ? '' : String(r.k)) + (ex.indexOf(r.k == null ? '' : String(r.k)) >= 0 ? ' (fora do filtro)' : ''); }, value: money, meta: function (r) { return plural(r.n, 'pedido', 'pedidos'); }, bar: function (r) { return r.v; } }) +
       rank('Formas de pagamento', d.payments, { name: function (r) { return PAY[r.k] || r.k || 'Outros'; }, value: money, meta: function (r) { return plural(r.n, 'pagamento', 'pagamentos'); }, bar: function (r) { return r.v; } });
     var empty = !d.orders && !d.canceled ? '<div class="card">' + UI.empty('receipt', 'Nenhum pedido no período', st.history ? 'O histórico ainda está chegando da Cardápio Web.' : 'Os pedidos aparecem aqui assim que entram na Cardápio Web.') + '</div>' : '';
-    return notices(e, st) + chips() + kpis + empty +
+    return notices(e, st) + chips() + channelChips(e.data.by_channel) + partial + kpis + empty +
       '<div class="home-grid"><div class="col">' + col1 + '</div><div class="col">' + col2 + '</div></div>' +
       '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">' + (st.last_ok ? 'Pedidos atualizados às ' + hm(st.last_ok) + '. ' : '') +
       'Para aceitar, cancelar ou mudar o status de um pedido, use o Portal da Cardápio Web.</p>';
@@ -233,6 +272,23 @@
           var p = ev.target.closest('[data-period]');
           if (p) { period = p.dataset.period; if (stale(period, 15000)) load(period, redrawIf('vendas')); return refresh(); }
           if (ev.target.closest('[data-retry]')) { delete cache[period]; refresh(); return; }
+          var ch = ev.target.closest('[data-ch]');
+          if (ch) {
+            var k = ch.dataset.ch;
+            DB.update(function (x) {
+              var list = x.prefs.cwExclude = x.prefs.cwExclude || [];
+              if (list.indexOf(k) >= 0) list.splice(list.indexOf(k), 1); else list.push(k);
+            });
+            // Os totais mudam com o filtro: busca de novo (o período atual primeiro).
+            Object.keys(cache).forEach(function (key) { if (key.indexOf('ins:') !== 0) cache[key].at = 0; });
+            load(period, redrawIf('vendas'));
+            return refresh();
+          }
+          if (ev.target.closest('[data-sql-canais]')) {
+            var hb = root.querySelector('[data-sqlhelp-canais]');
+            UI.sqlHelp(hb, CHANNEL_SQL, 'Feche e abra o app de novo: o filtro passa a valer para todo o relatório.');
+            return;
+          }
           var o = ev.target.closest('[data-order]');
           if (o) {
             var live = (cache[period].data.live || []).filter(function (x) { return String(x.id) === o.dataset.order; })[0];
