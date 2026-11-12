@@ -473,6 +473,23 @@
     if (f) f.focus();
   }
 
+  // Para a tela Relatórios (js/screens/relatorios.js): os números do mês atual, já calculados.
+  window.FinReport = {
+    // Busca custos, metas e as vendas do mês se ainda não vieram (ou estão velhos); "done" avisa quando chegam.
+    ensure: function (done) {
+      var later = function () { setTimeout(done, 0); };
+      if ((store.status === 'idle' || store.status === 'ok') && !(store.cfg && Date.now() - store.at < 60000)) load(later);
+      var key = Fin.monthKey(today());
+      if (!cw[key] || (!cw[key].loading && Date.now() - cw[key].at > 120000)) cwLoad(key, later);
+    },
+    summary: function () {
+      if (!store.cfg || store.status === 'sql') return { ready: false, sql: store.status === 'sql' };
+      var key = Fin.monthKey(today()), di = dayInfo(key), rv = revenueOf(key), base = result(key);
+      return { ready: true, empty: !base.fixed, key: key, di: di, r: base, cfg: store.cfg, source: rv.source,
+        proj: di.current && base.projection != null ? result(key, base.projection) : null, cmvLabel: cmvInfo(key, rv.value).label };
+    }
+  };
+
   Screens.financeiro = function (params) {
     if (!UI.isAdmin()) return Screens.inicio([]);
     return params[0] === 'custos' ? custos() : resumo();

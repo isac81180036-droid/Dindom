@@ -120,6 +120,8 @@
       (manager ? '<section class="section"><div class="eyebrow">Administração</div><div class="list">' +
         '<a class="row" href="#vendas" style="text-decoration:none;color:inherit"><div class="tile">' + icon('receipt') + '</div>' +
         '<div class="grow"><div class="card-title">Vendas</div><div class="card-meta">Pedidos da Cardápio Web · faturamento e mais vendidos</div></div>' + icon('chevronRight', 'sm') + '</a>' +
+        '<a class="row" href="#relatorios" style="text-decoration:none;color:inherit"><div class="tile">' + icon('chart') + '</div>' +
+        '<div class="grow"><div class="card-title">Relatórios</div><div class="card-meta">Gráficos e leituras da empresa · vendas, avaliações, Google, equipe</div></div>' + icon('chevronRight', 'sm') + '</a>' +
         '<button type="button" class="row" data-cx-alerts><div class="tile">' + icon('bell') + '</div>' +
         '<div class="grow"><div class="card-title">Avisos de cancelamento</div><div class="card-meta">Janela com o motivo e aviso no celular, mesmo com o app fechado</div></div>' + icon('chevronRight', 'sm') + '</button>' +
         '<a class="row" href="#produtos" style="text-decoration:none;color:inherit"><div class="tile">' + icon('box') + '</div>' +

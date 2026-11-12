@@ -280,7 +280,7 @@
               if (list.indexOf(k) >= 0) list.splice(list.indexOf(k), 1); else list.push(k);
             });
             // Os totais mudam com o filtro: busca de novo (o período atual primeiro).
-            Object.keys(cache).forEach(function (key) { if (key.indexOf('ins:') !== 0) cache[key].at = 0; });
+            Object.keys(cache).forEach(function (key) { cache[key].at = 0; });
             load(period, redrawIf('vendas'));
             return refresh();
           }
@@ -306,6 +306,7 @@
 
   var INS_PERIODS = [['7d', '7 dias', 7], ['30d', '30 dias', 30], ['90d', '90 dias', 90]];
   var insPeriod = '30d';
+  var noInsFilter = false; // banco ainda sem o 010: os insights não aceitam o filtro de canais
 
   function tabs(active) {
     return '<div class="seg" style="max-width:360px">' + [['vendas', 'Resumo'], ['vendas/insights', 'Insights']].map(function (t) {
@@ -327,8 +328,12 @@
     loading[key] = true;
     var r = insRange(p), tz = '';
     try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (er) {}
-    Cloud.client.rpc('cw_insights', { p_from: r[0].toISOString(), p_to: r[1].toISOString(), p_tz: tz }).then(function (res) {
+    var ex = excl(), args = { p_from: r[0].toISOString(), p_to: r[1].toISOString(), p_tz: tz };
+    if (ex.length && !noInsFilter) args.p_exclude = ex;
+    Cloud.client.rpc('cw_insights', args).then(function (res) {
       loading[key] = false;
+      // Banco sem o filtro nos insights (supabase/010_relatorios.sql): busca de novo sem ele.
+      if (res.error && args.p_exclude && !netError(res.error)) { noInsFilter = true; return loadIns(p, done); }
       if (res.error) cache[key] = { at: Date.now(), error: missingSql(res.error) ? 'sql' : netError(res.error) ? 'network' : res.error.message, data: cache[key] && cache[key].data };
       else cache[key] = { at: Date.now(), data: res.data };
       if (done) done();

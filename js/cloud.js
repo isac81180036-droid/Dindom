@@ -10,7 +10,7 @@
     insumos: 'id', cardapio: 'id', precoHist: 'id' };
   // Documentos únicos, sincronizados inteiros.
   var META = ['org', 'deliveryDays', 'categories', 'closing', 'shopping', 'checkHistory', 'nextMaintenanceId', 'settings',
-    'functions', 'prices', 'stock', 'matchMemory', 'shifts', 'cmv'];
+    'functions', 'prices', 'stock', 'matchMemory', 'shifts', 'cmv', 'gmb'];
   var PAGE = 1000;
   var LAST = 'dindom:member'; // último vínculo usado, para abrir sem internet
 

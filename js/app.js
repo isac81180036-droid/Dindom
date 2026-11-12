@@ -17,6 +17,7 @@
   // Área do administrador: no computador aparece no menu lateral; no celular, pelo Perfil.
   var ADMIN_TABS = [
     { id: 'vendas', label: 'Vendas', icon: 'receipt' },
+    { id: 'relatorios', label: 'Relatórios', icon: 'chart' },
     { id: 'financeiro', label: 'Financeiro', icon: 'tag', admin: true },
     { id: 'produtos', label: 'Produtos', icon: 'box' },
     { id: 'estacoes', label: 'Estações', icon: 'users' },

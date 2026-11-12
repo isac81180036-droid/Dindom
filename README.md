@@ -215,3 +215,27 @@ do CMV ligados (`CMV.fromNota`). Também dá para lançar os itens à mão, sem 
 Publicar (uma vez): crie uma chave em console.anthropic.com e adicione `ANTHROPIC_API_KEY` em Supabase › Edge Functions ›
 Secrets; depois publique `dindom-nota` pelo editor (Verify JWT ligado). Cada leitura custa centavos de dólar na conta da Anthropic.
 A leitura pelo QR Code (`js/scanner.js`, `jsQR`) saiu.
+
+## Relatórios
+
+Menu **Relatórios** no computador; no celular, **Perfil › Relatórios** (`#relatorios`). Gerente e administrador veem; a área
+Financeiro só aparece para o administrador. Antes do primeiro uso, rode `supabase/010_relatorios.sql` no Supabase (a tela oferece o SQL).
+
+- **Visão geral:** números do período (30 dias, 90 dias ou 6 meses, comparando com o período anterior do mesmo tamanho),
+  faturamento por dia, as decisões prioritárias de todas as áreas e um resumo de cada área.
+- **Áreas:** Vendas, Entrega e bairros, Clientes, Produtos, Avaliações (Cardápio Web), Google, Financeiro, Equipe (ponto) e
+  Operação (checklists, manutenção, estoque, notas fiscais, fichas técnicas e reservas). Cerca de 110 leituras, cada uma com
+  "o que fazer", e mais de 30 gráficos. Todo gráfico tem a tabela **Ver números**; o ícone de folha imprime ou salva em PDF.
+- Vale o filtro de canais de **Vendas › Resumo** (ex.: sem o 99Food), também em Vendas › Insights.
+- **Arquivos:** `js/charts.js` (gráficos em HTML/SVG, sem biblioteca), `js/rel-core.js` (contas e textos),
+  `js/screens/relatorios.js` (tela e ligação com o Google), `css/relatorios.css`. As leituras de Vendas › Insights entram também.
+- **Banco:** `cw_relatorio` soma tudo no servidor (vendas por dia, semana e mês, mapa dia x hora, faixas de valor, frequência
+  e safras de clientes, sabores com meia pizza contando meia, adicionais, taxa de entrega cobrada x paga ao entregador,
+  avaliações por quesito, horário, dia, bairro e sabor).
+
+**Google (nota e avaliações):** o administrador abre **Relatórios › Google › Ligar ao Google**, cola uma chave da
+*Places API (New)* criada no Google Cloud e escolhe a loja na busca. A chave fica só no banco (`g_config`, sem leitura pelo app).
+Pelas regras do Google, a nota e as avaliações são buscadas na hora (`g_place`, no máximo 30 consultas por dia, dentro da faixa
+gratuita) e não ficam guardadas; o Google entrega só as 5 avaliações em destaque. Para acompanhar a evolução, toque em
+**Registrar nota de hoje** uma vez por mês (fica em `meta/gmb`, sincronizado); sem a chave, dá para usar só os registros à mão.
+O botão **Copiar link "Avaliar no Google"** gera o link para mandar aos clientes ou virar QR Code na caixa.
