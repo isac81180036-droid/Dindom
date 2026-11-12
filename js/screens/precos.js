@@ -66,7 +66,7 @@
 
   function recoCard(A) {
     var pl = A.plan;
-    if (!pl) return '<section class="card">' + UI.empty('tag', 'Ainda sem preços suficientes', 'Escaneie as notas das próximas compras: cada nota registra os preços daquela loja e a comparação melhora sozinha.', '<a class="btn primary" href="#estoque/nota">' + icon('scan', 'sm') + 'Escanear nota</a>') + '</section>';
+    if (!pl) return '<section class="card">' + UI.empty('tag', 'Ainda sem preços suficientes', 'Leia as notas das próximas compras pela foto: cada nota registra os preços daquela loja e a comparação melhora sozinha.', '<a class="btn primary" href="#estoque/nota">' + icon('camera', 'sm') + 'Ler nota</a>') + '</section>';
     var head, text, tags = [];
     if (pl.type === 'split') {
       var a = pl.pair.a.s, b = pl.pair.b.s, na = pl.pair.split[a.id].length, nb = pl.pair.split[b.id].length;

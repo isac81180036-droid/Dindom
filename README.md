@@ -202,3 +202,16 @@ Com o app fechado (Web Push): publique `supabase/functions/dindom-push/index.ts`
 `dindom-push` e **Verify JWT** desligado; depois, cada gerente liga em **Perfil › Avisos de cancelamento › Ligar neste celular**.
 No iPhone, o app precisa estar na Tela de Início (iOS 16.4+). O banco chama a função (pg_net) com o segredo de `push_config`;
 a função cria as chaves VAPID na primeira vez e apaga inscrições que deixaram de existir.
+
+## Nota fiscal por foto (sem QR Code)
+
+**Estoque › Ler nota fiscal**: o comprista fotografa a nota inteira (até 5 fotos, de cima para baixo, para nota comprida) e
+toca em **Ler a nota**. As fotos vão para a função `supabase/functions/dindom-nota` (Claude Opus 5.5, da Anthropic), que
+devolve loja, CNPJ, data, chave de acesso (se legível), total e cada item, já apontando o produto do estoque e a quantidade
+convertida para a unidade dele (2 sacos de 5 kg = 10 kg). Na conferência, item que não existe no estoque é cadastrado com
+um toque (nome, unidade, categoria e tipo sugeridos); ao dar entrada, soma no estoque, registra o preço e atualiza os insumos
+do CMV ligados (`CMV.fromNota`). Também dá para lançar os itens à mão, sem foto.
+
+Publicar (uma vez): crie uma chave em console.anthropic.com e adicione `ANTHROPIC_API_KEY` em Supabase › Edge Functions ›
+Secrets; depois publique `dindom-nota` pelo editor (Verify JWT ligado). Cada leitura custa centavos de dólar na conta da Anthropic.
+A leitura pelo QR Code (`js/scanner.js`, `jsQR`) saiu.

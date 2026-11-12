@@ -12,14 +12,19 @@
     var pend = NotaFlow.pending && NotaFlow.pending.parsed.key === key ? NotaFlow.pending : null;
     var parsed = pend ? pend.parsed : NFCe.parse(key);
     var c = cache[key] = { status: 'loading', parsed: parsed, unit: DB.get().user.unit };
-    if (parsed.error) { c.status = 'error'; c.error = parsed.error; return c; }
-    NFCe.fetchItems(parsed).then(function (data) {
+    if (parsed.error) { c.status = 'error'; c.error = 'Esta nota não está mais aberta. Leia a nota de novo.'; return c; }
+    // Nota lida pela foto (js/screens/nota-scan.js): os itens já vêm prontos.
+    (pend && pend.data ? Promise.resolve(pend.data) : NFCe.fetchItems(parsed)).then(function (data) {
       c.data = data;
       c.rows = data.items.map(function (it) {
-        var m = NFCe.match(it.desc);
-        var p = m && DB.product(m.pid);
-        return { desc: it.desc, qty: it.qty, unit: it.unit, unitPrice: it.unitPrice, total: it.total,
-          pid: m ? m.pid : null, learned: m && m.learned, include: !!m, addQty: p ? NFCe.convert(it.qty, it.unit, p) : it.qty };
+        // Ordem: o que já foi corrigido antes nesta pizzaria; o produto que a leitura apontou; a semelhança do nome.
+        var m = NFCe.match(it.desc), s = it.suggest || {};
+        var pid = m && m.learned ? m.pid : (s.pid && DB.product(s.pid) ? s.pid : (m ? m.pid : null));
+        var p = pid && DB.product(pid);
+        // A leitura converte para a unidade do produto pelo tamanho da embalagem (2 sacos de 5 kg = 10 kg).
+        var productQty = s.pid && s.pid === pid && s.qty > 0 ? s.qty : null;
+        return { desc: it.desc, qty: it.qty, unit: it.unit, unitPrice: it.unitPrice, total: it.total, suggest: it.suggest, productQty: productQty,
+          pid: pid, learned: m && m.learned && m.pid === pid, include: !!pid, addQty: productQty || (p ? NFCe.convert(it.qty, it.unit, p) : it.qty) };
       });
       c.status = 'ok';
       if (route() === 'estoque/nota/' + key) refresh();
@@ -34,14 +39,40 @@
   function total(c) { return Math.round((c.rows || []).filter(function (r) { return r.include; }).reduce(function (s, r) { return s + (r.total || 0); }, 0) * 100) / 100; }
 
   function header(c) {
-    var p = c.parsed;
+    var p = c.parsed, hasKey = /^\d{44}$/.test(p.key);
+    var kind = p.model === '65' ? 'NFC-e' : p.model === '55' ? 'NF-e' : 'Nota';
     return '<section class="card nota-head">' +
       '<div class="card-row"><div class="tile">' + icon('receipt') + '</div><div class="grow">' +
       '<div class="card-title">' + esc(c.data ? (c.data.store.name || c.storeName || 'Loja nova') : 'Buscando loja…') + '</div>' +
-      '<div class="card-meta num">CNPJ ' + esc(NFCe.formatCnpj(p.cnpj)) + '</div></div>' +
+      (p.cnpj ? '<div class="card-meta num">CNPJ ' + esc(NFCe.formatCnpj(p.cnpj)) + '</div>' : '') + '</div>' +
       (c.data ? '<b class="num nota-total">' + money(total(c)) + '</b>' : '') + '</div>' +
-      '<div class="card-meta num">' + (p.model === '65' ? 'NFC-e' : 'NF-e') + ' nº ' + esc(p.number) + ' · ' + esc(p.uf) + (c.data ? ' · ' + fmtDate(c.data.date) : ' · ' + esc(p.period)) + '</div>' +
-      '<div class="card-meta num nota-key">' + esc(NFCe.formatKey(p.key)) + '</div></section>';
+      '<div class="card-meta num">' + kind + (p.number ? ' nº ' + esc(p.number) : '') + (p.uf ? ' · ' + esc(p.uf) : '') +
+      (c.data ? ' · ' + fmtDate(c.data.date) : p.period ? ' · ' + esc(p.period) : '') + (p.photo && c.data && !c.data.manual ? ' · lida pela foto' : '') + '</div>' +
+      (hasKey ? '<div class="card-meta num nota-key">' + esc(NFCe.formatKey(p.key)) + '</div>' : '') + '</section>';
+  }
+
+  // Produto novo a partir do item da nota (nome, unidade, categoria e tipo sugeridos pela leitura).
+  function unitFromNote(u) {
+    u = String(u || '').toLowerCase().replace(/[^a-z]/g, '');
+    return { kg: 'kg', g: 'kg', un: 'un', und: 'un', unid: 'un', pc: 'un', l: 'L', lt: 'L', ml: 'L', cx: 'cx', pct: 'pct', fd: 'fardo', sc: 'saco' }[u] || 'un';
+  }
+  function createProduct(r) {
+    var d = DB.get(), s = r.suggest || {};
+    var name = (s.name || r.desc).trim().replace(/\s+/g, ' ');
+    var same = d.products.filter(function (p) { return p.name.toLowerCase() === name.toLowerCase(); })[0];
+    var pid = same ? same.id : 'p' + Date.now() + Math.random().toString(36).slice(2, 5);
+    if (!same) {
+      var cat = d.categories.indexOf(s.cat) >= 0 ? s.cat : 'Outros';
+      DB.update(function (x) {
+        if (x.categories.indexOf(cat) < 0) x.categories.push(cat);
+        x.products.push({ id: pid, name: name, kind: ['preparo', 'montagem', 'apoio'].indexOf(s.kind) >= 0 ? s.kind : 'apoio', cat: cat,
+          unit: s.unit || unitFromNote(r.unit), ideal: {}, crit: 0, station: null });
+      });
+    }
+    var p = DB.product(pid);
+    r.pid = pid; r.include = true; r.learned = false; r.productQty = null; r.addQty = NFCe.convert(r.qty, r.unit, p);
+    NFCe.remember(r.desc, pid); // nas próximas notas este item já vem reconhecido
+    return p;
   }
 
   // Insumos da Ficha técnica que vão receber o preço deste produto ao dar entrada.
@@ -59,7 +90,10 @@
       '<div class="nota-desc">' + esc(r.desc) + ' <span class="num">· ' + fmt(r.qty) + ' ' + esc(r.unit) + ' × ' + money(r.unitPrice) + '</span></div>' +
       (p ? '<button type="button" class="nota-prod" data-pick>' + icon('box', 'sm') + '<b>' + esc(p.name) + '</b>' + icon('chevronDown', 'sm') + '</button>' +
           '<div class="card-row nota-tags">' + (r.learned ? '<span class="pill no-dot info">Reconhecido pelo histórico</span>' : '') + (onList(r.pid) ? '<span class="pill no-dot ok">Na lista de compras</span>' : '') + cmvTag(p) + '</div>'
-        : '<button type="button" class="btn sm" data-pick>' + icon('plus', 'sm') + 'Associar a um produto</button><div class="card-meta">Não reconhecido. Se não for do estoque, deixe de fora.</div>') +
+        : '<div class="card-row nota-new"><button type="button" class="btn sm primary" data-new>' + icon('plus', 'sm') + 'Cadastrar' +
+          (r.suggest && r.suggest.name ? ' “' + esc(r.suggest.name) + '”' : ' como produto novo') + '</button>' +
+          '<button type="button" class="btn sm" data-pick>Associar a um produto</button></div>' +
+          '<div class="card-meta">Não está no estoque ainda. Cadastre, associe a um produto que já existe ou deixe de fora.</div>') +
       '</div>' +
       (p ? '<label class="nota-qty"><span class="sr-only">Quantidade a somar</span><input class="input num" inputmode="decimal" data-qty value="' + String(r.addQty).replace('.', ',') + '"><span class="unit">' + esc(p.unit) + '</span></label>' : '') +
       '</div>';
@@ -89,7 +123,7 @@
         sheet.querySelector('[data-list]').addEventListener('click', function (e) {
           var b = e.target.closest('[data-pid]'); if (!b) return;
           var p = DB.product(b.dataset.pid);
-          r.pid = p.id; r.include = true; r.learned = false; r.addQty = NFCe.convert(r.qty, r.unit, p);
+          r.pid = p.id; r.include = true; r.learned = false; r.productQty = null; r.addQty = NFCe.convert(r.qty, r.unit, p);
           NFCe.remember(r.desc, p.id); // na próxima nota, este item já vem reconhecido
           close(); refresh(); UI.toast('Associado a ' + p.name + '. Nas próximas notas será automático.');
         });
@@ -170,8 +204,10 @@
     var by = d.user.name;
     var result = [], priced = [];
     DB.update(function (x) {
-      var store = x.stores.filter(function (s) { return s.cnpj === c.data.store.cnpj; })[0];
-      if (!store) { store = { id: 's' + Date.now(), name: c.data.store.name || c.storeName, kind: 'Loja', cnpj: c.data.store.cnpj, dist: '' }; x.stores.push(store); }
+      // Loja pelo CNPJ; nota sem CNPJ legível, pelo nome.
+      var sname = c.data.store.name || c.storeName || '', scnpj = c.data.store.cnpj || '';
+      var store = x.stores.filter(function (s) { return scnpj ? s.cnpj === scnpj : sname && s.name.toLowerCase() === sname.toLowerCase(); })[0];
+      if (!store) { store = { id: 's' + Date.now(), name: sname || 'Loja', kind: 'Loja', cnpj: scnpj, dist: '' }; x.stores.push(store); }
       x.stock[c.unit] = x.stock[c.unit] || {};
       rows.forEach(function (r) {
         var before = x.stock[c.unit][r.pid] || 0;
@@ -181,7 +217,7 @@
         if (c.unit === x.user.unit) x.shopping.items.forEach(function (it) { if (it.pid === r.pid && it.received == null) it.received = r.addQty; });
         // O preço pago entra na base que alimenta o "Onde comprar".
         // Preço por unidade do cadastro, calculado sobre o que a nota cobrou (não sobre a quantidade editada).
-        var noteQty = NFCe.convert(r.qty, r.unit, DB.product(r.pid));
+        var noteQty = r.productQty || NFCe.convert(r.qty, r.unit, DB.product(r.pid));
         var perUnit = noteQty ? r.total / noteQty : r.unitPrice;
         x.prices.push({ pid: r.pid, store: store.id, price: Math.round(perUnit * 100) / 100, date: c.data.date, source: 'nota' });
         priced.push({ pid: r.pid, price: perUnit });
@@ -202,7 +238,7 @@
 
     if (c.status === 'error') {
       return { html: '<main class="screen">' + top + '<div class="card">' + UI.empty('alert', 'Não deu para usar esta nota', c.error,
-        c.retry ? '<button type="button" class="btn primary" data-retry>' + icon('refresh', 'sm') + 'Tentar de novo</button>' : '<a class="btn primary" href="#estoque/nota">Escanear de novo</a>') + '</div></main>',
+        c.retry ? '<button type="button" class="btn primary" data-retry>' + icon('refresh', 'sm') + 'Tentar de novo</button>' : '<a class="btn primary" href="#estoque/nota">Ler a nota de novo</a>') + '</div></main>',
         tab: 'estoque',
         mount: function (root) {
           var b = root.querySelector('[data-retry]');
@@ -216,18 +252,29 @@
     }
     if (c.status === 'loading') {
       return { html: '<main class="screen">' + top + header(c) +
-        '<div class="section"><div class="card-meta">' + icon('refresh', 'sm') + ' Buscando os itens da nota na SEFAZ…</div>' +
+        '<div class="section"><div class="card-meta">' + icon('refresh', 'sm') + ' Preparando os itens da nota…</div>' +
         [1, 2, 3, 4].map(function () { return '<div class="skel" style="height:72px"></div>'; }).join('') + '</div></main>', tab: 'estoque', nav: false };
     }
 
     var matched = c.rows.filter(function (r) { return r.pid; }).length;
+    var loose = c.rows.filter(function (r) { return !r.pid; }).length;
+    var askStore = c.data.needStore || (c.data.manual && !c.data.store.known);
+    // Nota sem chave legível: confere se uma nota igual (loja, data e total) já entrou.
+    var twin = !/^\d{44}$/.test(key) && !c.data.manual && DB.get().notas.filter(function (n) {
+      return n.date === c.data.date && Math.abs((n.total || 0) - total(c)) < 0.01 && (!c.data.store.name || n.storeName === c.data.store.name);
+    })[0];
     var html = '<main class="screen has-dock no-nav">' + top + header(c) +
-      (c.data.manual ? '<div class="banner" style="background:var(--info-soft);color:var(--info)">' + icon('receipt', 'sm') + '<div class="grow">Nota identificada. Lance os itens abaixo: a busca automática na SEFAZ entra quando o servidor for ligado.</div></div>' : '') +
-      (c.data.manual && !c.data.store.known ? '<div class="field" id="f-store"><label for="nf-store">Nome da loja</label><input id="nf-store" class="input" placeholder="Ex.: Atacadão da Marginal" value="' + esc(c.storeName || '') + '"><span class="hint">Só na primeira nota desta loja. Nas próximas, ela é reconhecida pelo CNPJ.</span><span class="err" hidden>Informe o nome da loja.</span></div>' : '') +
+      (c.data.manual ? '<div class="banner" style="background:var(--info-soft);color:var(--info)">' + icon('receipt', 'sm') + '<div class="grow">Lance os itens da nota abaixo, um por um.</div></div>' : '') +
+      (twin ? '<div class="banner crit">' + icon('alert', 'sm') + '<div class="grow">Uma nota de ' + esc(twin.storeName) + ' com a mesma data e o mesmo total já entrou em ' + new Date(twin.at).toLocaleDateString('pt-BR') + ' por ' + esc(twin.by) + '. Confira para não somar duas vezes.</div></div>' : '') +
+      (c.data.notes ? '<div class="banner">' + icon('alert', 'sm') + '<div class="grow">' + esc(c.data.notes) + '</div></div>' : '') +
+      (!c.data.manual && c.data.total && Math.abs(c.data.total - c.rows.reduce(function (s, r) { return s + (r.total || 0); }, 0)) > 0.05
+        ? '<p class="card-meta">Total impresso na nota: ' + money(c.data.total) + '. A soma dos itens lidos dá ' + money(c.rows.reduce(function (s, r) { return s + (r.total || 0); }, 0)) + ': confira se faltou algum item.</p>' : '') +
+      (askStore ? '<div class="field" id="f-store"><label for="nf-store">Nome da loja</label><input id="nf-store" class="input" placeholder="Ex.: Atacadão da Marginal" value="' + esc(c.storeName || '') + '"><span class="hint">Só na primeira nota desta loja.</span><span class="err" hidden>Informe o nome da loja.</span></div>' : '') +
       '<div class="field"><span class="label">Dar entrada na unidade</span><div class="seg" data-unitsel>' + DB.get().units.map(function (u) {
         return '<button type="button" data-u="' + u.id + '" aria-pressed="' + (u.id === c.unit) + '">' + esc(u.name.replace('Unidade ', '')) + '</button>';
       }).join('') + '</div></div>' +
-      '<section class="section"><div class="section-head"><h2>Itens da nota</h2><span class="card-meta">' + (c.data.manual ? c.rows.length + (c.rows.length === 1 ? ' item' : ' itens') : matched + ' de ' + c.rows.length + ' reconhecidos') + '</span></div>' +
+      '<section class="section"><div class="section-head"><h2>Itens da nota</h2><span class="card-meta">' + (c.data.manual ? c.rows.length + (c.rows.length === 1 ? ' item' : ' itens') : matched + ' de ' + c.rows.length + ' no estoque') + '</span></div>' +
+      (loose > 1 && !c.data.manual ? '<button type="button" class="btn block" data-new-all>' + icon('plus', 'sm') + 'Cadastrar os ' + loose + ' itens novos no estoque</button>' : '') +
       '<div class="list nota-list">' + (c.rows.length ? c.rows.map(row).join('') : '<div class="row muted">Nenhum item lançado ainda.</div>') + '</div>' +
       '<button type="button" class="btn block" data-additem>' + icon('plus', 'sm') + 'Adicionar item da nota</button></section></main>' +
       '<div class="dock no-nav" data-dock>' + dockHtml(c) + '</div>';
@@ -243,6 +290,13 @@
         root.querySelector('.nota-list').addEventListener('click', function (e) {
           var el = e.target.closest('[data-i]'); if (!el) return;
           if (e.target.closest('[data-pick]')) pickSheet(c, Number(el.dataset.i));
+          if (e.target.closest('[data-new]')) { var p = createProduct(c.rows[Number(el.dataset.i)]); refresh(); UI.toast(p.name + ' cadastrado no estoque'); }
+        });
+        var all = root.querySelector('[data-new-all]');
+        if (all) all.addEventListener('click', function () {
+          var n = 0;
+          c.rows.forEach(function (r) { if (!r.pid) { createProduct(r); n++; } });
+          refresh(); UI.toast(n + ' produtos cadastrados no estoque');
         });
         root.querySelector('.nota-list').addEventListener('change', function (e) {
           var el = e.target.closest('[data-i]'); if (!el || !e.target.matches('[data-inc]')) return;
@@ -259,7 +313,7 @@
         });
         dock.addEventListener('click', function (e) {
           if (!e.target.closest('[data-apply]')) return;
-          if (c.data.manual && !c.data.store.known && !c.storeName) { var fs = root.querySelector('#f-store'); fs.classList.add('error'); fs.querySelector('.err').hidden = false; fs.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+          if (askStore && !c.storeName) { var fs = root.querySelector('#f-store'); fs.classList.add('error'); fs.querySelector('.err').hidden = false; fs.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
           var n = c.rows.filter(function (r) { return r.include && r.pid; }).length;
           UI.confirm({ title: 'Dar entrada em ' + n + ' itens?', body: 'As quantidades serão somadas ao estoque da ' + esc(unitName(c.unit)) + '.', ok: 'Dar entrada no estoque', onOk: function () { apply(c); } });
         });
@@ -287,7 +341,7 @@
       }).join('') + '</div></section>' : '') +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner" style="flex-direction:column;gap:8px">' +
-      '<a class="btn primary block" href="#estoque/nota">' + icon('scan', 'sm') + 'Escanear outra nota</a>' +
+      '<a class="btn primary block" href="#estoque/nota">' + icon('camera', 'sm') + 'Ler outra nota</a>' +
       '<div style="display:flex;gap:8px;width:100%"><a class="btn block" href="#estoque/compras">Lista de compras</a><a class="btn block" href="#estoque">Estoque</a></div></div></div>';
     return { html: html, tab: 'estoque', nav: false };
   }

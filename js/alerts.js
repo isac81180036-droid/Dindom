@@ -92,7 +92,6 @@
   // ---------- Celular (Web Push) ----------
   function cfgUrl() { return ((window.DINDOM_CONFIG || {}).supabaseUrl || '').replace(/\/$/, ''); }
   function fnUrl() { return cfgUrl() + '/functions/v1/dindom-push'; }
-  function ref() { return cfgUrl().replace(/^https:\/\/([^.]+)\..*$/, '$1'); }
   function b64(s) {
     var p = '='.repeat((4 - s.length % 4) % 4), raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')), out = new Uint8Array(raw.length);
     for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
@@ -141,29 +140,6 @@
     }
   };
 
-  // Passo a passo para publicar a função no Supabase (só o administrador).
-  function fnHelp(box) {
-    var code = '';
-    box.hidden = false;
-    box.innerHTML = '<div class="card" style="border:1.5px solid var(--warn)"><div class="card-row"><div class="tile warn">' + icon('alert') + '</div><div class="grow">' +
-      '<div class="card-title">Falta publicar a função de envio no Supabase</div><div class="card-meta">É uma vez só, pelo computador.</div></div></div>' +
-      '<ol class="card-meta" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;color:var(--ink-2)">' +
-      '<li>Toque em <b>Copiar código</b>.</li>' +
-      '<li>Toque em <b>Abrir Edge Functions</b> › <b>Deploy a new function</b> › <b>Via Editor</b>.</li>' +
-      '<li>Dê o nome <b>dindom-push</b>, apague o exemplo, cole o código e clique em <b>Deploy</b>.</li>' +
-      '<li>Na função, abra <b>Details</b>, desligue <b>Verify JWT</b> e clique em <b>Save</b>.</li>' +
-      '<li>Volte aqui e toque em <b>Ligar neste celular</b>.</li></ol>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-copyfn disabled>' + icon('copy', 'sm') + 'Copiar código</button>' +
-      '<a class="btn" href="https://supabase.com/dashboard/project/' + esc(ref()) + '/functions" target="_blank" rel="noopener">Abrir Edge Functions</a></div></div>';
-    var b = box.querySelector('[data-copyfn]');
-    fetch(FN_FILE, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { code = t; b.disabled = false; }, function () { b.disabled = false; });
-    b.addEventListener('click', function () {
-      if (!code) return UI.toast('Não foi possível baixar o código. Confira a internet.', { tone: 'crit' });
-      try { navigator.clipboard.writeText(code).then(function () { UI.toast('Código copiado. Cole no editor do Supabase.', { ms: 5000 }); }); }
-      catch (e) { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }
-    });
-  }
-
   // Painel de Perfil › Avisos de cancelamento.
   function sheet() {
     var sample = { id: 'cx-teste', ts: Date.now(), cancel: { number: '123', channel: '99Food', total: 89.9, customer: 'Maria', reason: 'O cliente pediu o cancelamento',
@@ -201,7 +177,7 @@
                 fn: UI.isAdmin() ? 'A função de envio ainda não está publicada no Supabase.' : 'Falta o administrador terminar de configurar os avisos no Supabase.',
                 sql: UI.isAdmin() ? 'Falta atualizar o banco no Supabase.' : 'Falta o administrador atualizar o banco no Supabase.' }[e.code] || ('Não deu certo: ' + e.message);
               line.textContent = msg;
-              if (UI.isAdmin() && e.code === 'fn') fnHelp(help);
+              if (UI.isAdmin() && e.code === 'fn') UI.fnHelp(help, { name: 'dindom-push', file: FN_FILE, jwtOff: true });
               if (UI.isAdmin() && e.code === 'sql') UI.sqlHelp(help, SQL_FILE, 'Volte aqui e toque em <b>Ligar neste celular</b> de novo.');
             });
         });

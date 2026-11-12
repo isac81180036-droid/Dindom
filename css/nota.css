@@ -86,3 +86,11 @@
 .price-chip.win b { color: var(--ok); }
 
 .nota-head .grow .card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Leitura da nota por foto (js/screens/nota-scan.js) */
+.nota-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--sp-2); }
+.nota-photo { position: relative; aspect-ratio: 3 / 4; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); box-shadow: var(--shadow); }
+.nota-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nota-photo span { position: absolute; left: 6px; bottom: 6px; min-width: 22px; height: 22px; border-radius: 11px; background: var(--ink); color: var(--bg); font-size: var(--fs-xs); font-weight: 700; display: grid; place-items: center; }
+.nota-photo .rm { position: absolute; top: 4px; right: 4px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--ink) 70%, transparent); color: var(--bg); display: grid; place-items: center; }
+.nota-new { flex-wrap: wrap; gap: var(--sp-2); margin-top: 6px; }

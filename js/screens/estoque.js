@@ -29,7 +29,7 @@
     var pend = Stats.shoppingPending(d);
     var html = '<main class="screen">' + UI.topbar('Estoque', { sub: DB.get().units.filter(function (u) { return u.id === d.user.unit; })[0].name }) +
       // Ação mais frequente de quem volta das compras: escanear a nota.
-      '<div class="quick-actions"><a class="btn primary block" href="#estoque/nota" style="min-height:56px;font-size:var(--fs-lg)">' + icon('scan') + 'Escanear nota fiscal</a>' +
+      '<div class="quick-actions"><a class="btn primary block" href="#estoque/nota" style="min-height:56px;font-size:var(--fs-lg)">' + icon('camera') + 'Ler nota fiscal</a>' +
       '<a class="btn block" href="#estoque/precos" style="min-height:56px">' + icon('tag', 'sm') + 'Onde comprar</a></div>' +
       '<div class="stat-grid">' +
       '<a class="card tap" href="#estoque/fechamento" style="text-decoration:none;color:inherit"><div class="tile accent">' + icon('checklist') + '</div>' +
@@ -100,7 +100,7 @@
       (!d.shopping.items.length ? '<div class="card">' + UI.empty('cart', 'Nenhuma lista ainda', 'A lista de compras é gerada sozinha quando o fechamento do estoque é finalizado.', '<a class="btn primary" href="#estoque/fechamento">Ir para o fechamento</a>') + '</div>' : '') +
       '<div class="card"' + (d.shopping.items.length ? '' : ' hidden') + '><div class="card-row" style="justify-content:space-between"><b class="num">' + done.length + ' de ' + d.shopping.items.length + ' recebidos</b>' +
       '<button type="button" class="btn sm" data-copy>Copiar lista</button></div>' + UI.bar(pct, 'ok') + '</div>' +
-      '<div class="quick-actions"><a class="btn primary block" href="#estoque/nota">' + icon('scan', 'sm') + 'Escanear nota da compra</a>' +
+      '<div class="quick-actions"><a class="btn primary block" href="#estoque/nota">' + icon('camera', 'sm') + 'Ler nota da compra</a>' +
       '<a class="btn block" href="#estoque/precos">' + icon('tag', 'sm') + 'Onde comprar</a></div>' +
       (pend.length ? '<section class="section"><div class="eyebrow">A receber</div><div class="list">' + pend.map(function (x) {
         return '<div class="row"><div class="grow"><div class="card-title">' + esc(x.p.name) + '</div><div class="card-meta">' + esc(x.p.cat) + '</div></div>' +

@@ -158,6 +158,35 @@
     box.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
 
+  // Função do Supabase (Edge Function) ainda não publicada: passo a passo com o código pronto para copiar.
+  // o: { name, file, secret (precisa da ANTHROPIC_API_KEY nos Secrets), jwtOff (desligar "Verify JWT") }
+  UI.fnHelp = function (box, o) {
+    var ref = ((window.DINDOM_CONFIG || {}).supabaseUrl || '').replace(/^https:\/\/([^.]+)\..*$/, '$1');
+    var base = 'https://supabase.com/dashboard/project/' + UI.esc(ref) + '/functions', code = '';
+    box.hidden = false;
+    box.innerHTML = '<div class="card" style="border:1.5px solid var(--warn)"><div class="card-row"><div class="tile warn">' + icon('alert') + '</div><div class="grow">' +
+      '<div class="card-title">Falta publicar a função ' + UI.esc(o.name) + ' no Supabase</div><div class="card-meta">É uma vez só, de preferência pelo computador.</div></div></div>' +
+      '<ol class="card-meta" style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;color:var(--ink-2)">' +
+      (o.secret ? '<li>Em <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>, crie uma chave de API (precisa de créditos na conta). ' +
+        'No Supabase, abra <b>Edge Functions › Secrets</b> e adicione <b>ANTHROPIC_API_KEY</b> com essa chave.</li>' : '') +
+      '<li>Toque em <b>Copiar código</b>.</li>' +
+      '<li>Toque em <b>Abrir Edge Functions</b> › <b>Deploy a new function</b> › <b>Via Editor</b>.</li>' +
+      '<li>Dê o nome <b>' + UI.esc(o.name) + '</b>, apague o exemplo, cole o código e clique em <b>Deploy</b>.</li>' +
+      (o.jwtOff ? '<li>Na função, abra <b>Details</b>, desligue <b>Verify JWT</b> e clique em <b>Save</b>.</li>' : '') +
+      '<li>Volte aqui e tente de novo.</li></ol>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn primary" data-copyfn disabled>' + icon('copy', 'sm') + 'Copiar código</button>' +
+      '<a class="btn" href="' + base + '" target="_blank" rel="noopener">Abrir Edge Functions</a>' +
+      (o.secret ? '<a class="btn" href="' + base + '/secrets" target="_blank" rel="noopener">Abrir Secrets</a>' : '') + '</div></div>';
+    var b = box.querySelector('[data-copyfn]');
+    fetch(o.file, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { code = t; b.disabled = false; }, function () { b.disabled = false; });
+    b.addEventListener('click', function () {
+      if (!code) return UI.toast('Não foi possível baixar o código. Confira a internet.', { tone: 'crit' });
+      try { navigator.clipboard.writeText(code).then(function () { UI.toast('Código copiado. Cole no editor do Supabase.', { ms: 5000 }); }); }
+      catch (e) { UI.toast('Não foi possível copiar.', { tone: 'crit' }); }
+    });
+    box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+
   UI.fmtCnpj = function (s) { var c = String(s || '').replace(/\D/g, '').slice(0, 14); return c.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2'); };
   // CNPJ válido pelos dígitos verificadores.
   UI.validCnpj = function (s) {
