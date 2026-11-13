@@ -250,11 +250,12 @@
   }
 
   function decisions(built, min, max) {
-    var top = built.list.filter(function (x) { return x.prio >= min && !doneOf(x); }).sort(function (a, b) { return b.prio - a.prio; }).slice(0, max);
+    var top = built.list.filter(function (x) { return x.prio >= min; }).sort(function (a, b) { return b.prio - a.prio; }).slice(0, max);
     if (!top.length) return '';
     return '<section class="section"><div class="section-head"><h2>Decisões prioritárias</h2><a class="btn ghost sm" href="#relatorios/plano">Plano de ação completo' + icon('chevronRight', 'sm') + '</a></div><div class="list">' + top.map(function (x, n) {
       var sec = Rel.SECTIONS.filter(function (s) { return s.id === x.s; })[0];
-      return '<div class="row cw-decision"><span class="cw-decision-n num">' + (n + 1) + '</span><div class="grow"><div class="card-title">' + esc(x.action) + '</div>' +
+      var dn = doneOf(x);
+      return '<div class="row cw-decision' + (dn ? ' plan-row done' : '') + '"><span class="cw-decision-n num">' + (dn ? icon('check', 'sm') : n + 1) + '</span><div class="grow"><div class="card-title plan-do">' + esc(x.action) + '</div>' + (dn ? '<div class="card-meta" style="color:var(--ok)">Concluído por ' + esc(String(dn.by || '').split(' ')[0] || 'alguém') + ' em ' + Rel.dm(DB.iso(new Date(dn.at))) + '</div>' : '') +
         '<div class="card-meta">' + esc(sec ? sec.label + ' · ' : '') + esc(x.title) + ': ' + esc(x.value) + '</div></div>' +
         (x.list && x.list.rows && x.list.rows.length ? '<button type="button" class="btn sm ghost" data-list="' + x.i + '">Ver</button>' : '') + '</div>';
     }).join('') + '</div></section>';
@@ -289,52 +290,52 @@
       if (!was) d.planDone.push({ id: id, at: Date.now(), by: d.user.name, title: x ? x.title : '' });
     });
     UI.buzz(15);
-    if (!was) UI.toast('Feito! Some da lista por ' + DONE_DAYS + ' dias.');
+    if (!was) UI.toast('Marcado como concluído.');
     refresh();
   }
 
   function planRow(x, showWhen) {
     var sec = Rel.SECTIONS.filter(function (s) { return s.id === x.s; })[0], bk = bucketOf(x), done = doneOf(x), id = planId(x);
     return '<div class="plan-row' + (done ? ' done' : '') + '">' +
-      '<button type="button" class="plan-check" data-done="' + esc(id) + '" aria-pressed="' + !!done + '" aria-label="' + (done ? 'Desmarcar' : 'Marcar como feito') + '">' + icon('check', 'sm') + '</button>' +
+      '<button type="button" class="plan-check" data-done="' + esc(id) + '" aria-pressed="' + !!done + '" aria-label="' + (done ? 'Desmarcar' : 'Marcar como concluído') + '">' + icon('check', 'sm') + '</button>' +
       '<div class="grow"><div class="plan-do">' + esc(x.action) + '</div>' +
       '<div class="plan-why"><b>Por quê:</b> ' + esc(x.title) + ': ' + esc(x.value) + '. ' + esc(x.text) + '</div>' +
       '<div class="plan-tags">' + (showWhen && bk ? '<span class="pill ' + bk.tone + ' no-dot">' + bk.label.replace('Fazer ', '') + '</span>' : '') +
       (sec && planMode !== 'area' ? '<span class="pill no-dot">' + icon(sec.icon, 'sm') + esc(sec.label) + '</span>' : '') +
-      (done ? '<span class="pill ok no-dot">' + icon('check', 'sm') + 'feito por ' + esc(String(done.by || '').split(' ')[0] || 'alguém') + ' em ' + Rel.dm(DB.iso(new Date(done.at))) + '</span>' : '') +
+      (done ? '<span class="pill ok no-dot">' + icon('check', 'sm') + 'concluído por ' + esc(String(done.by || '').split(' ')[0] || 'alguém') + ' em ' + Rel.dm(DB.iso(new Date(done.at))) + '</span>' : '') +
       (x.list && x.list.rows && x.list.rows.length ? '<button type="button" class="btn sm ghost" data-list="' + x.i + '">Ver lista (' + x.list.rows.length + ')</button>' : '') +
       (x.href ? '<a class="btn sm ghost" href="' + x.href + '">Abrir' + icon('chevronRight', 'sm') + '</a>' : sec ? '<a class="btn sm ghost" href="#relatorios/' + sec.id + '">Ver em ' + esc(sec.label) + icon('chevronRight', 'sm') + '</a>' : '') +
       '</div></div></div>';
   }
 
   function plan(ctx, built, e) {
+    // As concluídas continuam no lugar delas, só marcadas (riscadas, com quem fez e quando).
     var items = planItems(built), open = items.filter(function (x) { return !doneOf(x); }), done = items.filter(doneOf);
     var body = (hasCw(e) || !ready() ? '' : cwNotice(e, ctx));
     var counts = BUCKETS.map(function (b) { return open.filter(function (x) { return bucketOf(x) === b; }).length; });
     body += '<section class="card plan-intro"><div class="card-row"><div class="tile accent">' + icon('checklist') + '</div><div class="grow">' +
       '<div class="card-title">Plano de ação · ' + esc(ctx.label) + '</div>' +
       '<div class="card-meta">Tudo o que os relatórios recomendam, já em ordem de prioridade. Comece pelo topo, faça e marque o ✓. ' +
-      'O que for marcado some da lista por ' + DONE_DAYS + ' dias e aparece para toda a equipe como feito; se o número continuar ruim, volta sozinho.</div></div></div>' +
+      'A tarefa marcada continua na lista, riscada e com o nome de quem fez, para a equipe toda ver. Depois de ' + DONE_DAYS + ' dias a marca sai; se o número continuar ruim, a tarefa volta a ficar pendente.</div></div></div>' +
       '<div class="plan-sum">' + BUCKETS.map(function (b, i) { return '<div><b class="num">' + counts[i] + '</b><span>' + b.label.replace('Fazer ', '').replace(/^./, function (c) { return c.toUpperCase(); }) + '</span></div>'; }).join('') +
-      '<div><b class="num">' + done.length + '</b><span>Feitas</span></div></div>' +
+      '<div><b class="num">' + done.length + '</b><span>Concluídas</span></div></div>' +
       '<div class="seg sm" data-plan-mode style="max-width:360px"><button type="button" data-v="prio" aria-pressed="' + (planMode === 'prio') + '">Por prazo</button><button type="button" data-v="area" aria-pressed="' + (planMode === 'area') + '">Por área</button></div></section>';
     if (!items.length) return body + '<div class="card">' + UI.empty('check', 'Nada pendente', 'Os relatórios não apontaram nada que precise de ação neste período.') + '</div>';
     if (planMode === 'area') {
       sections().forEach(function (s) {
-        var list = open.filter(function (x) { return x.s === s.id; });
+        var list = items.filter(function (x) { return x.s === s.id; }), nd = list.filter(doneOf).length;
         if (!list.length) return;
-        body += '<section class="section"><div class="section-head"><h2>' + icon(s.icon, 'sm') + ' ' + esc(s.label) + '</h2><span class="card-meta num">' + Rel.plural(list.length, 'tarefa', 'tarefas') + '</span></div>' +
+        body += '<section class="section"><div class="section-head"><h2>' + icon(s.icon, 'sm') + ' ' + esc(s.label) + '</h2><span class="card-meta num">' + Rel.plural(list.length, 'tarefa', 'tarefas') + (nd ? ' · ' + nd + ' concluída' + (nd > 1 ? 's' : '') : '') + '</span></div>' +
           '<div class="list plan-list">' + list.map(function (x) { return planRow(x, true); }).join('') + '</div></section>';
       });
     } else {
       BUCKETS.forEach(function (b, i) {
-        var list = open.filter(function (x) { return bucketOf(x) === b; });
-        body += '<section class="section"><div class="section-head plan-head"><h2><span class="plan-dot ' + b.tone + '"></span>' + b.label + '</h2><span class="card-meta">' + b.hint + '</span></div>' +
+        var list = items.filter(function (x) { return bucketOf(x) === b; }), nd = list.filter(doneOf).length;
+        body += '<section class="section"><div class="section-head plan-head"><h2><span class="plan-dot ' + b.tone + '"></span>' + b.label + '</h2><span class="card-meta">' + b.hint + (nd ? ' · ' + nd + ' de ' + list.length + ' concluída' + (list.length > 1 ? 's' : '') : '') + '</span></div>' +
           (list.length ? '<div class="list plan-list">' + list.map(function (x) { return planRow(x, false); }).join('') + '</div>'
             : '<div class="card"><p class="muted" style="margin:0">' + (i === 0 ? 'Nada urgente para hoje.' : 'Nada nesta faixa.') + '</p></div>') + '</section>';
       });
     }
-    if (done.length) body += '<details class="plan-done"><summary>Feitas nos últimos ' + DONE_DAYS + ' dias (' + done.length + ')</summary><div class="list plan-list">' + done.map(function (x) { return planRow(x, true); }).join('') + '</div></details>';
     body += '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">O plano muda com o período e os canais escolhidos lá em cima. Para imprimir e levar para a reunião, toque no ícone de folha.</p>';
     return body;
   }
