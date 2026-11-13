@@ -226,7 +226,7 @@ Financeiro só aparece para o administrador. Antes do primeiro uso, rode `supaba
 - **Áreas:** Vendas, Entrega e bairros, Clientes, Produtos, Avaliações (Cardápio Web), Google, Financeiro, Equipe (ponto) e
   Operação (checklists, manutenção, estoque, notas fiscais, fichas técnicas e reservas). Cerca de 110 leituras, cada uma com
   "o que fazer", e mais de 30 gráficos. Todo gráfico tem a tabela **Ver números**; o ícone de folha imprime ou salva em PDF.
-- Vale o filtro de canais de **Vendas › Resumo** (ex.: sem o 99Food), também em Vendas › Insights.
+- **Canais na conta:** botões abaixo do período (ex.: tirar o 99Food). Valem para todos os números, gráficos, clientes e avaliações dos pedidos desses canais; é o mesmo filtro de **Vendas** e fica só no aparelho. Precisa do `010_relatorios.sql` mais recente.
 - **Arquivos:** `js/charts.js` (gráficos em HTML/SVG, sem biblioteca), `js/rel-core.js` (contas e textos),
   `js/screens/relatorios.js` (tela e ligação com o Google), `css/relatorios.css`. As leituras de Vendas › Insights entram também.
 - **Banco:** `cw_relatorio` soma tudo no servidor (vendas por dia, semana e mês, mapa dia x hora, faixas de valor, frequência

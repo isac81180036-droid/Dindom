@@ -96,12 +96,30 @@
       }).join('') + '</nav>';
   }
 
+  function chName(k) {
+    var N = { catalog: 'Cardápio digital', store_front_catalog: 'Cardápio da loja', portal: 'Balcão', whatsapp_extension: 'WhatsApp', ifood: 'iFood', food99: '99Food', '99food': '99Food', keeta: 'Keeta', rappi: 'Rappi', aiqfome: 'aiqfome' };
+    k = k == null ? '' : String(k);
+    return N[k] || (/99/.test(k) ? '99Food' : k ? k.replace(/_/g, ' ') : 'Outros');
+  }
+
   function filterRow(ctx) {
-    var ex = excl(), names = { food99: '99Food', '99food': '99Food', ifood: 'iFood', catalog: 'Cardápio digital', portal: 'Balcão', whatsapp_extension: 'WhatsApp' };
-    return '<div class="rel-filter"><div class="chips" role="toolbar" aria-label="Período">' + PERIODS.map(function (p) {
+    var ex = excl(), all = (ctx.r && ctx.r.channels_all) || [];
+    var rows = '<div class="rel-filter"><div class="chips" role="toolbar" aria-label="Período">' + PERIODS.map(function (p) {
       return '<button type="button" class="chip" data-period="' + p[0] + '" aria-pressed="' + (period === p[0]) + '">' + p[1] + '</button>';
-    }).join('') + '</div><span class="card-meta">De ' + Rel.dm(ctx.from) + ' a ' + Rel.dm(ctx.to) + (ctx.days < 175 ? ', comparando com os ' + ctx.days + ' dias anteriores' : '') + '.' +
-      (ex.length ? ' Sem ' + esc(ex.map(function (k) { return names[k] || k; }).join(', ')) + ' (filtro de canais de Vendas).' : '') + '</span></div>';
+    }).join('') + '</div><span class="card-meta">De ' + Rel.dm(ctx.from) + ' a ' + Rel.dm(ctx.to) + (ctx.days < 175 ? ', comparando com os ' + ctx.days + ' dias anteriores' : '') + '.</span></div>';
+    // Canais: tocar tira ou põe o canal (ex.: 99Food) de todos os números, gráficos e avaliações. É o mesmo filtro de Vendas.
+    if (all.length >= 2 || ex.length) {
+      var seen = {};
+      all.forEach(function (c) { seen[c.k == null ? '' : String(c.k)] = true; });
+      var list = all.map(function (c) { return { k: c.k == null ? '' : String(c.k), n: +c.n }; });
+      ex.forEach(function (k) { if (!seen[k]) list.push({ k: k, n: 0 }); });
+      rows += '<div class="rel-filter"><span class="card-meta" style="flex:none;min-width:0">Canais na conta:</span><div class="chips cw-channels" role="toolbar" aria-label="Canais de venda">' + list.map(function (c) {
+        var on = ex.indexOf(c.k) < 0;
+        return '<button type="button" class="chip" data-ch="' + esc(c.k) + '" aria-pressed="' + on + '" title="' + (on ? 'Tirar da conta' : 'Pôr de volta') + '">' + icon(on ? 'check' : 'x', 'sm') + esc(chName(c.k)) + (c.n ? ' <span class="count num">' + c.n + '</span>' : '') + '</button>';
+      }).join('') + '</div></div>' +
+        (ex.length ? '<p class="card-meta" style="margin-top:-8px">Sem ' + esc(ex.map(chName).join(', ')) + ': pedidos, clientes e avaliações desses canais ficam fora de todo o relatório. O mesmo filtro vale em Vendas e fica só neste aparelho.</p>' : '');
+    }
+    return rows;
   }
 
   // Avisos sobre os números da Cardápio Web (sem servidor, SQL que falta, loja desligada, histórico chegando).
@@ -414,6 +432,11 @@
         var offCharts = Charts.mount(root);
         root.addEventListener('click', function (ev) {
           var t = ev.target, b;
+          if ((b = t.closest('[data-ch]'))) {
+            var ck = b.dataset.ch;
+            DB.update(function (x) { var l = x.prefs.cwExclude = x.prefs.cwExclude || []; if (l.indexOf(ck) >= 0) l.splice(l.indexOf(ck), 1); else l.push(ck); });
+            load(); return refresh();
+          }
           if ((b = t.closest('[data-period]'))) { period = b.dataset.period; if (stale(120000)) load(); return refresh(); }
           if (t.closest('[data-retry]')) { delete cache[key()]; noSql = false; load(); return refresh(); }
           if (t.closest('[data-print]')) { root.querySelectorAll('details.ch-data').forEach(function (d) { d.open = false; }); return window.print(); }

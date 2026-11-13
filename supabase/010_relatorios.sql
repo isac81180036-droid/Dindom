@@ -49,6 +49,12 @@ begin
 
   select min(created_at) into hist_from from cw_tmp_o;
 
+  -- Avaliações, sem as de pedidos dos canais que ficam fora da conta.
+  create temp table if not exists cw_tmp_rv (like cw_reviews) on commit drop;
+  truncate cw_tmp_rv;
+  insert into cw_tmp_rv select r.* from cw_reviews r where r.org_id = o
+    and not exists (select 1 from cw_orders od where od.org_id = o and od.id = r.order_id and coalesce(od.sales_channel, '') = any(ex));
+
   -- Visão geral: período atual e o anterior, do mesmo tamanho.
   res := res || jsonb_build_object(
     'history_from', hist_from,
@@ -192,17 +198,17 @@ begin
 
   -- Avaliações: nota média, nota por quesito e comentários das notas baixas.
   res := res || jsonb_build_object('reviews', jsonb_build_object(
-    'n', (select count(*) from cw_reviews where org_id = o and created_at >= p_from and created_at < p_to),
-    'avg', (select round(avg(rating), 2) from cw_reviews where org_id = o and created_at >= p_from and created_at < p_to),
-    'prev_avg', (select round(avg(rating), 2) from cw_reviews where org_id = o and created_at >= pf and created_at < p_from),
-    'low', (select count(*) from cw_reviews where org_id = o and created_at >= p_from and created_at < p_to and rating <= 3),
+    'n', (select count(*) from cw_tmp_rv where org_id = o and created_at >= p_from and created_at < p_to),
+    'avg', (select round(avg(rating), 2) from cw_tmp_rv where org_id = o and created_at >= p_from and created_at < p_to),
+    'prev_avg', (select round(avg(rating), 2) from cw_tmp_rv where org_id = o and created_at >= pf and created_at < p_from),
+    'low', (select count(*) from cw_tmp_rv where org_id = o and created_at >= p_from and created_at < p_to and rating <= 3),
     'aspects', (select coalesce(jsonb_agg(t order by t.avg), '[]') from (
       select a->>'question' as q, round(avg((a->>'answer')::numeric), 2) as avg, count(*) as n
-      from cw_reviews, jsonb_array_elements(coalesce(answers, '[]'::jsonb)) a
+      from cw_tmp_rv, jsonb_array_elements(coalesce(answers, '[]'::jsonb)) a
       where org_id = o and created_at >= p_from and created_at < p_to and a->>'answer' ~ '^[0-9]+(\.[0-9]+)?$'
       group by 1) t),
     'comments', (select coalesce(jsonb_agg(t), '[]') from (
-      select r.rating, r.comment, r.created_at, k.name from cw_reviews r left join cw_customers k on k.org_id = r.org_id and k.id = r.customer_id
+      select r.rating, r.comment, r.created_at, k.name from cw_tmp_rv r left join cw_customers k on k.org_id = r.org_id and k.id = r.customer_id
       where r.org_id = o and r.created_at >= p_from and r.created_at < p_to and r.comment is not null and r.rating <= 3
       order by r.created_at desc limit 5) t)));
 
@@ -235,6 +241,11 @@ begin
       'has_orders', exists (select 1 from cw_orders where org_id = o), 'now', now()),
     'day_from', ((p_from at time zone tz) - interval '5 hours')::date,
     'day_to', ((p_to at time zone tz) - interval '5 hours')::date,
+    -- Todos os canais do período (mesmo os que estão fora da conta), para os botões do filtro.
+    'channels_all', (select coalesce(jsonb_agg(t order by t.n desc), '[]') from (
+      select sales_channel as k, count(*) as n, coalesce(sum(total), 0) as v from cw_orders
+      where org_id = o and created_at >= p_from and created_at < p_to and status not in ('canceled', 'canceling', 'pending_online_payment')
+      group by 1) t),
     'ins', public.cw_insights(p_from, p_to, tz, ex));
 
   -- Pedidos válidos de todo o histórico: dia de trabalho (vira às 5h), hora e o 1º pedido do cliente.
@@ -370,7 +381,8 @@ begin
   from cw_reviews v
     left join cw_orders ord on ord.org_id = v.org_id and ord.id = v.order_id
     left join cw_customers k on k.org_id = v.org_id and k.id = v.customer_id
-  where v.org_id = o and v.rating is not null;
+  where v.org_id = o and v.rating is not null
+    and not (coalesce(ord.sales_channel, '') = any(ex));
 
   res := res || jsonb_build_object('reviews', jsonb_build_object(
     'all_n', (select count(*) from cw_tmp_v),
