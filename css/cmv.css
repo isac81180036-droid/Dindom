@@ -85,3 +85,17 @@ button.ins-origin { border: 0; cursor: pointer; }
 .fin-channels { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .fin-channels .chip[aria-pressed="false"] { text-decoration: line-through; opacity: .75; }
 .fin-channels .chip[aria-pressed="false"] .count { text-decoration: line-through; }
+
+/* ---------- Contas a pagar (js/contas.js) ---------- */
+.conta-row { gap: var(--sp-3); }
+.conta-row .grow { display: flex; flex-direction: column; gap: 2px; }
+.conta-row > b { white-space: nowrap; }
+.conta-date { flex: none; width: 44px; display: flex; flex-direction: column; align-items: center; padding: 6px 0; border-radius: var(--r-sm); background: var(--surface-2); line-height: 1.1; }
+.conta-date b { font: 650 var(--fs-lg) var(--font-display); }
+.conta-date span { font-size: 10px; font-weight: 600; color: var(--ink-3); letter-spacing: .04em; }
+.conta-row.late .conta-date { background: var(--crit-soft); color: var(--crit); }
+.conta-row.late .conta-date span { color: inherit; }
+.conta-row.paid { opacity: .7; }
+.conta-row.paid .card-title { text-decoration: line-through; text-decoration-color: var(--ink-3); }
+.conta-row .pill .ico { width: 13px; height: 13px; }
+@media (max-width: 520px) { .conta-row .pill { display: none; } }

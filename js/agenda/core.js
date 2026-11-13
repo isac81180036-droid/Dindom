@@ -49,6 +49,8 @@
         if (first < from) first = add(e.date, Math.ceil(diffDays(e.date, from) / step) * step);
         for (var s = first; s <= to; s = add(s, step)) out.push({ ev: e, date: s });
       });
+      // Vencimentos das contas a pagar (js/contas.js): só o administrador vê.
+      if (window.Contas) out = out.concat(Contas.occurrences(from, to));
       return out.sort(function (a, b) {
         if (a.date !== b.date) return a.date < b.date ? -1 : 1;
         if (!!a.ev.allDay !== !!b.ev.allDay) return a.ev.allDay ? -1 : 1;

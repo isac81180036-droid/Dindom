@@ -134,7 +134,7 @@
   function pctVal(v) { return v == null ? '' : String(Math.round(v * 10000) / 100).replace('.', ','); }
 
   function tabs(active) {
-    return '<nav class="chips cmv-tabs" aria-label="Seções do financeiro">' + [['', 'Resumo do mês'], ['custos', 'Custos e metas']].map(function (t) {
+    return '<nav class="chips cmv-tabs" aria-label="Seções do financeiro">' + [['', 'Resumo do mês'], ['contas', 'Contas a pagar'], ['custos', 'Custos e metas']].map(function (t) {
       return '<a class="chip" href="#financeiro' + (t[0] ? '/' + t[0] : '') + '"' + (t[0] === active ? ' aria-current="page"' : '') + '>' + t[1] + '</a>';
     }).join('') + '</nav>';
   }
@@ -492,6 +492,7 @@
 
   Screens.financeiro = function (params) {
     if (!UI.isAdmin()) return Screens.inicio([]);
+    if (params[0] === 'contas') return Contas.screen(shell);
     return params[0] === 'custos' ? custos() : resumo();
   };
 })();

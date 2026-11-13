@@ -135,6 +135,7 @@
         root.addEventListener('click', function (e) {
           var t = e.target;
           var ev = t.closest('[data-ev]');
+          if (ev && ev.dataset.ev.indexOf('bill:') === 0) return Contas.sheet(ev.dataset.ev.slice(5), ev.dataset.date);
           if (ev) return CalForm.detail(ev.dataset.ev, ev.dataset.date);
           var rv = t.closest('[data-rv]');
           if (rv) return Reservas.open(rv.dataset.rv);
@@ -164,6 +165,8 @@
           }
         });
         bindFilters(root);
+        // Contas a pagar do administrador: quando chegam do servidor, redesenha a agenda.
+        if (window.Contas) Contas.ensure(function () { if (route() === 'agenda' && !document.querySelector('.sheet-wrap')) rerender(); });
       }
     };
   };

@@ -169,7 +169,7 @@
     return '<section class="section"><div class="section-head"><h2>Agenda de hoje</h2><a class="btn ghost sm" href="#agenda">Abrir agenda</a></div>' +
       '<div class="list">' + (list.length ? list.map(function (o) {
         var c = Cal.calendar(o.ev.cal);
-        return '<a class="row today-ev" href="' + (o.ev.reserva ? '#reservas/' + o.ev.reserva.id : '#agenda') + '" style="text-decoration:none;color:inherit;--c:' + Cal.css(o.ev) + '">' +
+        return '<a class="row today-ev" href="' + (o.ev.reserva ? '#reservas/' + o.ev.reserva.id : o.ev.conta ? '#financeiro/contas' : '#agenda') + '" style="text-decoration:none;color:inherit;--c:' + Cal.css(o.ev) + '">' +
           '<span class="time num">' + (o.ev.allDay ? 'Dia' : o.ev.start) + '</span><span class="ev-bar"></span>' +
           '<span class="grow"><span class="card-title">' + esc(o.ev.title) + '</span><span class="card-meta" style="display:block">' + Cal.timeRange(o.ev) + (o.ev.place ? ' · ' + esc(o.ev.place) : '') + '</span></span></a>';
       }).join('') : '<div class="row muted">Nada mais na agenda hoje.</div>') + '</div></section>';
@@ -211,7 +211,7 @@
     var manager = UI.isManager();
     // No celular as colunas viram uma pilha só, na ordem: coluna 1, depois coluna 2.
     var cols = manager
-      ? [startCard(d) + pontoCard() + CW.homeCard() + managerSummary(d) + closingCard(d), Reservas.homeCard() + agendaSection() + stockSection(d)]
+      ? [startCard(d) + pontoCard() + CW.homeCard() + (window.Contas ? Contas.homeCard() : '') + managerSummary(d) + closingCard(d), Reservas.homeCard() + agendaSection() + stockSection(d)]
       : [pontoCard() + closingCard(d) + tasksSection(d), Reservas.homeCard() + agendaSection() + stockSection(d) + maintSection(d)];
     var html = '<main class="screen wide">' + header(d) +
       '<div class="home-grid"><div class="col">' + cols[0] + '</div><div class="col">' + cols[1] + '</div></div>' +
@@ -221,6 +221,10 @@
       mount: function (r) {
         r.querySelector('[data-unit]').addEventListener('click', unitSheet);
         CW.homeLoad();
+        if (window.Contas) {
+          Contas.ensure(function () { if (route() === 'inicio' && !document.querySelector('.sheet-wrap')) refresh(); });
+          r.addEventListener('click', function (e) { var b = e.target.closest('[data-home-conta]'); if (b) Contas.sheet(b.dataset.homeConta, b.dataset.date); });
+        }
         r.querySelectorAll('[data-home-punch]').forEach(function (b) { b.addEventListener('click', function () { PontoUI.confirmPunch(Ponto.me().id, b.dataset.homePunch, 'app'); }); });
       }
     };
