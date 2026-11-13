@@ -1,5 +1,5 @@
 // Service worker: guarda a casca do app para abrir rápido e funcionar sem internet.
-var CACHE = 'dindom-v45';
+var CACHE = 'dindom-v46';
 var SHELL = [
   './', './index.html', './manifest.webmanifest',
   './icons/icon-64.png', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
@@ -50,10 +50,16 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   // Só os arquivos do próprio app passam por aqui. Dados do Supabase e fontes vão direto à rede
   // (o app já guarda a própria cópia dos dados; respostas do servidor não ficam no cache).
-  if (new URL(e.request.url).origin !== self.location.origin) return;
+  var url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
+  // A página pública de reservas (/reserva) não depende do app: o navegador abre direto, sem cache.
+  if (/\/reserva(\/|$)/.test(url.pathname)) return;
   var net = fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' });
   e.respondWith(
     net.then(function (res) {
+      // Endereço que redireciona (ex.: pasta sem a barra no fim): o navegador recusa a resposta redirecionada
+      // numa navegação, então manda ele seguir o redirecionamento por conta própria.
+      if (res.redirected && e.request.mode === 'navigate') return Response.redirect(res.url, 302);
       var copy = res.clone();
       caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
       return res;

@@ -100,7 +100,8 @@
 
   // ---------- Link público ----------
 
-  function link() { return new URL('reserva', location.href.split('#')[0]).href; }
+  // Com a barra no fim: sem ela o GitHub Pages redireciona, e o redirecionamento quebra a página em quem já usa o app.
+  function link() { return new URL('reserva/', location.href.split('#')[0]).href; }
 
   function copyLink() {
     var url = link();
