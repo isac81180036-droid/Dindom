@@ -58,6 +58,91 @@
   function stale(ms) { var e = cache[key()]; return !e || Date.now() - e.at > ms; }
 
   // Nota do Google: no máximo uma consulta a cada 30 minutos por aparelho (o servidor também limita por dia).
+  // ---------- Mapa de calor das entregas (cw_mapa, supabase/011_mapa_calor.sql) ----------
+  var MAP_SQL = 'supabase/011_mapa_calor.sql';
+  var mapCache = {}, mapLoading = {}, mapMode = 'n'; // n = pedidos, v = faturamento
+  var LEAFLET = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/';
+  var HEAT = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js';
+  var leafletReady = null;
+
+  function loadMap() {
+    var k = key();
+    if (!ready() || mapLoading[k]) return;
+    mapLoading[k] = true;
+    var r = range(), ex = excl(), args = { p_from: r[0].toISOString(), p_to: r[1].toISOString() };
+    if (ex.length) args.p_exclude = ex;
+    Cloud.client.rpc('cw_mapa', args).then(function (res) {
+      mapLoading[k] = false;
+      mapCache[k] = res.error ? { at: Date.now(), error: missingSql(res.error) || /cw_mapa/.test(res.error.message || '') ? 'sql' : netError(res.error) ? 'network' : res.error.message, data: mapCache[k] && mapCache[k].data }
+        : { at: Date.now(), data: res.data };
+      redraw();
+    }, function () { mapLoading[k] = false; mapCache[k] = { at: Date.now(), error: 'network', data: mapCache[k] && mapCache[k].data }; redraw(); });
+  }
+
+  // Biblioteca do mapa (Leaflet) e do calor: baixadas só quando o mapa abre.
+  function leaflet() {
+    if (leafletReady) return leafletReady;
+    function js(src) { return new Promise(function (ok, fail) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
+    if (!document.querySelector('link[data-leaflet]')) { var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = LEAFLET + 'leaflet.css'; css.setAttribute('data-leaflet', ''); document.head.appendChild(css); }
+    leafletReady = (window.L ? Promise.resolve() : js(LEAFLET + 'leaflet.js')).then(function () { return window.L.heatLayer ? null : js(HEAT); });
+    leafletReady.catch(function () { leafletReady = null; });
+    return leafletReady;
+  }
+
+  // Tira pontos perdidos longe da cidade (endereço errado no cadastro), para o mapa não abrir afastado demais.
+  function nearby(points) {
+    if (points.length < 5) return points;
+    function med(a) { a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }
+    var la = med(points.map(function (p) { return +p.lat; })), lo = med(points.map(function (p) { return +p.lng; }));
+    return points.filter(function (p) { return Math.abs(p.lat - la) < 0.25 && Math.abs(p.lng - lo) < 0.25; });
+  }
+
+  function mapBlock() {
+    var m = mapCache[key()], d = m && m.data;
+    var head = '<div class="ch-head"><h3>Mapa de calor das entregas</h3><p>De onde vêm os pedidos de entrega do período. Cada ponto é um quadrado de uns 110 m: o app não guarda rua nem número.</p></div>';
+    if (!ready()) return '';
+    if (m && m.error === 'sql' && !d) {
+      return '<section class="card ch wide">' + head + (UI.isAdmin() ? '<div data-sqlhelp-map></div>' : '<p class="ch-none">Peça ao administrador para atualizar o banco (arquivo 011_mapa_calor.sql).</p>') + '</section>';
+    }
+    if (!d) return '<section class="card ch wide">' + head + (m && m.error ? '<div class="banner crit">' + icon('alert', 'sm') + '<div class="grow">' + esc(m.error === 'network' ? 'Sem conexão com o servidor.' : m.error) + '</div></div>' : '<div class="skel" style="height:360px"></div>') + '</section>';
+    var pts = nearby(d.points || []), withGeo = +d.with_geo || 0, total = +d.deliveries || 0;
+    var note = +d.pending > 0 ? '<div class="banner info">' + icon('refresh', 'sm') + '<div class="grow">Buscando a localização de ' + fmt(+d.pending) + ' entregas antigas na Cardápio Web. O mapa vai se completando sozinho nas próximas horas.</div></div>' : '';
+    if (!pts.length) return '<section class="card ch wide">' + head + note + '<p class="ch-none">' + (total ? 'Nenhuma entrega do período tem localização ainda.' : 'Nenhuma entrega no período.') + '</p></section>';
+    var top = pts.slice().sort(function (a, b) { return mapMode === 'v' ? b.v - a.v : b.n - a.n; }).slice(0, 15);
+    return '<section class="card ch wide">' + head + note +
+      '<div class="rel-map-bar"><div class="seg sm" data-map-mode><button type="button" data-v="n" aria-pressed="' + (mapMode === 'n') + '">Pedidos</button><button type="button" data-v="v" aria-pressed="' + (mapMode === 'v') + '">Faturamento</button></div>' +
+      '<div class="rel-map-scale" aria-hidden="true"><span>menos</span><i></i><span>mais</span></div></div>' +
+      '<div class="rel-map" data-map role="img" aria-label="Mapa de calor com ' + fmt(withGeo) + ' entregas"><p class="ch-none">Carregando o mapa…</p></div>' +
+      '<p class="card-meta">' + fmt(withGeo) + ' de ' + Rel.plural(total, 'entrega', 'entregas') + ' do período no mapa' + (total > withGeo + (+d.pending || 0) ? ' (pedidos de alguns apps chegam sem localização)' : '') + '. Mapa © colaboradores do OpenStreetMap.</p>' +
+      Charts.table(['Área (bairro mais comum)', 'Pedidos', 'Faturamento'], top.map(function (p) { return [(p.nb || 'Sem bairro') + ' · ' + Number(p.lat).toFixed(3) + ', ' + Number(p.lng).toFixed(3), fmt(+p.n), money(+p.v)]; })) +
+      '</section>';
+  }
+
+  // Desenha o mapa no quadro. Devolve a função que desmonta o mapa (ao sair da tela ou redesenhar).
+  function mountMap(root) {
+    var box = root.querySelector('[data-map]'), m = mapCache[key()];
+    if (!box || !m || !m.data) return null;
+    var pts = nearby(m.data.points || []), map = null, dead = false;
+    leaflet().then(function () {
+      if (dead || !box.isConnected) return;
+      var L = window.L;
+      box.textContent = '';
+      // No celular, arrastar com um dedo rola a página; o mapa mexe pelos botões + e − e com dois dedos.
+      map = L.map(box, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false, zoomControl: true });
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+      var w = pts.map(function (p) { return mapMode === 'v' ? +p.v : +p.n; }).sort(function (a, b) { return a - b; });
+      var cap = w[Math.floor(w.length * 0.95)] || w[w.length - 1] || 1; // um ponto muito forte não apaga o resto
+      L.heatLayer(pts.map(function (p) { return [+p.lat, +p.lng, mapMode === 'v' ? +p.v : +p.n]; }), {
+        radius: 22, blur: 18, maxZoom: 15, max: cap, minOpacity: 0.35,
+        gradient: { 0.2: '#fde68a', 0.45: '#fbbf24', 0.65: '#f97316', 0.85: '#dc2626', 1: '#7f1d1d' }
+      }).addTo(map);
+      map.fitBounds(L.latLngBounds(pts.map(function (p) { return [+p.lat, +p.lng]; })).pad(0.08), { maxZoom: 15 });
+    }, function () {
+      if (!dead && box.isConnected) box.innerHTML = '<p class="ch-none">Não deu para carregar o mapa agora (precisa de internet). A tabela "Ver números" logo abaixo tem as áreas com mais pedidos.</p>';
+    });
+    return function () { dead = true; if (map) { map.remove(); map = null; } };
+  }
+
   function loadGoogle(force) {
     if (!ready() || google.loading || (!force && google.at && Date.now() - google.at < 30 * 60000)) return;
     google.loading = true;
@@ -223,6 +308,7 @@
     var body = '', cwArea = ['vendas', 'entrega', 'clientes', 'produtos', 'avaliacoes'].indexOf(sec.id) >= 0;
     if (cwArea) { body += cwNotice(e, ctx); if (!hasCw(e)) return body; }
     if (sec.id === 'google') body += googleBlock(ctx, built);
+    if (sec.id === 'entrega') body += '<div class="rel-charts">' + mapBlock() + '</div>';
     if (sec.id === 'financeiro') body += financeNote(ctx);
     if (sec.id === 'avaliacoes') body += reviewsHero(ctx);
     body += chartsHtml(built.charts[sec.id]);
@@ -429,9 +515,12 @@
       mount: function (root) {
         var box = root.querySelector('[data-sqlhelp]');
         if (box) UI.sqlHelp(box, SQL_FILE, 'Volte aqui e abra <b>Relatórios</b> de novo.');
-        var offCharts = Charts.mount(root);
+        var offCharts = Charts.mount(root), offMap = active === 'entrega' ? mountMap(root) : null;
+        var mb = root.querySelector('[data-sqlhelp-map]');
+        if (mb) UI.sqlHelp(mb, MAP_SQL, 'Volte aqui e abra <b>Relatórios › Entrega e bairros</b> de novo.');
         root.addEventListener('click', function (ev) {
           var t = ev.target, b;
+          if ((b = t.closest('[data-map-mode] [data-v]'))) { mapMode = b.dataset.v; return refresh(); }
           if ((b = t.closest('[data-ch]'))) {
             var ck = b.dataset.ch;
             DB.update(function (x) { var l = x.prefs.cwExclude = x.prefs.cwExclude || []; if (l.indexOf(ck) >= 0) l.splice(l.indexOf(ck), 1); else l.push(ck); });
@@ -453,8 +542,9 @@
         // Os números mudam devagar: recalcula no máximo a cada 2 minutos (ou quando o banco acabou de ser atualizado).
         if (ready() && (stale(120000) || (noSql && stale(15000)))) load();
         if (ready() && !noSql && (!active || active === 'google')) loadGoogle(false);
+        if (ready() && active === 'entrega') { var mc = mapCache[key()]; if (!mc || Date.now() - mc.at > (mc.error === 'sql' ? 15000 : 120000)) loadMap(); }
         if (UI.isAdmin() && window.FinReport && (!active || active === 'financeiro')) FinReport.ensure(redraw);
-        return offCharts;
+        return function () { offCharts(); if (offMap) offMap(); };
       }
     };
   };

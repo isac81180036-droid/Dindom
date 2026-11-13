@@ -239,3 +239,5 @@ Pelas regras do Google, a nota e as avaliações são buscadas na hora (`g_place
 gratuita) e não ficam guardadas; o Google entrega só as 5 avaliações em destaque. Para acompanhar a evolução, toque em
 **Registrar nota de hoje** uma vez por mês (fica em `meta/gmb`, sincronizado); sem a chave, dá para usar só os registros à mão.
 O botão **Copiar link "Avaliar no Google"** gera o link para mandar aos clientes ou virar QR Code na caixa.
+
+**Mapa de calor das entregas** (Relatórios › Entrega e bairros): rode `supabase/011_mapa_calor.sql` depois do 010. Cada pedido de entrega passa a guardar só a posição aproximada do endereço (latitude e longitude com 3 casas, um quadrado de uns 110 m); rua, número e telefone continuam fora do app. As entregas dos últimos 6 meses são buscadas de novo aos poucos para ganhar a posição. O mapa (Leaflet + leaflet.heat, do cdnjs, e o mapa do OpenStreetMap) só é baixado quando a área abre; alterna entre pedidos e faturamento e tem a tabela das áreas com mais pedidos. Pedidos de alguns apps (como o iFood) podem chegar sem localização.

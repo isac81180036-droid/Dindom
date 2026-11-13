@@ -64,6 +64,18 @@
   .rel-areas { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); }
 }
 
+/* Mapa de calor das entregas */
+.rel-map { height: 380px; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); position: relative; z-index: 0; }
+.rel-map .ch-none { padding: var(--sp-5); }
+.rel-map.leaflet-container { font: inherit; }
+.rel-map-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
+.rel-map-scale { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-3); }
+.rel-map-scale i { width: 96px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #fde68a, #fbbf24, #f97316, #dc2626, #7f1d1d); }
+@media (min-width: 900px) { .rel-map { height: 460px; } }
+:root[data-theme="dark"] .rel-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rel-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); } }
+@media print { .rel-map { height: 320px; } .rel-map .leaflet-control-zoom { display: none; } }
+
 /* ---------- Número em destaque ---------- */
 .ch-kpi { gap: 6px; position: relative; overflow: hidden; text-decoration: none; color: inherit; min-height: 104px; }
 .ch-kpi-label { font-size: var(--fs-sm); color: var(--ink-2); }
