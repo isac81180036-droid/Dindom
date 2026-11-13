@@ -226,7 +226,7 @@ Financeiro só aparece para o administrador. Antes do primeiro uso, rode `supaba
 - **Áreas:** Vendas, Entrega e bairros, Clientes, Produtos, Avaliações (Cardápio Web), Google, Financeiro, Equipe (ponto) e
   Operação (checklists, manutenção, estoque, notas fiscais, fichas técnicas e reservas). Cerca de 110 leituras, cada uma com
   "o que fazer", e mais de 30 gráficos. Todo gráfico tem a tabela **Ver números**; o ícone de folha imprime ou salva em PDF.
-- **Canais na conta:** botões abaixo do período (ex.: tirar o 99Food). Valem para todos os números, gráficos, clientes e avaliações dos pedidos desses canais; é o mesmo filtro de **Vendas** e fica só no aparelho. Precisa do `010_relatorios.sql` mais recente.
+- **Canais na conta:** botões abaixo do período (ex.: tirar o 99Food). Valem para todos os números, gráficos, clientes, avaliações e para o plano de ação; é o mesmo filtro de **Vendas** e vale para a equipe toda (`settings.cwExclude`, sincronizado). **Todos os canais** volta ao normal. Precisa do `010_relatorios.sql` mais recente.
 - **Arquivos:** `js/charts.js` (gráficos em HTML/SVG, sem biblioteca), `js/rel-core.js` (contas e textos),
   `js/screens/relatorios.js` (tela e ligação com o Google), `css/relatorios.css`. As leituras de Vendas › Insights entram também.
 - **Banco:** `cw_relatorio` soma tudo no servidor (vendas por dia, semana e mês, mapa dia x hora, faixas de valor, frequência
@@ -241,3 +241,5 @@ gratuita) e não ficam guardadas; o Google entrega só as 5 avaliações em dest
 O botão **Copiar link "Avaliar no Google"** gera o link para mandar aos clientes ou virar QR Code na caixa.
 
 **Mapa de calor das entregas** (Relatórios › Entrega e bairros): rode `supabase/011_mapa_calor.sql` depois do 010. Cada pedido de entrega passa a guardar só a posição aproximada do endereço (latitude e longitude com 3 casas, um quadrado de uns 110 m); rua, número e telefone continuam fora do app. As entregas dos últimos 6 meses são buscadas de novo aos poucos para ganhar a posição. O mapa (Leaflet + leaflet.heat, do cdnjs, e o mapa do OpenStreetMap) só é baixado quando a área abre; alterna entre pedidos e faturamento e tem a tabela das áreas com mais pedidos. Pedidos de alguns apps (como o iFood) podem chegar sem localização.
+
+**Plano de ação** (Relatórios › Plano de ação, para o gerente): todas as recomendações dos relatórios em uma lista só, separadas em **Fazer hoje**, **Fazer esta semana** e **Fazer este mês** (ou por área), cada uma com o motivo e o atalho para o relatório. O ✓ marca como feita para a equipe toda (coleção `planDone`, com quem marcou e quando); a tarefa some por 14 dias e volta se o número continuar ruim. A Visão geral mostra as mais urgentes ainda não feitas. Pelo ícone de folha, o plano sai impresso para a reunião.

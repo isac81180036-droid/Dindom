@@ -15,7 +15,7 @@
   function ready() { return !!(window.Cloud && Cloud.orgId && Cloud.client); }
   function missingSql(err) { return /schema cache|does not exist|cw_relatorio|g_place|g_search|g_connect/i.test((err && err.message) || ''); }
   function netError(err) { return !err || /fetch|network|Failed to/i.test(String(err.message || err)); }
-  function excl() { return (DB.get().prefs.cwExclude || []).slice().sort(); }
+  function excl() { var d = DB.get(), s = d.settings && d.settings.cwExclude; return (s || d.prefs.cwExclude || []).slice().sort(); }
   function pinfo() { return PERIODS.filter(function (p) { return p[0] === period; })[0]; }
   function key() { return period + '|' + excl().join(','); }
   function onScreen() { return route().split('/')[0] === 'relatorios'; }
@@ -175,6 +175,8 @@
     built.list.forEach(function (x) { if (x.tone === 'crit') crit[x.s] = (crit[x.s] || 0) + 1; });
     return '<nav class="chips rel-tabs" aria-label="Áreas do relatório">' +
       '<a class="chip" href="#relatorios"' + (!active ? ' aria-current="page"' : '') + '>Visão geral</a>' +
+      '<a class="chip" href="#relatorios/plano"' + (active === 'plano' ? ' aria-current="page"' : '') + '>' + icon('checklist', 'sm') + 'Plano de ação' +
+        (planCount(built) ? ' <span class="count num" title="Para fazer hoje">' + planCount(built) + '</span>' : '') + '</a>' +
       sections().map(function (s) {
         return '<a class="chip" href="#relatorios/' + s.id + '"' + (s.id === active ? ' aria-current="page"' : '') + '>' + s.label +
           (crit[s.id] ? ' <span class="count num" title="Leituras que pedem atenção">' + crit[s.id] + '</span>' : '') + '</a>';
@@ -188,7 +190,7 @@
   }
 
   function filterRow(ctx) {
-    var ex = excl(), all = (ctx.r && ctx.r.channels_all) || [];
+    var ex = excl(), all = (ctx.r && (ctx.r.channels_all || (ctx.r.ins && ctx.r.ins.channels))) || [];
     var rows = '<div class="rel-filter"><div class="chips" role="toolbar" aria-label="Período">' + PERIODS.map(function (p) {
       return '<button type="button" class="chip" data-period="' + p[0] + '" aria-pressed="' + (period === p[0]) + '">' + p[1] + '</button>';
     }).join('') + '</div><span class="card-meta">De ' + Rel.dm(ctx.from) + ' a ' + Rel.dm(ctx.to) + (ctx.days < 175 ? ', comparando com os ' + ctx.days + ' dias anteriores' : '') + '.</span></div>';
@@ -201,8 +203,9 @@
       rows += '<div class="rel-filter"><span class="card-meta" style="flex:none;min-width:0">Canais na conta:</span><div class="chips cw-channels" role="toolbar" aria-label="Canais de venda">' + list.map(function (c) {
         var on = ex.indexOf(c.k) < 0;
         return '<button type="button" class="chip" data-ch="' + esc(c.k) + '" aria-pressed="' + on + '" title="' + (on ? 'Tirar da conta' : 'Pôr de volta') + '">' + icon(on ? 'check' : 'x', 'sm') + esc(chName(c.k)) + (c.n ? ' <span class="count num">' + c.n + '</span>' : '') + '</button>';
-      }).join('') + '</div></div>' +
-        (ex.length ? '<p class="card-meta" style="margin-top:-8px">Sem ' + esc(ex.map(chName).join(', ')) + ': pedidos, clientes e avaliações desses canais ficam fora de todo o relatório. O mesmo filtro vale em Vendas e fica só neste aparelho.</p>' : '');
+      }).join('') + (ex.length ? '<button type="button" class="chip" data-ch-all>' + icon('refresh', 'sm') + 'Todos os canais</button>' : '') + '</div></div>' +
+        '<p class="card-meta" style="margin-top:-8px">' + (ex.length ? 'Sem ' + esc(ex.map(chName).join(', ')) + ': pedidos, clientes e avaliações desses canais ficam fora de todo o relatório e do plano de ação. '
+          : 'Toque num canal para tirá-lo da conta (ex.: 99Food). ') + 'O filtro vale para a equipe toda e também na tela de Vendas.</p>';
     }
     return rows;
   }
@@ -247,9 +250,9 @@
   }
 
   function decisions(built, min, max) {
-    var top = built.list.filter(function (x) { return x.prio >= min; }).sort(function (a, b) { return b.prio - a.prio; }).slice(0, max);
+    var top = built.list.filter(function (x) { return x.prio >= min && !doneOf(x); }).sort(function (a, b) { return b.prio - a.prio; }).slice(0, max);
     if (!top.length) return '';
-    return '<section class="section"><div class="section-head"><h2>Decisões prioritárias</h2><span class="card-meta">o que mais pede atenção agora</span></div><div class="list">' + top.map(function (x, n) {
+    return '<section class="section"><div class="section-head"><h2>Decisões prioritárias</h2><a class="btn ghost sm" href="#relatorios/plano">Plano de ação completo' + icon('chevronRight', 'sm') + '</a></div><div class="list">' + top.map(function (x, n) {
       var sec = Rel.SECTIONS.filter(function (s) { return s.id === x.s; })[0];
       return '<div class="row cw-decision"><span class="cw-decision-n num">' + (n + 1) + '</span><div class="grow"><div class="card-title">' + esc(x.action) + '</div>' +
         '<div class="card-meta">' + esc(sec ? sec.label + ' · ' : '') + esc(x.title) + ': ' + esc(x.value) + '</div></div>' +
@@ -258,6 +261,83 @@
   }
 
   function stars(v) { var n = Math.round(v); return '<span class="rel-stars" aria-label="' + n + ' de 5 estrelas">' + '★★★★★'.slice(0, n) + '<span style="opacity:.25">' + '★★★★★'.slice(n) + '</span></span>'; }
+
+  // ---------- Plano de ação ----------
+  // Tudo o que os relatórios mandam fazer, em ordem: hoje, esta semana, este mês. Cada tarefa pode ser marcada
+  // como feita (fica em "planDone", para a equipe toda); depois de 14 dias ela volta se o problema continuar.
+  var planMode = 'prio'; // prio = por prazo, area = por área
+  var DONE_DAYS = 14;
+  var BUCKETS = [
+    { id: 'hoje', label: 'Fazer hoje', hint: 'o que está custando dinheiro ou cliente agora', tone: 'crit', min: 60 },
+    { id: 'semana', label: 'Fazer esta semana', hint: 'problemas que crescem se ficarem parados', tone: 'warn', min: 40 },
+    { id: 'mes', label: 'Fazer este mês', hint: 'melhorias para vender mais e gastar menos', tone: 'info', min: 20 }
+  ];
+  function planId(x) { return 'p:' + x.s + ':' + x.title; }
+  function doneOf(x) {
+    var id = planId(x);
+    return (DB.get().planDone || []).filter(function (p) { return p.id === id && Date.now() - p.at < DONE_DAYS * 864e5; })[0] || null;
+  }
+  function bucketOf(x) { for (var i = 0; i < BUCKETS.length; i++) if (x.prio >= BUCKETS[i].min) return BUCKETS[i]; return null; }
+  function planItems(built) { return built.list.filter(function (x) { return bucketOf(x); }).sort(function (a, b) { return b.prio - a.prio; }); }
+  function planCount(built) { return planItems(built).filter(function (x) { return x.prio >= 60 && !doneOf(x); }).length; }
+
+  function toggleDone(id) {
+    var x = last && last.list.filter(function (q) { return planId(q) === id; })[0];
+    var was = (DB.get().planDone || []).some(function (p) { return p.id === id && Date.now() - p.at < DONE_DAYS * 864e5; });
+    DB.update(function (d) {
+      d.planDone = (d.planDone || []).filter(function (p) { return p.id !== id && Date.now() - p.at < 90 * 864e5; });
+      if (!was) d.planDone.push({ id: id, at: Date.now(), by: d.user.name, title: x ? x.title : '' });
+    });
+    UI.buzz(15);
+    if (!was) UI.toast('Feito! Some da lista por ' + DONE_DAYS + ' dias.');
+    refresh();
+  }
+
+  function planRow(x, showWhen) {
+    var sec = Rel.SECTIONS.filter(function (s) { return s.id === x.s; })[0], bk = bucketOf(x), done = doneOf(x), id = planId(x);
+    return '<div class="plan-row' + (done ? ' done' : '') + '">' +
+      '<button type="button" class="plan-check" data-done="' + esc(id) + '" aria-pressed="' + !!done + '" aria-label="' + (done ? 'Desmarcar' : 'Marcar como feito') + '">' + icon('check', 'sm') + '</button>' +
+      '<div class="grow"><div class="plan-do">' + esc(x.action) + '</div>' +
+      '<div class="plan-why"><b>Por quê:</b> ' + esc(x.title) + ': ' + esc(x.value) + '. ' + esc(x.text) + '</div>' +
+      '<div class="plan-tags">' + (showWhen && bk ? '<span class="pill ' + bk.tone + ' no-dot">' + bk.label.replace('Fazer ', '') + '</span>' : '') +
+      (sec && planMode !== 'area' ? '<span class="pill no-dot">' + icon(sec.icon, 'sm') + esc(sec.label) + '</span>' : '') +
+      (done ? '<span class="pill ok no-dot">' + icon('check', 'sm') + 'feito por ' + esc(String(done.by || '').split(' ')[0] || 'alguém') + ' em ' + Rel.dm(DB.iso(new Date(done.at))) + '</span>' : '') +
+      (x.list && x.list.rows && x.list.rows.length ? '<button type="button" class="btn sm ghost" data-list="' + x.i + '">Ver lista (' + x.list.rows.length + ')</button>' : '') +
+      (x.href ? '<a class="btn sm ghost" href="' + x.href + '">Abrir' + icon('chevronRight', 'sm') + '</a>' : sec ? '<a class="btn sm ghost" href="#relatorios/' + sec.id + '">Ver em ' + esc(sec.label) + icon('chevronRight', 'sm') + '</a>' : '') +
+      '</div></div></div>';
+  }
+
+  function plan(ctx, built, e) {
+    var items = planItems(built), open = items.filter(function (x) { return !doneOf(x); }), done = items.filter(doneOf);
+    var body = (hasCw(e) || !ready() ? '' : cwNotice(e, ctx));
+    var counts = BUCKETS.map(function (b) { return open.filter(function (x) { return bucketOf(x) === b; }).length; });
+    body += '<section class="card plan-intro"><div class="card-row"><div class="tile accent">' + icon('checklist') + '</div><div class="grow">' +
+      '<div class="card-title">Plano de ação · ' + esc(ctx.label) + '</div>' +
+      '<div class="card-meta">Tudo o que os relatórios recomendam, já em ordem de prioridade. Comece pelo topo, faça e marque o ✓. ' +
+      'O que for marcado some da lista por ' + DONE_DAYS + ' dias e aparece para toda a equipe como feito; se o número continuar ruim, volta sozinho.</div></div></div>' +
+      '<div class="plan-sum">' + BUCKETS.map(function (b, i) { return '<div><b class="num">' + counts[i] + '</b><span>' + b.label.replace('Fazer ', '').replace(/^./, function (c) { return c.toUpperCase(); }) + '</span></div>'; }).join('') +
+      '<div><b class="num">' + done.length + '</b><span>Feitas</span></div></div>' +
+      '<div class="seg sm" data-plan-mode style="max-width:360px"><button type="button" data-v="prio" aria-pressed="' + (planMode === 'prio') + '">Por prazo</button><button type="button" data-v="area" aria-pressed="' + (planMode === 'area') + '">Por área</button></div></section>';
+    if (!items.length) return body + '<div class="card">' + UI.empty('check', 'Nada pendente', 'Os relatórios não apontaram nada que precise de ação neste período.') + '</div>';
+    if (planMode === 'area') {
+      sections().forEach(function (s) {
+        var list = open.filter(function (x) { return x.s === s.id; });
+        if (!list.length) return;
+        body += '<section class="section"><div class="section-head"><h2>' + icon(s.icon, 'sm') + ' ' + esc(s.label) + '</h2><span class="card-meta num">' + Rel.plural(list.length, 'tarefa', 'tarefas') + '</span></div>' +
+          '<div class="list plan-list">' + list.map(function (x) { return planRow(x, true); }).join('') + '</div></section>';
+      });
+    } else {
+      BUCKETS.forEach(function (b, i) {
+        var list = open.filter(function (x) { return bucketOf(x) === b; });
+        body += '<section class="section"><div class="section-head plan-head"><h2><span class="plan-dot ' + b.tone + '"></span>' + b.label + '</h2><span class="card-meta">' + b.hint + '</span></div>' +
+          (list.length ? '<div class="list plan-list">' + list.map(function (x) { return planRow(x, false); }).join('') + '</div>'
+            : '<div class="card"><p class="muted" style="margin:0">' + (i === 0 ? 'Nada urgente para hoje.' : 'Nada nesta faixa.') + '</p></div>') + '</section>';
+      });
+    }
+    if (done.length) body += '<details class="plan-done"><summary>Feitas nos últimos ' + DONE_DAYS + ' dias (' + done.length + ')</summary><div class="list plan-list">' + done.map(function (x) { return planRow(x, true); }).join('') + '</div></details>';
+    body += '<p class="faint" style="text-align:center;font-size:var(--fs-xs)">O plano muda com o período e os canais escolhidos lá em cima. Para imprimir e levar para a reunião, toque no ícone de folha.</p>';
+    return body;
+  }
 
   // ---------- Visão geral ----------
 
@@ -502,14 +582,14 @@
   Screens.relatorios = function (params) {
     if (!UI.isManager()) return Screens.inicio([]);
     var active = params[0] || '', sec = sections().filter(function (s) { return s.id === active; })[0];
-    if (active && !sec) active = '';
+    if (active && !sec && active !== 'plano') active = '';
     var e = cache[key()], ctx = context(), built = Rel.build(ctx);
     last = built;
     var busy = !!loading[key()] && e && e.data;
     var printBtn = '<button type="button" class="icon-btn plain" data-print aria-label="Imprimir ou salvar em PDF">' + icon('file') + '</button>';
-    var body = sec ? sectionBody(sec, ctx, built, e) : overview(ctx, built, e);
+    var body = active === 'plano' ? plan(ctx, built, e) : sec ? sectionBody(sec, ctx, built, e) : overview(ctx, built, e);
     return {
-      html: '<main class="screen wide rel">' + UI.topbar('Relatórios', { sub: (sec ? sec.label : 'Visão geral') + ' · ' + ctx.label, right: printBtn }) +
+      html: '<main class="screen wide rel">' + UI.topbar('Relatórios', { sub: (active === 'plano' ? 'Plano de ação' : sec ? sec.label : 'Visão geral') + ' · ' + ctx.label, right: printBtn }) +
         tabs(active, built) + filterRow(ctx) + '<div class="section' + (busy ? ' rel-stale' : '') + '" style="gap:var(--sp-5)">' + body + '</div></main>',
       tab: 'relatorios',
       mount: function (root) {
@@ -523,9 +603,12 @@
           if ((b = t.closest('[data-map-mode] [data-v]'))) { mapMode = b.dataset.v; return refresh(); }
           if ((b = t.closest('[data-ch]'))) {
             var ck = b.dataset.ch;
-            DB.update(function (x) { var l = x.prefs.cwExclude = x.prefs.cwExclude || []; if (l.indexOf(ck) >= 0) l.splice(l.indexOf(ck), 1); else l.push(ck); });
+            DB.update(function (x) { var l = x.settings.cwExclude = (x.settings.cwExclude || x.prefs.cwExclude || []).slice(); delete x.prefs.cwExclude; if (l.indexOf(ck) >= 0) l.splice(l.indexOf(ck), 1); else l.push(ck); });
             load(); return refresh();
           }
+          if (t.closest('[data-ch-all]')) { DB.update(function (x) { x.settings.cwExclude = []; delete x.prefs.cwExclude; }); load(); return refresh(); }
+          if ((b = t.closest('[data-plan-mode] [data-v]'))) { planMode = b.dataset.v; return refresh(); }
+          if ((b = t.closest('[data-done]'))) return toggleDone(b.dataset.done);
           if ((b = t.closest('[data-period]'))) { period = b.dataset.period; if (stale(120000)) load(); return refresh(); }
           if (t.closest('[data-retry]')) { delete cache[key()]; noSql = false; load(); return refresh(); }
           if (t.closest('[data-print]')) { root.querySelectorAll('details.ch-data').forEach(function (d) { d.open = false; }); return window.print(); }

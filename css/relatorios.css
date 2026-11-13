@@ -76,6 +76,34 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rel-map .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); } }
 @media print { .rel-map { height: 320px; } .rel-map .leaflet-control-zoom { display: none; } }
 
+/* Plano de ação */
+.rel-tabs .chip .ico { width: 16px; height: 16px; }
+.plan-intro { gap: var(--sp-4); }
+.plan-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
+.plan-sum > div { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3); border-radius: var(--r-md); background: var(--surface-2); }
+.plan-sum b { font: 650 var(--fs-xl)/1 var(--font-display); }
+.plan-sum span { font-size: var(--fs-xs); color: var(--ink-2); }
+.section-head h2 .ico { vertical-align: -3px; }
+.plan-head { flex-wrap: wrap; row-gap: 2px; }
+.plan-head h2 { white-space: nowrap; }
+.plan-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; background: var(--info); }
+.plan-dot.crit { background: var(--crit); } .plan-dot.warn { background: var(--warn); }
+.plan-row { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-4); }
+.plan-row > .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.plan-check { flex: none; width: 32px; height: 32px; margin-top: -2px; border-radius: 10px; border: 2px solid var(--ink-3); background: transparent; color: transparent; display: grid; place-items: center; }
+.plan-check[aria-pressed="true"] { background: var(--ok); border-color: var(--ok); color: #fff; }
+.plan-do { font-weight: 650; font-size: var(--fs-md); line-height: 1.35; }
+.plan-why { font-size: var(--fs-sm); color: var(--ink-2); }
+.plan-why b { color: var(--ink); font-weight: 600; }
+.plan-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.plan-tags .pill .ico { width: 13px; height: 13px; }
+.plan-tags .btn.sm { min-height: 32px; padding: 0 var(--sp-2); }
+.plan-row.done .plan-do { color: var(--ink-3); text-decoration: line-through; }
+.plan-done summary { cursor: pointer; font-weight: 600; color: var(--ink-2); padding: var(--sp-2) 0; }
+.plan-done .list { margin-top: var(--sp-2); }
+@media (max-width: 520px) { .plan-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media print { .plan-check { border-color: #555; } .plan-intro .seg, .plan-tags .btn { display: none !important; } .plan-row { break-inside: avoid; } }
+
 /* ---------- Número em destaque ---------- */
 .ch-kpi { gap: 6px; position: relative; overflow: hidden; text-decoration: none; color: inherit; min-height: 104px; }
 .ch-kpi-label { font-size: var(--fs-sm); color: var(--ink-2); }

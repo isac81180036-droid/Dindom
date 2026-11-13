@@ -56,10 +56,11 @@
     return [today, add(1)];
   }
 
-  // Canais tirados da conta neste aparelho (ex.: o 99Food, que não passa o valor certo).
+  // Canais tirados da conta (ex.: o 99Food, que não passa o valor certo). Vale para a equipe toda (settings);
+  // aparelhos que ainda tinham o filtro antigo, só deles (prefs), continuam com ele até o primeiro toque.
   var CHANNEL_SQL = 'supabase/008_vendas_canais.sql';
   var noFilterSql = false; // banco ainda sem o 008: filtra só faturamento, pedidos e ticket, aqui no app
-  function excl() { return (DB.get().prefs.cwExclude || []).slice(); }
+  function excl() { var d = DB.get(), s = d.settings && d.settings.cwExclude; return (s || d.prefs.cwExclude || []).slice(); }
   function chName(k) { return CHANNELS[k] || (/99/.test(k) ? '99Food' : k ? k.replace(/_/g, ' ') : 'Outros'); }
 
   // Busca o resumo do período no servidor e chama "done" quando chega.
@@ -276,7 +277,9 @@
           if (ch) {
             var k = ch.dataset.ch;
             DB.update(function (x) {
-              var list = x.prefs.cwExclude = x.prefs.cwExclude || [];
+              // Vale para a equipe toda: fica nas configurações sincronizadas (antes ficava só no aparelho).
+              var list = x.settings.cwExclude = (x.settings.cwExclude || x.prefs.cwExclude || []).slice();
+              delete x.prefs.cwExclude;
               if (list.indexOf(k) >= 0) list.splice(list.indexOf(k), 1); else list.push(k);
             });
             // Os totais mudam com o filtro: busca de novo (o período atual primeiro).

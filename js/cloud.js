@@ -7,7 +7,7 @@
   // Listas sincronizadas item a item e o campo que identifica cada item.
   var ITEMS = { employees: 'id', products: 'id', checklists: 'id', events: 'id', maintenance: 'id', notifications: 'id',
     stores: 'id', punches: 'id', adjusts: 'id', notas: 'key', units: 'id', calendars: 'id', stations: 'id', counts: 'id',
-    insumos: 'id', cardapio: 'id', precoHist: 'id' };
+    insumos: 'id', cardapio: 'id', precoHist: 'id', planDone: 'id' };
   // Documentos únicos, sincronizados inteiros.
   var META = ['org', 'deliveryDays', 'categories', 'closing', 'shopping', 'checkHistory', 'nextMaintenanceId', 'settings',
     'functions', 'prices', 'stock', 'matchMemory', 'shifts', 'cmv', 'gmb'];

@@ -59,13 +59,15 @@
     insumos: [],
     cardapio: [],
     precoHist: [],
+    // Relatórios › Plano de ação: o que já foi feito ({ id, at, by, title }); volta à lista depois de 14 dias.
+    planDone: [],
     session: null,
     loginGuard: { fails: 0 }
   };
 
   var mem = null;
 
-  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function clone(o) { return o === undefined ? undefined : JSON.parse(JSON.stringify(o)); }
   function iso(dt) {
     return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
   }
