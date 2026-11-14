@@ -221,7 +221,8 @@ A leitura pelo QR Code (`js/scanner.js`, `jsQR`) saiu.
 Menu **Relatórios** no computador; no celular, **Perfil › Relatórios** (`#relatorios`). Gerente e administrador veem; a área
 Financeiro só aparece para o administrador. Antes do primeiro uso, rode `supabase/010_relatorios.sql` no Supabase (a tela oferece o SQL).
 
-- **Visão geral:** números do período (30 dias, 90 dias ou 6 meses, comparando com o período anterior do mesmo tamanho),
+- **Período:** hoje, ontem, esta semana, semana passada, este mês, mês passado, 30 dias, 90 dias, 6 meses ou **Escolher data** (um dia ou de/até, dentro dos 6 meses guardados). A semana vai de segunda a domingo e o dia de trabalho vira às 5h. A comparação é sempre com o período anterior do mesmo tamanho; quando o período termina hoje, compara até a mesma hora (ex.: hoje x ontem até agora). O período escolhido fica lembrado no aparelho.
+- **Visão geral:** números do período escolhido,
   faturamento por dia, as decisões prioritárias de todas as áreas e um resumo de cada área.
 - **Áreas:** Vendas, Entrega e bairros, Clientes, Produtos, Avaliações (Cardápio Web), Google, Financeiro, Equipe (ponto) e
   Operação (checklists, manutenção, estoque, notas fiscais, fichas técnicas e reservas). Cerca de 110 leituras, cada uma com

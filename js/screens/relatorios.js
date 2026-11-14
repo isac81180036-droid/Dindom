@@ -4,8 +4,46 @@
 (function () {
   var esc = UI.esc, money = UI.money, fmt = UI.fmt;
   var SQL_FILE = 'supabase/010_relatorios.sql';
-  var PERIODS = [['30d', '30 dias', 30], ['90d', '90 dias', 90], ['175d', '6 meses', 175]];
-  var period = '30d';
+  // Períodos prontos. 'dia' = data escolhida (um dia ou de/até). A semana vai de segunda a domingo.
+  var PERIODS = [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['semana', 'Esta semana'], ['semana_ant', 'Semana passada'], ['mes', 'Este mês'], ['mes_ant', 'Mês passado'],
+    ['30d', '30 dias'], ['90d', '90 dias'], ['175d', '6 meses']];
+  var MAX_DAYS = 175; // o histórico guardado da Cardápio Web cobre uns 6 meses
+  var period = null, custom = null; // custom: { from, to } (AAAA-MM-DD, dias de trabalho)
+
+  // Último período usado neste aparelho.
+  function ensurePeriod() {
+    if (period) return;
+    var p = DB.get().prefs.relPeriod || {};
+    period = PERIODS.some(function (x) { return x[0] === p.id; }) || (p.id === 'dia' && p.from) ? p.id : '30d';
+    custom = p.id === 'dia' ? { from: p.from, to: p.to || p.from } : null;
+  }
+  function setPeriod(id, c) {
+    period = id; custom = id === 'dia' ? c : null;
+    DB.update(function (x) { x.prefs.relPeriod = id === 'dia' ? { id: id, from: c.from, to: c.to } : { id: id }; });
+  }
+  function monday(iso) { var d = Cal.parse(iso), w = (d.getDay() + 6) % 7; return Rel.addDays(iso, -w); }
+  function monthEnd(key) { return key + '-' + String(Fin.daysIn(key)).padStart(2, '0'); }
+  function fullDate(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+
+  // O período escolhido em dias de trabalho (o dia vira às 5h), com o texto da comparação.
+  // live = termina hoje: o fim é agora, e o período anterior vai até a mesma hora (ontem até esta hora, por ex.).
+  function span() {
+    ensurePeriod();
+    var t = DB.businessDay(), from, to, label, cmp;
+    var n = function (a, b) { return Math.round((Cal.parse(b) - Cal.parse(a)) / 864e5) + 1; };
+    if (period === 'hoje') { from = to = t; label = 'hoje'; cmp = 'comparando com ontem até a mesma hora'; }
+    else if (period === 'ontem') { from = to = Rel.addDays(t, -1); label = 'ontem'; cmp = 'comparando com anteontem'; }
+    else if (period === 'semana') { from = monday(t); to = t; label = 'esta semana'; cmp = 'comparando com o mesmo trecho da semana passada'; }
+    else if (period === 'semana_ant') { from = Rel.addDays(monday(t), -7); to = Rel.addDays(monday(t), -1); label = 'semana passada'; cmp = 'comparando com a semana anterior'; }
+    else if (period === 'mes') { from = t.slice(0, 7) + '-01'; to = t; label = 'este mês'; }
+    else if (period === 'mes_ant') { var pm = Fin.addMonth(t.slice(0, 7), -1); from = pm + '-01'; to = monthEnd(pm); label = Rel.monthName(pm); }
+    else if (period === 'dia' && custom) { from = custom.from; to = custom.to < custom.from ? custom.from : custom.to; if (to > t) to = t;
+      label = from === to ? (from === t ? 'hoje' : 'dia ' + fullDate(from)) : 'de ' + Rel.dm(from) + ' a ' + Rel.dm(to); }
+    else { var p = PERIODS.filter(function (x) { return x[0] === period; })[0] || PERIODS[6], d = parseInt(p[0], 10) || 30; from = Rel.addDays(t, -(d - 1)); to = t; label = 'últimos ' + p[1]; }
+    var days = n(from, to);
+    if (!cmp) cmp = days === 1 ? 'comparando com o dia anterior' : 'comparando com os ' + days + ' dias anteriores';
+    return { from: from, to: to, days: days, label: label, cmp: cmp, live: to === t };
+  }
   var cache = {};     // período + filtro de canais → { at, data, error }
   var loading = {};
   var google = { at: 0, data: null, loading: false, error: '' }; // nota buscada agora no Google (não fica guardada)
@@ -16,14 +54,13 @@
   function missingSql(err) { return /schema cache|does not exist|cw_relatorio|g_place|g_search|g_connect/i.test((err && err.message) || ''); }
   function netError(err) { return !err || /fetch|network|Failed to/i.test(String(err.message || err)); }
   function excl() { var d = DB.get(), s = d.settings && d.settings.cwExclude; return (s || d.prefs.cwExclude || []).slice().sort(); }
-  function pinfo() { return PERIODS.filter(function (p) { return p[0] === period; })[0]; }
-  function key() { return period + '|' + excl().join(','); }
+  function key() { var s = span(); return s.from + '_' + s.to + '|' + excl().join(','); }
   function onScreen() { return route().split('/')[0] === 'relatorios'; }
 
-  // Período no "dia de trabalho" do app (vira às 5h): termina amanhã às 5h e volta N dias.
+  // Período em horário: do início do primeiro dia de trabalho (5h) até o fim do último, ou até agora se termina hoje.
   function range() {
-    var days = pinfo()[2], b = DB.businessDay().split('-');
-    return [new Date(+b[0], b[1] - 1, +b[2] + 1 - days, DB.DAY_START_HOUR), new Date(+b[0], b[1] - 1, +b[2] + 1, DB.DAY_START_HOUR)];
+    var s = span(), a = s.from.split('-'), b = s.to.split('-');
+    return [new Date(+a[0], a[1] - 1, +a[2], DB.DAY_START_HOUR), s.live ? new Date() : new Date(+b[0], b[1] - 1, +b[2] + 1, DB.DAY_START_HOUR)];
   }
 
   // Redesenha só se a pessoa continua nos Relatórios, sem painel aberto e sem estar digitando.
@@ -157,12 +194,12 @@
   function gmbLog() { var g = DB.get().gmb; return ((g && g.log) || []).slice().sort(function (a, b) { return a.d < b.d ? -1 : 1; }); }
 
   function context() {
-    var p = pinfo(), e = cache[key()], to = DB.businessDay();
+    var s = span(), e = cache[key()];
     return {
       r: e && e.data ? e.data : null, d: DB.get(), admin: UI.isAdmin(),
       fin: UI.isAdmin() && window.FinReport ? FinReport.summary() : null,
       google: { live: google.data && google.data.connected ? google.data : null, log: gmbLog() },
-      from: Rel.addDays(to, -(p[2] - 1)), to: to, days: p[2], label: 'últimos ' + p[1]
+      from: s.from, to: s.to, days: s.days, label: s.label, cmp: s.cmp, live: s.live
     };
   }
 
@@ -191,9 +228,10 @@
 
   function filterRow(ctx) {
     var ex = excl(), all = (ctx.r && (ctx.r.channels_all || (ctx.r.ins && ctx.r.ins.channels))) || [];
-    var rows = '<div class="rel-filter"><div class="chips" role="toolbar" aria-label="Período">' + PERIODS.map(function (p) {
+    var rows = '<div class="rel-filter"><div class="chips rel-periods" role="toolbar" aria-label="Período">' + PERIODS.map(function (p) {
       return '<button type="button" class="chip" data-period="' + p[0] + '" aria-pressed="' + (period === p[0]) + '">' + p[1] + '</button>';
-    }).join('') + '</div><span class="card-meta">De ' + Rel.dm(ctx.from) + ' a ' + Rel.dm(ctx.to) + (ctx.days < 175 ? ', comparando com os ' + ctx.days + ' dias anteriores' : '') + '.</span></div>';
+    }).join('') + '<button type="button" class="chip" data-pick-day aria-pressed="' + (period === 'dia') + '">' + icon('calendar', 'sm') + (period === 'dia' ? esc(ctx.label.replace(/^dia /, '')) : 'Escolher data') + '</button>' +
+      '</div><span class="card-meta">' + (ctx.from === ctx.to ? esc(Cal.dayTitle(ctx.from)) : 'De ' + Rel.dm(ctx.from) + ' a ' + Rel.dm(ctx.to)) + (ctx.days < MAX_DAYS ? ', ' + esc(ctx.cmp) : '') + '.</span></div>';
     // Canais: tocar tira ou põe o canal (ex.: 99Food) de todos os números, gráficos e avaliações. É o mesmo filtro de Vendas.
     if (all.length >= 2 || ex.length) {
       var seen = {};
@@ -346,7 +384,7 @@
     var r = ctx.r, C = Charts, k = [], body = '';
     if (r && hasCw(e)) {
       var ins = r.ins, cur = ins.cur || {}, prev = ins.prev || {}, cmp = prev.orders > 0, rv = r.reviews || {}, cn = ins.cancel || {}, c = ins.customers || {};
-      var ds = built.daily ? built.daily.cur.slice(0, -1) : [];
+      var ds = built.daily ? (ctx.live ? built.daily.cur.slice(0, -1) : built.daily.cur) : [];
       k.push(C.kpi({ label: 'Faturamento', value: money(cur.revenue), delta: cmp ? Rel.pct(cur.revenue, prev.revenue) : null, sub: cmp ? 'antes ' + C.moneyK(prev.revenue) : ctx.label, spark: ds.map(function (d) { return d.v; }), href: '#relatorios/vendas' }));
       k.push(C.kpi({ label: 'Pedidos', value: fmt(cur.orders), delta: cmp ? Rel.pct(cur.orders, prev.orders) : null, sub: cmp ? 'antes ' + fmt(prev.orders) : ctx.label, spark: ds.map(function (d) { return d.n; }), href: '#relatorios/vendas' }));
       k.push(C.kpi({ label: 'Ticket médio', value: money(cur.orders ? cur.revenue / cur.orders : 0), delta: cmp && cur.orders ? Rel.pct(cur.revenue / cur.orders, prev.revenue / prev.orders) : null, sub: cmp ? 'antes ' + money(prev.revenue / prev.orders) : '', href: '#relatorios/vendas' }));
@@ -578,6 +616,41 @@
     try { navigator.clipboard.writeText(text).then(function () { UI.toast(ok, { icon: 'link', ms: 4500 }); UI.buzz(15); }, manual); } catch (e) { manual(); }
   }
 
+  // Escolher um dia ou um intervalo de/até (dentro do histórico guardado).
+  function pickDay() {
+    var t = DB.businessDay(), min = Rel.addDays(t, -(MAX_DAYS - 1)), s = span(), range0 = s.from !== s.to;
+    UI.sheet('<h2>Escolher data</h2>' +
+      '<div class="seg" data-mode><button type="button" data-v="dia" aria-pressed="' + !range0 + '">Um dia</button><button type="button" data-v="faixa" aria-pressed="' + range0 + '">De / até</button></div>' +
+      '<div class="ev-when"><div class="field"><label for="pd-from" data-from-label>' + (range0 ? 'De' : 'Dia') + '</label><input id="pd-from" type="date" class="input" min="' + min + '" max="' + t + '" value="' + s.from + '"></div>' +
+      '<div class="field" data-to' + (range0 ? '' : ' style="display:none"') + '><label for="pd-to">Até</label><input id="pd-to" type="date" class="input" min="' + min + '" max="' + t + '" value="' + s.to + '"></div></div>' +
+      '<div class="chips wrap" data-quick>' + [['Ontem', -1], ['Anteontem', -2], ['Há 7 dias', -7]].map(function (q) { return '<button type="button" class="chip" data-q="' + Rel.addDays(t, q[1]) + '">' + q[0] + '</button>'; }).join('') + '</div>' +
+      '<p class="card-meta">Dá para ver até ' + fullDate(min) + ' (os pedidos guardados cobrem uns 6 meses). O dia vai das 5h às 5h do dia seguinte, como no resto do app.</p>' +
+      '<p class="err" data-pd-err hidden style="color:var(--crit);font-size:var(--fs-sm);font-weight:600"></p>' +
+      '<button type="button" class="btn primary block" data-ok>Ver relatório</button><button type="button" class="btn block" data-close>Cancelar</button>',
+      function (sh, close) {
+        var q = function (x) { return sh.querySelector(x); }, mode = range0 ? 'faixa' : 'dia';
+        sh.querySelectorAll('[data-mode] button').forEach(function (b) {
+          b.addEventListener('click', function () {
+            mode = b.dataset.v;
+            sh.querySelectorAll('[data-mode] button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+            q('[data-to]').style.display = mode === 'dia' ? 'none' : ''; q('[data-from-label]').textContent = mode === 'dia' ? 'Dia' : 'De';
+            if (mode === 'faixa' && q('#pd-to').value < q('#pd-from').value) q('#pd-to').value = q('#pd-from').value;
+          });
+        });
+        sh.querySelectorAll('[data-q]').forEach(function (b) { b.addEventListener('click', function () { q('#pd-from').value = b.dataset.q; if (mode === 'dia') q('#pd-to').value = b.dataset.q; }); });
+        q('[data-ok]').addEventListener('click', function () {
+          var a = q('#pd-from').value, z = mode === 'dia' ? a : q('#pd-to').value, err = '';
+          if (!a || !z) err = 'Escolha a data.';
+          else if (z < a) err = 'O "até" precisa ser depois do "de".';
+          else if (a > t) err = 'Escolha um dia até hoje.';
+          else if (a < min) err = 'Só dá para ver até ' + fullDate(min) + '.';
+          var e = q('[data-pd-err]'); e.hidden = !err; e.textContent = err;
+          if (err) return;
+          close(); setPeriod('dia', { from: a, to: z > t ? t : z }); if (stale(120000)) load(); refresh();
+        });
+      });
+  }
+
   // ---------- Tela ----------
 
   Screens.relatorios = function (params) {
@@ -610,7 +683,8 @@
           if (t.closest('[data-ch-all]')) { DB.update(function (x) { x.settings.cwExclude = []; delete x.prefs.cwExclude; }); load(); return refresh(); }
           if ((b = t.closest('[data-plan-mode] [data-v]'))) { planMode = b.dataset.v; return refresh(); }
           if ((b = t.closest('[data-done]'))) return toggleDone(b.dataset.done);
-          if ((b = t.closest('[data-period]'))) { period = b.dataset.period; if (stale(120000)) load(); return refresh(); }
+          if ((b = t.closest('[data-period]'))) { setPeriod(b.dataset.period); if (stale(120000)) load(); return refresh(); }
+          if (t.closest('[data-pick-day]')) return pickDay();
           if (t.closest('[data-retry]')) { delete cache[key()]; noSql = false; load(); return refresh(); }
           if (t.closest('[data-print]')) { root.querySelectorAll('details.ch-data').forEach(function (d) { d.open = false; }); return window.print(); }
           if ((b = t.closest('[data-list]'))) { var x = last && last.list[+b.dataset.list]; if (x && x.list) listSheet(x); return; }

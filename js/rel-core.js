@@ -69,7 +69,7 @@
 
   function salesInsights(add, x) {
     var r = x.r, ins = r.ins, cur = ins.cur || {}, ds = x.daily, today = x.to;
-    var full = ds.cur.slice(0, -1); // sem hoje, que ainda está em andamento
+    var full = x.live ? ds.cur.slice(0, -1) : ds.cur; // sem hoje, que ainda está em andamento
     var open = full.filter(function (d) { return d.n > 0; });
     var ticket = cur.orders ? cur.revenue / cur.orders : 0;
 
@@ -136,8 +136,8 @@
     var cell = maxBy(r.heat || [], function (h) { return +h.n; });
     if (cell && +cell.n >= 5) {
       var weeks = Math.max(1, x.days / 7);
-      add({ g: 'Horários e dias', ic: 'clock', tone: 'info', title: 'Hora mais cheia da semana', value: DB.WEEK[cell.d] + ', ' + cell.h + 'h',
-        text: plural(+cell.n, 'pedido', 'pedidos') + ' nessa hora no período: cerca de ' + one(+cell.n / weeks) + ' por semana, ' + money(+cell.v / weeks) + ' em uma hora.',
+      add({ g: 'Horários e dias', ic: 'clock', tone: 'info', title: x.days >= 14 ? 'Hora mais cheia da semana' : 'Hora mais cheia do período', value: DB.WEEK[cell.d] + ', ' + cell.h + 'h',
+        text: plural(+cell.n, 'pedido', 'pedidos') + ' nessa hora no período' + (x.days >= 14 ? ': cerca de ' + one(+cell.n / weeks) + ' por semana, ' + money(+cell.v / weeks) + ' em uma hora.' : ', somando ' + money(+cell.v) + '.'),
         action: 'É a hora que não pode dar errado: ninguém de folga ou no intervalo, forno já quente e pelo menos um entregador a mais disponível.', prio: 22 });
     }
 
@@ -796,11 +796,23 @@
 
   function salesCharts(x) {
     var r = x.r, ins = r.ins, ds = x.daily, out = [], C = Charts;
-    var cur = ds.cur.slice(0, -1), prev = ds.prev.slice(0, -1), hasPrev = sum(prev, 'v') > 0;
-    if (cur.length >= 2) out.push({ wide: true, html: C.card('Faturamento por dia', 'Até ontem' + (hasPrev ? ', com o período anterior em cinza para comparar' : '') + '.',
+    var cur = x.live ? ds.cur.slice(0, -1) : ds.cur, prev = x.live ? ds.prev.slice(0, -1) : ds.prev, hasPrev = sum(prev, 'v') > 0;
+    // Pedidos por hora: o gráfico principal quando o período tem só um ou dois dias.
+    var hrs = (ins.hours || []).filter(function (h) { return +h.n > 0; });
+    var hourChart = null;
+    if (hrs.length) {
+      var hs = hrs.map(function (h) { return +h.h; }).sort(function (a, b) { return (a + 19) % 24 - (b + 19) % 24; }), lo = (hs[0] + 19) % 24, hi = (hs[hs.length - 1] + 19) % 24, cols = [];
+      for (var k = lo; k <= hi; k++) { var hh = (k + 5) % 24, q = hrs.filter(function (h) { return +h.h === hh; })[0]; cols.push({ h: hh, n: q ? +q.n : 0, v: q ? +q.v : 0 }); }
+      hourChart = { wide: x.days <= 2, html: C.card('Pedidos por hora', x.days === 1 ? 'Quantos pedidos entraram em cada hora do dia.' : 'Pedidos de todo o período, somados por hora do dia.',
+        C.cols({ labels: cols.map(function (c) { return c.h + 'h'; }), tipLabels: cols.map(function (c) { return c.h + 'h às ' + ((c.h + 1) % 24) + 'h'; }), values: cols.map(function (c) { return c.n; }),
+          tips: cols.map(function (c) { return money(c.v); }), fmt: function (v) { return plural(v, 'pedido', 'pedidos'); }, axisFmt: fmt, name: 'Pedidos', xName: 'Hora' })) };
+    }
+    if (x.days <= 2 && hourChart) { out.push(hourChart); hourChart = null; }
+    if (cur.length >= 2) out.push({ wide: true, html: C.card('Faturamento por dia', (x.live ? 'Até ontem' : 'Dia a dia do período') + (hasPrev ? ', com o período anterior em cinza para comparar' : '') + '.',
       C.line({ labels: cur.map(function (d) { return wdm(d.d); }), xLabels: cur.map(function (d) { return dm(d.d); }), area: true, fmt: money, axisFmt: C.moneyK,
         series: (hasPrev ? [{ name: 'Período anterior', slot: 0, values: prev.map(function (d) { return d.v; }) }] : []).concat([{ name: 'Este período', slot: 1, values: cur.map(function (d) { return d.v; }) }]) })) });
-    var wk = (r.weeks || []).filter(function (w) { return addDays(w.w, 6) < x.to; });
+    if (hourChart) out.push(hourChart);
+    var wk = (r.weeks || []).filter(function (w) { return addDays(w.w, 6) < DB.businessDay(); });
     if (wk.length >= 3) out.push({ html: C.card('Faturamento por semana', 'Semanas completas de todo o histórico guardado (segunda a domingo).',
       C.cols({ labels: wk.map(function (w) { return dm(w.w); }), tipLabels: wk.map(function (w) { return 'Semana de ' + dm(w.w); }), values: wk.map(function (w) { return +w.v; }),
         tips: wk.map(function (w) { return w.n + ' pedidos'; }), fmt: money, axisFmt: C.moneyK, name: 'Faturamento', xName: 'Semana', xMax: 5 })) });
