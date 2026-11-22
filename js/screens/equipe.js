@@ -62,7 +62,7 @@
   function listItems() {
     var q = filter.q.toLowerCase();
     var items = DB.get().employees.filter(function (e) {
-      if (e.role === 'contador') return false; // parceiros ficam na área própria
+      if (e.role === 'contador' || e.deleted) return false; // parceiros ficam na área própria; excluídos não aparecem
       if (filter.status === 'ativos' && !e.active) return false;
       if (filter.status === 'inativos' && e.active) return false;
       if (filter.unit !== 'todas' && e.unit !== filter.unit) return false;
@@ -74,7 +74,7 @@
 
   function list() {
     var d = DB.get();
-    var staff = d.employees.filter(function (e) { return e.role !== 'contador'; });
+    var staff = d.employees.filter(function (e) { return e.role !== 'contador' && !e.deleted; });
     var partners = d.employees.filter(function (e) { return e.role === 'contador'; });
     var act = staff.filter(function (e) { return e.active; }).length;
     var count = function (s) { return staff.filter(function (e) { return s === 'todos' || (s === 'ativos') === e.active; }).length; };
@@ -105,6 +105,48 @@
     };
   }
 
+  // ---------- Excluir ----------
+  // Tem ponto ou ajuste de ponto registrado? A lei (Portaria 671) manda guardar as marcações.
+  function hasRecords(id) {
+    var d = DB.get();
+    return d.punches.some(function (p) { return p.emp === id; }) || (d.adjusts || []).some(function (a) { return a.emp === id; });
+  }
+
+  // Sem ponto registrado: apaga o cadastro de vez. Com ponto: some de todas as telas e perde o acesso, mas o
+  // cadastro fica guardado (marcado como excluído) para o ponto continuar no espelho e nos arquivos da contabilidade.
+  function removeEmployee(e) {
+    var d = DB.get(), first = e.name.split(' ')[0], keep = hasRecords(e.id);
+    if (e.id === d.user.empId) return UI.toast('Você não pode excluir o próprio cadastro.', { tone: 'crit' });
+    var admins = d.employees.filter(function (x) { return x.role === 'admin' && x.active && !x.deleted && x.id !== e.id; });
+    if (e.role === 'admin' && !admins.length) return UI.toast('É o único administrador: cadastre outro antes de excluir.', { tone: 'crit', ms: 5000 });
+    UI.confirm({
+      title: 'Excluir ' + e.name + '?',
+      body: 'Some da lista de colaboradores, das estações e da escala, e perde o acesso ao app na hora. ' +
+        (keep ? 'As marcações de ponto continuam guardadas e aparecem no espelho e nos arquivos da contabilidade, como manda a lei.' : 'Como ainda não bateu ponto, o cadastro é apagado de vez.') +
+        ' <b>Não dá para desfazer.</b>',
+      ok: 'Excluir colaborador', danger: true,
+      onOk: function () {
+        var cloud = !!(window.Cloud && Cloud.orgId && Cloud.client);
+        // Com servidor, primeiro corta o login (apaga o vínculo com a pizzaria); se falhar, não mexe em nada.
+        var step = cloud ? Cloud.client.from('members').delete().eq('org_id', Cloud.orgId).eq('emp_id', e.id).then(function (r) { if (r.error) throw r.error; }) : Promise.resolve();
+        step.then(function () {
+          DB.update(function (x) {
+            (x.stations || []).forEach(function (s) { s.emps = (s.emps || []).filter(function (id) { return id !== e.id; }); });
+            if (keep) {
+              var t = x.employees.filter(function (y) { return y.id === e.id; })[0];
+              t.active = false; t.deleted = Date.now(); t.deletedBy = x.user.name;
+              t.email = ''; t.pin = null; t.pass = null; t.mustChange = false; // libera o e-mail para um cadastro novo
+            } else x.employees = x.employees.filter(function (y) { return y.id !== e.id; });
+          });
+          go('equipe', { replace: true });
+          UI.toast(first + ' foi excluído' + (keep ? '. O ponto continua guardado.' : '.'), { ms: 4000 });
+        }, function (er) {
+          UI.toast('Não deu para excluir: ' + ((er && er.message) || 'sem conexão com o servidor') + '. Tente de novo.', { tone: 'crit', ms: 6000 });
+        });
+      }
+    });
+  }
+
   // ---------- Formulário (novo e edição) ----------
   function chips(name, opts, val) {
     return '<div class="chips wrap" data-pick="' + name + '">' + opts.map(function (o) {
@@ -121,7 +163,7 @@
     var d = DB.get();
     var cloud = !!(window.Cloud && Cloud.orgId); // com servidor, o login de cada pessoa fica no Supabase
     var e = id ? find(id) : null;
-    if (id && !e) return list();
+    if (id && (!e || e.deleted)) return list();
     if (e && e.role === 'contador') return Screens.parceiros([e.id]); // parceiros têm a própria tela
     var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', phone: '', email: '', cpf: '', pis: '', func: '', unit: d.user.unit, shift: 'Noite', role: 'colaborador', admission: Cal.today() };
 
@@ -152,6 +194,9 @@
         '<button type="button" class="row" data-toggle style="color:' + (e.active ? 'var(--crit)' : 'var(--ok)') + '"><div class="tile ' + (e.active ? 'crit' : 'ok') + '">' + icon(e.active ? 'logout' : 'check') + '</div>' +
         '<div class="grow"><div class="card-title">' + (e.active ? 'Desativar colaborador' : 'Reativar colaborador') + '</div><div class="card-meta" style="color:var(--ink-2)">' +
         (e.active ? 'Perde o acesso ao app. O histórico continua salvo.' : 'Volta a entrar com o mesmo e-mail e senha.') + '</div></div></button>' +
+        (e.id !== d.user.empId ? '<button type="button" class="row" data-delete style="color:var(--crit)"><div class="tile crit">' + icon('x') + '</div>' +
+          '<div class="grow"><div class="card-title">Excluir colaborador</div><div class="card-meta" style="color:var(--ink-2)">Some da lista e perde o acesso. ' +
+          (hasRecords(e.id) ? 'O ponto já registrado continua guardado para a contabilidade (exigência da lei).' : 'Ainda sem ponto registrado: o cadastro é apagado de vez.') + '</div></div></button>' : '') +
         '</div></section>' : '') +
       '</main>' +
       '<div class="dock no-nav"><div class="dock-inner"><button type="button" class="btn primary block" data-save style="min-height:56px">' + (e ? 'Salvar alterações' : 'Cadastrar colaborador') + '</button></div></div>';
@@ -221,6 +266,8 @@
           if (off) UI.confirm({ title: 'Desativar ' + e.name.split(' ')[0] + '?', body: 'A pessoa perde o acesso ao app na hora. Contagens, checklists e chamados que ela fez continuam no histórico.', ok: 'Desativar', danger: true, onOk: run });
           else run();
         });
+        var del = $('[data-delete]');
+        if (del) del.addEventListener('click', function () { removeEmployee(e); });
 
         var save = $('[data-save]');
         save.addEventListener('click', function () {
@@ -229,12 +276,12 @@
           v.email = $('#emp-email').value.trim();
           v.admission = $('#emp-adm').value || v.admission;
           var bad = [];
-          var dup = DB.get().employees.filter(function (x) { return x.phone === v.phone && (!e || x.id !== e.id); })[0];
+          var dup = DB.get().employees.filter(function (x) { return !x.deleted && x.phone === v.phone && (!e || x.id !== e.id); })[0];
           setErr('f-name', v.name.split(' ').length < 2 ? 'Informe nome e sobrenome.' : ''); if (v.name.split(' ').length < 2) bad.push('f-name');
           var phoneMsg = v.phone.length < 10 ? 'Informe o celular com DDD.' : dup ? 'Este celular já está cadastrado para ' + dup.name + '.' : '';
           setErr('f-phone', phoneMsg); if (phoneMsg) bad.push('f-phone');
           v.email = Auth.normEmail(v.email);
-          var dupMail = DB.get().employees.filter(function (x) { return Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
+          var dupMail = DB.get().employees.filter(function (x) { return !x.deleted && Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
           var mailMsg = !v.email ? 'Informe o e-mail: é com ele que a pessoa entra.' : !Auth.validEmail(v.email) ? 'Confira o e-mail: falta o @ ou o domínio.' : dupMail ? 'Este e-mail já é de ' + dupMail.name + '.' : '';
           setErr('f-email', mailMsg); if (mailMsg) bad.push('f-email');
           v.cpf = digits($('#emp-cpf').value); v.pis = digits($('#emp-pis').value);
@@ -508,7 +555,7 @@
           var bad = [];
           var nameMsg = v.name.length < 3 ? 'Informe o nome do escritório.' : '';
           setErr('f-name', nameMsg); if (nameMsg) bad.push('f-name');
-          var dupMail = DB.get().employees.filter(function (x) { return Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
+          var dupMail = DB.get().employees.filter(function (x) { return !x.deleted && Auth.normEmail(x.email) === v.email && (!e || x.id !== e.id); })[0];
           var mailMsg = !v.email ? 'Informe o e-mail: é com ele que a contabilidade entra.' : !Auth.validEmail(v.email) ? 'Confira o e-mail: falta o @ ou o domínio.' : dupMail ? 'Este e-mail já é de ' + dupMail.name + '.' : '';
           setErr('f-email', mailMsg); if (mailMsg) bad.push('f-email');
           var phoneMsg = v.phone && v.phone.length < 10 ? 'Informe o telefone com DDD.' : '';
