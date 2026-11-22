@@ -1,28 +1,28 @@
 /* ---------- Relatórios (js/screens/relatorios.js) e gráficos (js/charts.js) ---------- */
 
-/* Cores dos gráficos: uma por série, na mesma ordem em toda a tela (azul, laranja, verde…).
+/* Cores dos gráficos: uma por série, na mesma ordem em toda a tela (verde, azul, laranja…), validadas para daltonismo.
    O cinza (s0) é sempre "período anterior" ou referência. Tema escuro tem os próprios tons. */
 :root {
-  --ch-1: #2a78d6; --ch-2: #eb6834; --ch-3: #1baf7a; --ch-4: #eda100; --ch-5: #e87ba4; --ch-6: #008300;
+  --ch-1: #4f7d09; --ch-2: #2a78d6; --ch-3: #eb6834; --ch-4: #eda100; --ch-5: #e87ba4; --ch-6: #6250d6;
   --ch-0: #a3a39f;
   --ch-grid: #e8e8e6; --ch-axis: #c9c9c5;
-  --ch-h1: #cde2fb; --ch-h2: #9ec5f4; --ch-h3: #6da7ec; --ch-h4: #3987e5; --ch-h5: #256abf; --ch-h6: #104281;
+  --ch-h1: #eaf5cf; --ch-h2: #cfe8a0; --ch-h3: #a9d468; --ch-h4: #7cb342; --ch-h5: #4f7d09; --ch-h6: #2f4d05;
   --ch-good: #006300; --ch-bad: #c62a2a;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ch-1: #3987e5; --ch-2: #d95926; --ch-3: #199e70; --ch-4: #c98500; --ch-5: #d55181; --ch-6: #008300;
+    --ch-1: #6fa524; --ch-2: #3987e5; --ch-3: #d95926; --ch-4: #c98500; --ch-5: #d55181; --ch-6: #9085e9;
     --ch-0: #6f6f6c;
     --ch-grid: #262626; --ch-axis: #3a3a38;
-    --ch-h1: #0d366b; --ch-h2: #184f95; --ch-h3: #256abf; --ch-h4: #3987e5; --ch-h5: #6da7ec; --ch-h6: #9ec5f4;
+    --ch-h1: #1f2a0e; --ch-h2: #2f4d05; --ch-h3: #4f7d09; --ch-h4: #6fa524; --ch-h5: #9bd32f; --ch-h6: #cdee8a;
     --ch-good: #3ccf87; --ch-bad: #ff6b6b;
   }
 }
 :root[data-theme="dark"] {
-  --ch-1: #3987e5; --ch-2: #d95926; --ch-3: #199e70; --ch-4: #c98500; --ch-5: #d55181; --ch-6: #008300;
+  --ch-1: #6fa524; --ch-2: #3987e5; --ch-3: #d95926; --ch-4: #c98500; --ch-5: #d55181; --ch-6: #9085e9;
   --ch-0: #6f6f6c;
   --ch-grid: #262626; --ch-axis: #3a3a38;
-  --ch-h1: #0d366b; --ch-h2: #184f95; --ch-h3: #256abf; --ch-h4: #3987e5; --ch-h5: #6da7ec; --ch-h6: #9ec5f4;
+  --ch-h1: #1f2a0e; --ch-h2: #2f4d05; --ch-h3: #4f7d09; --ch-h4: #6fa524; --ch-h5: #9bd32f; --ch-h6: #cdee8a;
   --ch-good: #3ccf87; --ch-bad: #ff6b6b;
 }
 .s0 { --c: var(--ch-0); } .s1 { --c: var(--ch-1); } .s2 { --c: var(--ch-2); } .s3 { --c: var(--ch-3); }

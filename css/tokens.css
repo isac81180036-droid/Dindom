@@ -1,27 +1,35 @@
-/* Identidade Dindom: preto e branco da marca, letreiro manuscrito como assinatura e Montserrat espaçada (como o "DESDE 2009").
-   Cor só para significado: ok, atenção, crítico, informação e as cores das agendas.
-   Layout: app de uma coluna, conteúdo rolável entre cabeçalho e barra inferior fixa; ações principais na metade de baixo da tela (uso com uma mão). */
+/* Identidade Dindom no padrão iPhone: fonte do sistema (SF Pro no iPhone), cartões brancos bem arredondados
+   sobre um fundo levemente esverdeado, cartões de destaque pretos e o verde-limão como cor de destaque.
+   O verde-limão (--lime) é só fundo: botão selecionado, aba ativa, "hoje", barra de progresso. Texto nunca é verde-limão
+   (some no branco); para texto e ícones fortes vale --accent (preto, ou branco no tema escuro).
+   Cor também tem significado: ok, atenção, crítico, informação e as cores das agendas. */
 :root {
-  --bg: #f4f4f3;
+  --bg: #eef3e2;              /* fundo do app: cinza-claro levemente esverdeado, como no iOS agrupado */
   --surface: #ffffff;
-  --surface-2: #ececeb;
-  --ink: #0a0a0a;
-  --ink-2: #5c5c5a;
-  --ink-3: #8f8f8c;
-  --line: #e3e3e1;
-  --accent: #0a0a0a;          /* o preto da marca */
+  --surface-2: #f2f5ea;
+  --ink: #0e100b;
+  --ink-2: #5d6256;
+  --ink-3: #8e9386;
+  --line: #e3e8d8;
+  --accent: #0e100b;          /* texto e ícones fortes, botão principal */
   --accent-ink: #ffffff;
-  --accent-soft: #ebebea;
-  --ok: #1f8a57;
-  --ok-soft: #e3f4ea;
-  --warn: #b86e00;
-  --warn-soft: #fff1d9;
-  --crit: #c62a2a;
-  --crit-soft: #fde4e4;
-  --info: #2a62c6;
-  --info-soft: #e4ecfb;
-  --scrim: rgba(0, 0, 0, .5);
-  --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 4px 14px rgba(0, 0, 0, .05);
+  --accent-soft: #e9eedd;
+  --lime: #c5ef48;            /* destaque da marca: selecionado, ativo, hoje */
+  --lime-2: #b3e22f;          /* um tom abaixo, para toque e borda */
+  --lime-ink: #0e100b;        /* texto sobre o verde-limão */
+  --lime-soft: #eef9cc;
+  --hero: #0e100b;            /* cartão de destaque (preto) */
+  --hero-ink: #ffffff;
+  --ok: #1f8a3d;
+  --ok-soft: #e3f4e6;
+  --warn: #b25a00;
+  --warn-soft: #fff0dc;
+  --crit: #d70015;
+  --crit-soft: #ffe5e7;
+  --info: #0066cc;
+  --info-soft: #e3effc;
+  --scrim: rgba(10, 14, 4, .42);
+  --shadow: 0 1px 2px rgba(30, 40, 10, .04), 0 6px 20px rgba(30, 40, 10, .05);
   --logo-invert: 0;           /* a logo é preta; no tema escuro inverte para branco */
 
   /* Cores das agendas (entregas, equipe, manutenção, reservas, financeiro) */
@@ -38,19 +46,21 @@
   --rv-2: #d88a0c;
   --rv-ink: #2a1a00;
 
-  --font-display: "Montserrat", "Segoe UI", system-ui, sans-serif;
-  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* Fonte do sistema: SF Pro no iPhone e no Mac (arredondada nos números grandes); Inter e Nunito nos outros aparelhos. */
+  --font-display: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Nunito", "Segoe UI", system-ui, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
 
   --fs-xs: .75rem;
   --fs-sm: .8125rem;
   --fs-md: .9375rem;
   --fs-lg: 1.0625rem;
   --fs-xl: 1.375rem;
-  --fs-2xl: 1.75rem;
+  --fs-2xl: 1.875rem;
+  --fs-title: 2.125rem;       /* título grande do iOS (34 px) */
 
-  --r-sm: 10px;
+  --r-sm: 12px;
   --r-md: 16px;
-  --r-lg: 22px;
+  --r-lg: 26px;
   --r-pill: 999px;
 
   --sp-1: 4px;
@@ -61,8 +71,8 @@
   --sp-6: 28px;
 
   --tap: 48px;
-  --nav-h: 64px;
-  --side-w: 0px;     /* largura do menu lateral; só existe no computador */
+  --nav-h: 76px;             /* barra de abas flutuante + respiro */
+  --side-w: 0px;             /* largura do menu lateral; só existe no computador */
   --gutter: 16px;
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -75,25 +85,31 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #000000;
-    --surface: #121212;
-    --surface-2: #1f1f1f;
-    --ink: #f7f7f5;
-    --ink-2: #a8a8a5;
-    --ink-3: #72726f;
-    --line: #262626;
-    --accent: #f7f7f5;
-    --accent-ink: #0a0a0a;
-    --accent-soft: #262626;
-    --ok: #3ccf87;
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --ink: #f5f5f7;
+    --ink-2: #a1a1a6;
+    --ink-3: #6e6e73;
+    --line: #38383a;
+    --accent: #f5f5f7;
+    --accent-ink: #0e100b;
+    --accent-soft: #2c2c2e;
+    --lime: #c5ef48;
+    --lime-2: #d4f56f;
+    --lime-ink: #0e100b;
+    --lime-soft: #2a3313;
+    --hero: #1f2614;
+    --hero-ink: #ffffff;
+    --ok: #30d158;
     --ok-soft: #10291b;
-    --warn: #f0a83a;
-    --warn-soft: #2e220d;
-    --crit: #ff6b6b;
-    --crit-soft: #351515;
-    --info: #79a6ff;
-    --info-soft: #141f38;
-    --scrim: rgba(0, 0, 0, .7);
-    --shadow: 0 0 0 1px #1c1c1c;
+    --warn: #ff9f0a;
+    --warn-soft: #33230a;
+    --crit: #ff453a;
+    --crit-soft: #3a1513;
+    --info: #64a8ff;
+    --info-soft: #14233d;
+    --scrim: rgba(0, 0, 0, .66);
+    --shadow: 0 0 0 1px #242426;
     --logo-invert: 1;
     --cal-1: #f0a050;
     --cal-2: #79a6ff;
@@ -112,25 +128,31 @@
 
 :root[data-theme="dark"] {
   --bg: #000000;
-  --surface: #121212;
-  --surface-2: #1f1f1f;
-  --ink: #f7f7f5;
-  --ink-2: #a8a8a5;
-  --ink-3: #72726f;
-  --line: #262626;
-  --accent: #f7f7f5;
-  --accent-ink: #0a0a0a;
-  --accent-soft: #262626;
-  --ok: #3ccf87;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --ink: #f5f5f7;
+  --ink-2: #a1a1a6;
+  --ink-3: #6e6e73;
+  --line: #38383a;
+  --accent: #f5f5f7;
+  --accent-ink: #0e100b;
+  --accent-soft: #2c2c2e;
+  --lime: #c5ef48;
+  --lime-2: #d4f56f;
+  --lime-ink: #0e100b;
+  --lime-soft: #2a3313;
+  --hero: #1f2614;
+  --hero-ink: #ffffff;
+  --ok: #30d158;
   --ok-soft: #10291b;
-  --warn: #f0a83a;
-  --warn-soft: #2e220d;
-  --crit: #ff6b6b;
-  --crit-soft: #351515;
-  --info: #79a6ff;
-  --info-soft: #141f38;
-  --scrim: rgba(0, 0, 0, .7);
-  --shadow: 0 0 0 1px #1c1c1c;
+  --warn: #ff9f0a;
+  --warn-soft: #33230a;
+  --crit: #ff453a;
+  --crit-soft: #3a1513;
+  --info: #64a8ff;
+  --info-soft: #14233d;
+  --scrim: rgba(0, 0, 0, .66);
+  --shadow: 0 0 0 1px #242426;
   --logo-invert: 1;
   --cal-1: #f0a050;
   --cal-2: #79a6ff;
@@ -148,5 +170,5 @@
 
 /* Computador: menu lateral e margens maiores. */
 @media (min-width: 900px) {
-  :root { --nav-h: 0px; --side-w: 248px; --gutter: 32px; }
+  :root { --nav-h: 0px; --side-w: 264px; --gutter: 32px; }
 }

@@ -35,23 +35,37 @@
   var STATUS = { aberta: ['accent', 'Aberta'], andamento: ['info', 'Em andamento'], aguardando: ['warn', 'Aguardando peça'], resolvida: ['ok', 'Resolvida'] };
   window.MAINT = { PRIORITY: PRIORITY, STATUS: STATUS };
 
+  // Topo no estilo iPhone: avatar, saudação e nome, e os atalhos redondos (reservas, agenda, avisos).
   function header(d) {
     var unit = d.units.filter(function (u) { return u.id === d.user.unit; })[0] || { name: '' };
     var unread = UI.notes().some(function (n) { return !n.read; });
     var bell = '<a class="icon-btn" href="#notificacoes" aria-label="Notificações">' + icon('bell') + (unread ? '<span class="dot"></span>' : '') + '</a>';
     var rv = Reservas.pendingCount();
     var party = '<a class="icon-btn" href="#reservas" aria-label="Reservas' + (rv ? ': ' + rv + ' pendentes' : '') + '">' + icon('party') + (rv ? '<span class="nbadge num">' + rv + '</span>' : '') + '</a>';
-    // Celular: assinatura da marca no topo, com agenda e notificações. Computador: a marca já está no menu lateral.
-    return '<div class="home-brand mobile-only"><img class="logo-ink" src="icons/wordmark-black.png" alt="Dindom"><span class="grow"></span>' +
-      party + '<a class="icon-btn" href="#agenda" aria-label="Agenda">' + icon('calendar') + '</a>' + bell + '</div>' +
-      '<header class="topbar">' +
-      '<div style="flex:1;min-width:0">' +
-      '<div class="sub">' + UI.greeting() + ',</div>' +
-      '<h1 style="font-size:var(--fs-2xl)">' + esc(d.user.name.split(' ')[0]) + '</h1>' +
-      '<button type="button" class="pill no-dot" data-unit style="border:0;margin-top:6px">' + icon('mapPin', 'sm') + esc(unit.name) + icon('chevronDown', 'sm') + '</button>' +
-      '</div>' +
-      '<span class="desk-only">' + bell + '</span>' +
-      '</header>';
+    return '<header class="home-top">' +
+      '<a class="avatar" href="#perfil" aria-label="Perfil" style="text-decoration:none">' + esc(d.user.name.charAt(0)) + '</a>' +
+      '<div class="grow"><span class="hello">' + UI.greeting() + ',</span><h1>' + esc(d.user.name.split(' ')[0]) + ' 👋</h1></div>' +
+      '<div class="acts">' + party + '<a class="icon-btn mobile-only" href="#agenda" aria-label="Agenda">' + icon('calendar') + '</a>' + bell + '</div>' +
+      '</header>' +
+      (d.units.length > 1 || unit.name ? '<button type="button" class="home-unit" data-unit>' + icon('mapPin', 'sm') + esc(unit.name) + icon('chevronDown', 'sm') + '</button>' : '');
+  }
+
+  // Atalhos redondos para o que a equipe mais faz (como "Enviar", "Pagar" no app do banco).
+  function quickActions(d) {
+    var pend = DB.todayChecklists().filter(function (c) { return !c.finishedAt; }).length;
+    var emp = window.Ponto && Ponto.me();
+    var list = [];
+    if (emp && emp.ponto !== false) list.push(['#ponto', 'clock', 'Ponto', true]);
+    if (d.products.length) list.push(['#estoque/fechamento', 'box', 'Fechamento']);
+    list.push(['#checklists', 'checklist', 'Checklists', false, pend]);
+    list.push(['#manutencao/nova', 'wrench', 'Problema']);
+    if (UI.isManager()) list.push(['#vendas', 'receipt', 'Vendas'], ['#relatorios', 'chart', 'Relatórios']);
+    if (UI.isAdmin()) list.push(['#financeiro/contas', 'tag', 'Contas']);
+    list.push(['#agenda', 'calendar', 'Agenda']);
+    if (!list.some(function (q) { return q[3]; })) list[0][3] = true; // o primeiro em destaque
+    return '<nav class="quick" aria-label="Atalhos">' + list.map(function (q) {
+      return '<a href="' + q[0] + '"' + (q[3] ? ' class="main"' : '') + '><span>' + icon(q[1]) + (q[4] ? '<i class="nbadge num">' + q[4] + '</i>' : '') + '</span><span>' + q[2] + '</span></a>';
+    }).join('') + '</nav>';
   }
 
   function closingCard(d) {
@@ -213,13 +227,13 @@
     var cols = manager
       ? [startCard(d) + pontoCard() + CW.homeCard() + (window.Contas ? Contas.homeCard() : '') + managerSummary(d) + closingCard(d), Reservas.homeCard() + agendaSection() + stockSection(d)]
       : [pontoCard() + closingCard(d) + tasksSection(d), Reservas.homeCard() + agendaSection() + stockSection(d) + maintSection(d)];
-    var html = '<main class="screen wide">' + header(d) +
+    var html = '<main class="screen wide">' + header(d) + quickActions(d) +
       '<div class="home-grid"><div class="col">' + cols[0] + '</div><div class="col">' + cols[1] + '</div></div>' +
       '</main>';
     return {
       html: html, tab: 'inicio',
       mount: function (r) {
-        r.querySelector('[data-unit]').addEventListener('click', unitSheet);
+        var un = r.querySelector('[data-unit]'); if (un) un.addEventListener('click', unitSheet);
         CW.homeLoad();
         if (window.Contas) {
           Contas.ensure(function () { if (route() === 'inicio' && !document.querySelector('.sheet-wrap')) refresh(); });

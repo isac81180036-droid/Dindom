@@ -9,7 +9,7 @@
     // Logo no canto superior direito; saudação embaixo, à esquerda, para o verde não ficar vazio.
     // No computador, um notebook flutuando mostra telas reais do sistema (só decoração).
     return '<section class="login-brand">' +
-      '<img class="login-logo" src="icons/logo-white.png" alt="Dindom, desde 2009">' +
+      '<img class="login-logo" src="icons/logo-black.png" alt="Dindom, desde 2009">' +
       '<div class="login-hello"><p class="login-tag">Gestão da pizzaria</p>' +
       '<h2>' + esc(title || UI.greeting() + '!') + '</h2>' +
       '<p>' + esc(text || 'Ponto, estoque, agenda e equipe da Dindom num lugar só.') + '</p></div>' +

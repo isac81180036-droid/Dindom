@@ -38,7 +38,7 @@ Arquivos em `icons/`, gerados a partir da logo oficial:
 - `wordmark-black.png` / `wordmark-white.png` — só o letreiro "Dindom", fundo transparente.
 - `icon-*.png` — ícones do app (fundo preto, letreiro branco).
 
-A identidade fica em `css/tokens.css` (preto e branco da marca, Montserrat espaçada nos rótulos) e `css/brand.css` (logo e animação de abertura).
+A identidade fica em `css/tokens.css` (cores, fontes, cantos), `css/brand.css` (logo) e `css/ios.css` (visual padrão iPhone, carregado por último: título grande, cartões brancos bem arredondados, cartão de destaque preto, verde-limão `--lime` no que está selecionado, barra de abas flutuante no celular e menu lateral em cartão no computador). A fonte é a do sistema (SF Pro no iPhone), com Inter e Nunito nos outros aparelhos. O verde-limão é só fundo; texto e ícones fortes usam `--accent` (preto, ou branco no tema escuro).
 
 **Celular x computador:** abaixo de 900 px de largura o app usa a barra inferior (5 destinos; a Agenda abre pelo ícone de calendário no Início). A partir de 900 px vira layout de computador: menu lateral com a Agenda, telas mais largas com grade de cards e painéis em janela centralizada. O limite está em `css/desktop.css` e em `isDesktop()` no `js/app.js`.
 
