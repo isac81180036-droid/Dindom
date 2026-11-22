@@ -71,6 +71,11 @@
 /* ---------- Admin › Colaboradores ---------- */
 .emp-card .avatar { width: 44px; height: 44px; font-size: var(--fs-md); }
 .emp-card.inactive { opacity: .6; }
+/* Lixeira em cada pessoa da lista e no topo do cadastro. */
+.emp-wrap { position: relative; }
+.emp-wrap .emp-card .card-row:last-child { padding-right: 44px; }
+.emp-del { position: absolute; z-index: 1; bottom: 10px; right: 10px; width: 40px; height: 40px; color: var(--crit); }
+.emp-del-top { color: var(--crit); }
 .chip-sep { flex: none; width: 1px; margin: 8px 4px; background: var(--line); }
 .pin { font: 700 var(--fs-xl) var(--font-display); letter-spacing: .18em; }
 .pin-big { display: flex; gap: 10px; justify-content: center; padding: var(--sp-2) 0; }

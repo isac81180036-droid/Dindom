@@ -49,14 +49,16 @@
 
   // ---------- Lista ----------
   function card(e) {
-    return '<a class="card tap emp-card' + (e.active ? '' : ' inactive') + '" href="#equipe/' + e.id + '" style="text-decoration:none;color:inherit">' +
+    var me = e.id === DB.get().user.empId;
+    return '<div class="emp-wrap">' + (me ? '' : '<button type="button" class="icon-btn plain emp-del" data-del-emp="' + esc(e.id) + '" aria-label="Excluir ' + esc(e.name) + '" title="Excluir">' + icon('trash', 'sm') + '</button>') +
+      '<a class="card tap emp-card' + (e.active ? '' : ' inactive') + '" href="#equipe/' + e.id + '" style="text-decoration:none;color:inherit">' +
       '<div class="card-row"><span class="avatar">' + esc(initials(e.name)) + '</span>' +
       '<div class="grow"><div class="card-title">' + esc(e.name) + '</div><div class="card-meta">' + esc(e.func) + ' · ' + esc(unitName(e.unit)) + '</div></div>' +
       icon('chevronRight', 'sm') + '</div>' +
       '<div class="card-row card-meta" style="flex-wrap:wrap;gap:6px">' +
       (e.active ? '' : '<span class="pill">Inativo</span>') +
       (e.role !== 'colaborador' ? '<span class="pill no-dot info">' + icon('shield', 'sm') + UI.ROLES[e.role] + '</span>' : '') +
-      '<span class="num">' + esc(fmtPhone(e.phone)) + '</span><span>·</span><span>' + esc(since(e.admission)) + '</span></div></a>';
+      '<span class="num">' + esc(fmtPhone(e.phone)) + '</span><span>·</span><span>' + esc(since(e.admission)) + '</span></div></a></div>';
   }
 
   function listItems() {
@@ -101,6 +103,8 @@
         root.querySelector('#emp-search').addEventListener('input', function (e) { filter.q = e.target.value; box.innerHTML = listItems(); });
         root.querySelectorAll('[data-st]').forEach(function (b) { b.addEventListener('click', function () { filter.status = b.dataset.st; refresh(); }); });
         root.querySelectorAll('[data-unit-f]').forEach(function (b) { b.addEventListener('click', function () { filter.unit = b.dataset.unitF; refresh(); }); });
+        // Lixeira da lista (a lista é redesenhada pela busca, então o clique fica no contêiner).
+        box.addEventListener('click', function (ev) { var b = ev.target.closest('[data-del-emp]'); if (b) { ev.preventDefault(); removeEmployee(find(b.dataset.delEmp)); } });
       }
     };
   }
@@ -168,7 +172,8 @@
     var v = e ? JSON.parse(JSON.stringify(e)) : { name: '', phone: '', email: '', cpf: '', pis: '', func: '', unit: d.user.unit, shift: 'Noite', role: 'colaborador', admission: Cal.today() };
 
     var html = '<main class="screen no-nav">' +
-      UI.topbar(e ? 'Editar colaborador' : 'Novo colaborador', { back: '#equipe', sub: e ? (e.active ? 'Ativo' : 'Inativo') + ' · ' + since(e.admission) : 'Os campos com * são obrigatórios' }) +
+      UI.topbar(e ? 'Editar colaborador' : 'Novo colaborador', { back: '#equipe', sub: e ? (e.active ? 'Ativo' : 'Inativo') + ' · ' + since(e.admission) : 'Os campos com * são obrigatórios',
+        right: e && e.id !== d.user.empId ? '<button type="button" class="icon-btn emp-del-top" data-delete aria-label="Excluir colaborador" title="Excluir colaborador">' + icon('trash') + '</button>' : '' }) +
       '<div class="field" id="f-name"><label for="emp-name">Nome completo *</label><input id="emp-name" class="input" autocomplete="name" autocapitalize="words" maxlength="60" placeholder="Ex.: Rafael Souza" value="' + esc(v.name) + '"><span class="err" hidden></span></div>' +
       '<div class="field" id="f-phone"><label for="emp-phone">Celular (WhatsApp) *</label><input id="emp-phone" class="input num" inputmode="tel" autocomplete="tel" placeholder="(11) 98765-4321" value="' + esc(fmtPhone(v.phone)) + '"><span class="hint">Para avisos pelo WhatsApp.</span><span class="err" hidden></span></div>' +
       '<div class="field" id="f-email"><label for="emp-email">E-mail *</label><input id="emp-email" class="input" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="nome@dindom.com.br" value="' + esc(v.email) + '"' + (cloud && e ? ' readonly' : '') + '><span class="hint">' + (cloud && e ? 'O e-mail de acesso não muda por aqui. Para trocar, cadastre a pessoa de novo com o e-mail novo.' : 'É com ele que a pessoa entra no app.') + '</span><span class="err" hidden></span></div>' +
@@ -194,7 +199,7 @@
         '<button type="button" class="row" data-toggle style="color:' + (e.active ? 'var(--crit)' : 'var(--ok)') + '"><div class="tile ' + (e.active ? 'crit' : 'ok') + '">' + icon(e.active ? 'logout' : 'check') + '</div>' +
         '<div class="grow"><div class="card-title">' + (e.active ? 'Desativar colaborador' : 'Reativar colaborador') + '</div><div class="card-meta" style="color:var(--ink-2)">' +
         (e.active ? 'Perde o acesso ao app. O histórico continua salvo.' : 'Volta a entrar com o mesmo e-mail e senha.') + '</div></div></button>' +
-        (e.id !== d.user.empId ? '<button type="button" class="row" data-delete style="color:var(--crit)"><div class="tile crit">' + icon('x') + '</div>' +
+        (e.id !== d.user.empId ? '<button type="button" class="row" data-delete style="color:var(--crit)"><div class="tile crit">' + icon('trash') + '</div>' +
           '<div class="grow"><div class="card-title">Excluir colaborador</div><div class="card-meta" style="color:var(--ink-2)">Some da lista e perde o acesso. ' +
           (hasRecords(e.id) ? 'O ponto já registrado continua guardado para a contabilidade (exigência da lei).' : 'Ainda sem ponto registrado: o cadastro é apagado de vez.') + '</div></div></button>' : '') +
         '</div></section>' : '') +
@@ -266,8 +271,7 @@
           if (off) UI.confirm({ title: 'Desativar ' + e.name.split(' ')[0] + '?', body: 'A pessoa perde o acesso ao app na hora. Contagens, checklists e chamados que ela fez continuam no histórico.', ok: 'Desativar', danger: true, onOk: run });
           else run();
         });
-        var del = $('[data-delete]');
-        if (del) del.addEventListener('click', function () { removeEmployee(e); });
+        root.querySelectorAll('[data-delete]').forEach(function (b) { b.addEventListener('click', function () { removeEmployee(e); }); });
 
         var save = $('[data-save]');
         save.addEventListener('click', function () {
