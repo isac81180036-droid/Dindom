@@ -250,3 +250,13 @@
 .ch-kpi-label { font-size: var(--fs-sm); }
 .ch-tip { background: var(--ink); color: var(--bg); border-radius: 12px; font-size: 13px; }
 .rel-filter .card-meta { font-size: var(--fs-sm); }
+
+/* Colunas com destaque: a maior na cor cheia, as outras claras (o hover também acende a coluna). */
+.ch-cols.focus .ch-stack i { background: color-mix(in srgb, var(--c) 34%, var(--surface)); transition: background .15s; }
+.ch-cols.focus .ch-col.top .ch-stack i, .ch-cols.focus .ch-col.hot .ch-stack i { background: var(--c); }
+.ch-cols.focus .ch-col.hot .ch-stack { filter: none; }
+/* Linha tracejada da média */
+.ch-avg { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--ink-2); z-index: 2; pointer-events: none; }
+.ch-avg-key { display: inline-block; width: 18px; height: 0; border-top: 2px dashed var(--ink-2); margin-right: 6px; vertical-align: middle; }
+/* Última data do eixo encosta na borda direita em vez de ser cortada */
+.ch-x.cols span:last-child:nth-child(n+10) { display: flex; justify-content: flex-end; white-space: nowrap; }

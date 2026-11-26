@@ -102,28 +102,34 @@
   }
 
   // ---------- Colunas (comparar tamanhos; com várias séries, empilha) ----------
-  // o: { labels, series: [{ name, values, slot }] ou values: [..], fmt, axisFmt, tips: [texto extra por coluna], xMax }
+  // o: { labels, series: [{ name, values, slot }] ou values: [..], fmt, axisFmt, tips: [texto extra por coluna], xMax,
+  //      avg: valor da linha tracejada de média, avgLabel, focus: false para não destacar a maior coluna }
+  // Com uma série só, a maior coluna fica na cor cheia e as outras em tom claro: o olho vai direto ao que importa.
   function cols(o) {
     var series = o.series || [{ name: o.name || '', values: o.values, slot: o.slot || 1 }];
     var n = o.labels.length, fmt = o.fmt || num, totals = [];
     for (var i = 0; i < n; i++) totals.push(series.reduce(function (s, x) { return s + (+x.values[i] || 0); }, 0));
     var max = Math.max.apply(null, totals.concat([0]));
     if (!n || !max) return nothing(o.empty);
-    var sc = scale(max, 3), top = totals.indexOf(max);
+    var sc = scale(max, 3), top = totals.indexOf(max), focus = series.length === 1 && o.focus !== false;
     var xs = pick(n, o.xMax || (n <= 12 ? n : 6)), show = {};
     xs.forEach(function (i) { show[i] = true; });
     var bars = o.labels.map(function (l, i) {
       var tip = series.length > 1
         ? series.map(function (s) { return s.name + ': ' + fmt(+s.values[i] || 0); }).join(' · ')
         : fmt(totals[i]);
-      return '<div class="ch-col" data-tip-l="' + esc(o.tipLabels ? o.tipLabels[i] : l) + '" data-tip-v="' + esc(tip) + '"' + (o.tips && o.tips[i] ? ' data-tip-x="' + esc(o.tips[i]) + '"' : '') + '>' +
+      return '<div class="ch-col' + (focus && i === top ? ' top' : '') + '" data-tip-l="' + esc(o.tipLabels ? o.tipLabels[i] : l) + '" data-tip-v="' + esc(tip) + '"' + (o.tips && o.tips[i] ? ' data-tip-x="' + esc(o.tips[i]) + '"' : '') + '>' +
         (i === top && !o.noCap ? '<b class="ch-cap' + (n > 6 && i >= n - 2 ? ' end' : n > 6 && i < 2 ? ' start' : '') + '" style="bottom:' + (totals[i] / sc.max * 100) + '%">' + esc((o.axisFmt || fmt)(totals[i])) + '</b>' : '') +
         '<div class="ch-stack" style="height:' + (totals[i] / sc.max * 100) + '%">' +
         series.slice().reverse().map(function (s) { var v = +s.values[i] || 0; return v > 0 ? '<i class="s' + s.slot + '" style="flex:' + v + '"></i>' : ''; }).join('') +
         '</div></div>';
     }).join('');
-    return (series.length > 1 ? legend(series) : '') +
-      '<div class="ch-plot">' + yAxis(sc, o.axisFmt || fmt) + '<div class="ch-area ch-cols">' + grid(sc) + bars + '</div>' +
+    // Legenda curta acima do gráfico: o que é a linha tracejada e um lembrete (ex.: dia sem coluna = fechado).
+    var key = o.avg || o.note ? '<div class="ch-legend">' + (o.avg ? '<span><i class="ch-avg-key"></i>' + esc(o.avgLabel || 'média ' + fmt(o.avg)) + '</span>' : '') + (o.note ? '<span>' + esc(o.note) + '</span>' : '') + '</div>' : '';
+    return (series.length > 1 ? legend(series) : key) +
+      '<div class="ch-plot">' + yAxis(sc, o.axisFmt || fmt) + '<div class="ch-area ch-cols' + (focus ? ' focus' : '') + '">' + grid(sc) +
+        (o.avg ? '<div class="ch-avg" style="bottom:' + (o.avg / sc.max * 100) + '%" aria-hidden="true"></div>' : '') +
+        bars + '</div>' +
       '<div class="ch-x cols" aria-hidden="true">' + o.labels.map(function (l, i) { return '<span>' + (show[i] ? esc(l) : '') + '</span>'; }).join('') + '</div></div>' +
       table([o.xName || ''].concat(series.map(function (s) { return s.name || 'Valor'; })),
         o.labels.map(function (l, i) { return [o.tipLabels ? o.tipLabels[i] : l].concat(series.map(function (s) { return fmt(+s.values[i] || 0); })); }));

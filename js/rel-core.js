@@ -810,9 +810,24 @@
     }
     if (x.days <= 2 && hourChart) { out.push(hourChart); hourChart = null; }
     var openD = cur.filter(function (d) { return d.v > 0; }), bestD = maxBy(openD, function (d) { return d.v; });
-    if (cur.length >= 2) out.push({ wide: true, html: C.card('Faturamento por dia', (openD.length ? 'Média de ' + money(sum(openD, 'v') / openD.length) + ' por dia aberto. Melhor dia: ' + wdm(bestD.d) + ', ' + money(bestD.v) + '.' : 'Nenhuma venda no período.') + (hasPrev ? ' A linha cinza é o período anterior.' : ''),
-      C.line({ labels: cur.map(function (d) { return wdm(d.d); }), xLabels: cur.map(function (d) { return dm(d.d); }), area: true, fmt: money, axisFmt: C.moneyK,
-        series: (hasPrev ? [{ name: 'Período anterior', slot: 0, values: prev.map(function (d) { return d.v; }) }] : []).concat([{ name: 'Este período', slot: 1, values: cur.map(function (d) { return d.v; }) }]) })) });
+    if (cur.length >= 2) {
+      // Período longo: soma por semana (segunda a domingo), senão as colunas ficam finas demais.
+      var byWeek = cur.length > 62, grp = cur;
+      if (byWeek) {
+        var wmap = {}; grp = [];
+        cur.forEach(function (d) { var dt = day(d.d), k = addDays(d.d, -((dt.getDay() + 6) % 7)); if (!wmap[k]) { wmap[k] = { d: k, v: 0 }; grp.push(wmap[k]); } wmap[k].v += +d.v || 0; });
+      }
+      var totC = sum(cur, 'v'), totP = sum(prev, 'v'), gP = hasPrev ? pct(totC, totP) : null;
+      var avgD = openD.length ? totC / openD.length : 0, closed = cur.length - openD.length;
+      var sub = !openD.length ? 'Nenhuma venda no período.' :
+        'Total de ' + money(totC) + (gP != null ? ' (' + (gP >= 0 ? fmt(Math.round(gP)) + '% acima' : fmt(Math.round(-gP)) + '% abaixo') + ' do período anterior)' : '') + '. ' +
+        (byWeek ? 'Cada coluna é uma semana.' : 'Melhor dia: ' + wdm(bestD.d) + ', com ' + money(bestD.v) + '.');
+      out.push({ wide: true, html: C.card('Faturamento por dia', sub,
+        C.cols({ labels: grp.map(function (d) { return dm(d.d); }), tipLabels: grp.map(function (d) { return byWeek ? 'Semana de ' + dm(d.d) : wdm(d.d); }),
+          values: grp.map(function (d) { return +d.v || 0; }), avg: byWeek ? null : avgD, avgLabel: 'Média por dia aberto: ' + money(avgD), note: !byWeek && closed ? 'Dia sem coluna: loja fechada' : null,
+          tips: byWeek ? null : grp.map(function (d, i) { return +d.v ? (prev[i] && +prev[i].v ? 'mesmo dia do período anterior: ' + money(prev[i].v) : '') : 'loja fechada ou sem vendas'; }),
+          fmt: money, axisFmt: C.moneyK, name: 'Faturamento', xName: byWeek ? 'Semana' : 'Dia', xMax: byWeek ? 8 : 7 })) });
+    }
     if (hourChart) out.push(hourChart);
     var wk = (r.weeks || []).filter(function (w) { return addDays(w.w, 6) < DB.businessDay(); });
     var lw = wk[wk.length - 1], pw = wk[wk.length - 2], gw = lw && pw ? pct(+lw.v, +pw.v) : null;
