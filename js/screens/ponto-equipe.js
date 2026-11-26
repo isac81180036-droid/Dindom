@@ -201,9 +201,9 @@
       '<div class="row" style="border:1px solid var(--line);border-radius:var(--r-md)"><div class="tile">' + icon('clock') + '</div><div class="grow"><div class="card-title num">' + esc(P.horarioLabel(emp)) + '</div>' +
       '<div class="card-meta">Horário de trabalho' + (P.shift(emp).pause ? ' · intervalo ' + P.dur(P.shift(emp).pause) : '') + ' · ' + P.dur(P.shift(emp).hours * 60) + ' por dia</div></div>' +
       (UI.isAdmin() ? '<button type="button" class="btn sm" data-horario-edit>Alterar</button>' : '') + '</div>' +
-      '<div class="stat-grid three"><div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num">' + P.dur(s.worked) + '</div><div class="card-meta">no mês</div></div>' +
-      '<div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num ' + (s.balance >= 0 ? 'pos' : 'neg') + '">' + P.signed(s.balance) + '</div><div class="card-meta">banco</div></div>' +
-      '<div class="card" style="box-shadow:none;background:var(--surface-2)"><div class="stat num">' + s.lateCount + '</div><div class="card-meta">atrasos</div></div></div>' +
+      '<div class="stat-grid three"><div class="card"><div class="card-meta">Trabalhadas no mês</div><div class="stat num">' + P.dur(s.worked) + '</div></div>' +
+      '<div class="card"><div class="card-meta">Banco do mês</div><div class="stat num ' + (s.balance >= 0 ? 'pos' : 'neg') + '">' + P.signed(s.balance) + '</div></div>' +
+      '<div class="card"><div class="card-meta">Atrasos no mês</div><div class="stat num' + (s.lateCount ? ' neg' : '') + '">' + s.lateCount + '</div></div></div>' +
       // Banco acumulado (não só do mês) e o "zerar banco".
       '<div class="row" style="border:1px solid var(--line);border-radius:var(--r-md)"><div class="tile">' + icon('clock') + '</div><div class="grow">' +
       '<div class="card-title">Banco de horas: <span class="num ' + (bank >= 0 ? 'pos' : 'neg') + '">' + P.signed(bank) + '</span></div>' +
@@ -212,6 +212,7 @@
       (edit ? '<button type="button" class="btn sm" data-zero>Zerar</button>' : '') + '</div>' +
       vacRow(emp, edit) +
       PontoUI.historyRows(emp.id, false, edit) +
+      '<button type="button" class="btn block" data-pdf>' + icon('file', 'sm') + 'PDF do ponto · <span class="num">' + br(range()[0]).slice(0, 5) + ' a ' + br(range()[1]).slice(0, 5) + '</span></button>' +
       (edit ? '<button type="button" class="btn block" data-otherday>' + icon('calendar', 'sm') + 'Corrigir ou lançar outro dia</button>' : '') +
       '<button type="button" class="btn block" data-close>Fechar</button>',
       function (sheet, close) {
@@ -221,6 +222,7 @@
           var d = ev.target.closest('[data-edit-day]');
           if (d) { close(); return editDaySheet(emp, d.dataset.editDay); }
           if (ev.target.closest('[data-otherday]')) { close(); return pickDaySheet(emp); }
+          if (ev.target.closest('[data-pdf]')) { var r = range(); return PontoExport.pdf(r[0], r[1], null, emp.id); }
           if (ev.target.closest('[data-zero]')) { close(); return zeroSheet(emp); }
           if (ev.target.closest('[data-vac]')) { close(); return vacationSheet(emp); }
           if (ev.target.closest('[data-unzero]') && zero) {
@@ -267,6 +269,9 @@
       opt('marcacoes', 'Marcações', 'Cada batida, com data, hora, tipo, origem e NSR') +
       opt('espelho', 'Espelho de ponto', 'Um dia por linha: entrada, intervalo, saída, horas e saldo') +
       opt('resumo', 'Resumo do período', 'Um colaborador por linha: horas, banco de horas e atrasos') +
+      '</div>' +
+      '<div class="eyebrow">PDF</div><div class="list">' +
+      opt('pdf', 'Espelho de ponto em PDF', 'Uma página por colaborador: todos os dias, totais e campo para assinatura. Abre a impressão: escolha “Salvar como PDF”', 'PDF') +
       '</div>' +
       '<div class="eyebrow">Texto (TXT)</div><div class="list">' +
       opt('afd', 'AFD · arquivo de ponto', 'Para importar no sistema da contabilidade: cada batida com NSR, data, hora e PIS', 'TXT', afdWarn) +
@@ -343,7 +348,12 @@
           if (pm) { period.mode = pm.dataset.v; if (pm.dataset.v === 'custom' && !period.from) { period.from = from; period.to = to; } return refresh(); }
           var ex = t.closest('[data-export]');
           if (ex) {
-            var kind = ex.dataset.export, name = PontoExport.filename(kind, from, to, unitFilter), text, extra = '';
+            var kind = ex.dataset.export, name, text, extra = '';
+            if (kind === 'pdf') {
+              if (!PontoExport.pdf(from, to, unitFilter)) UI.toast('Nenhum colaborador com ponto nesse filtro.', { tone: 'crit' });
+              return;
+            }
+            name = PontoExport.filename(kind, from, to, unitFilter);
             if (kind === 'afd') {
               if (!PontoExport.company().cnpj) { UI.toast('Falta o CNPJ da empresa. O administrador cadastra em Perfil › Dados da empresa.', { tone: 'crit', ms: 5000 }); return; }
               var r = PontoExport.afd(from, to, unitFilter);

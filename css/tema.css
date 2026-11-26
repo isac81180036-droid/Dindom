@@ -231,3 +231,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing:
 /* Números grandes dos cartões sempre numa linha */
 .rel-kpis .ch-kpi-value { font-size: clamp(1.4rem, 2.1vw, 2rem); white-space: nowrap; }
 .rel-kpis .ch-spark { display: none; } /* o gráfico por dia logo abaixo já mostra isso */
+
+/* Faixas de números nunca encolhem dentro de painéis que rolam (o overflow:hidden dos cantos deixava o navegador espremer) */
+.stat-grid, .rel-kpis, .fin-kpis, .cmv-kpis, .fin-split, .today-marks { flex-shrink: 0; }
+/* O painel inferior é quem rola: nada dentro dele encolhe (listas e faixas com cantos arredondados eram espremidas) */
+.sheet > * { flex-shrink: 0; }
+.sheet .stat-grid { border: 1px solid var(--line); }
