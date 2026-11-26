@@ -230,6 +230,8 @@ Financeiro só aparece para o administrador. Antes do primeiro uso, rode `supaba
 - **Canais na conta:** botões abaixo do período (ex.: tirar o 99Food). Valem para todos os números, gráficos, clientes, avaliações e para o plano de ação; é o mesmo filtro de **Vendas** e vale para a equipe toda (`settings.cwExclude`, sincronizado). **Todos os canais** volta ao normal. Precisa do `010_relatorios.sql` mais recente.
 - **Arquivos:** `js/charts.js` (gráficos em HTML/SVG, sem biblioteca), `js/rel-core.js` (contas e textos),
   `js/screens/relatorios.js` (tela e ligação com o Google), `css/relatorios.css`. As leituras de Vendas › Insights entram também.
+
+**Relatórios › Tempos (preparo e entrega).** A Cardápio Web não informa quando o pedido ficou pronto ou foi entregue, então o banco anota a hora de cada troca de etapa que o sync (a cada minuto) enxerga: `supabase/012_tempos.sql` cria a tabela `cw_order_events`, o gatilho em `cw_orders` e a função `cw_tempos`. A aba mostra aceite, preparo (aceito → Pronto), espera pelo entregador (Pronto → Saiu), rua (Saiu → Entregue) e o total, sempre o pedido típico (mediana), por dia, por horário e por bairro, com metas editáveis (padrão 25/25/50 min, em `settings.timeGoals`). Só conta a partir de quando o 012 roda, e depende da equipe mudar a etapa no painel na hora.
 - **Banco:** `cw_relatorio` soma tudo no servidor (vendas por dia, semana e mês, mapa dia x hora, faixas de valor, frequência
   e safras de clientes, sabores com meia pizza contando meia, adicionais, taxa de entrega cobrada x paga ao entregador,
   avaliações por quesito, horário, dia, bairro e sabor).

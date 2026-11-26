@@ -95,6 +95,87 @@
   function stale(ms) { var e = cache[key()]; return !e || Date.now() - e.at > ms; }
 
   // Nota do Google: no máximo uma consulta a cada 30 minutos por aparelho (o servidor também limita por dia).
+
+  // ---------- Tempos de preparo e entrega (cw_tempos, supabase/012_tempos.sql) ----------
+  // Pede o período atual junto com o anterior (mesmo tamanho), para comparar.
+  var TIMES_SQL = 'supabase/012_tempos.sql';
+  var timesCache = {}, timesLoading = {};
+
+  function loadTimes() {
+    var k = key();
+    if (!ready() || timesLoading[k]) return;
+    timesLoading[k] = true;
+    var r = range(), len = r[1] - r[0], ex = excl();
+    var args = { p_from: new Date(r[0].getTime() - len).toISOString(), p_to: r[1].toISOString(), p_cut: r[0].toISOString() };
+    if (ex.length) args.p_exclude = ex;
+    Cloud.client.rpc('cw_tempos', args).then(function (res) {
+      timesLoading[k] = false;
+      timesCache[k] = res.error ? { at: Date.now(), cut: r[0].getTime(), error: missingSql(res.error) || /cw_tempos/.test(res.error.message || '') ? 'sql' : netError(res.error) ? 'network' : res.error.message, data: timesCache[k] && timesCache[k].data }
+        : { at: Date.now(), cut: r[0].getTime(), data: res.data };
+      redraw();
+    }, function () { timesLoading[k] = false; timesCache[k] = { at: Date.now(), cut: r[0].getTime(), error: 'network', data: timesCache[k] && timesCache[k].data }; redraw(); });
+  }
+  function timesStale() { var c = timesCache[key()]; return !c || Date.now() - c.at > (c.error === 'sql' ? 15000 : 120000); }
+
+  // Topo da aba Tempos: os quatro números que respondem "a cozinha está demorando?" e o que falta para medir.
+  function timesBlock(ctx, built) {
+    var c = timesCache[key()], t = built.times, C = Charts, G = Rel.timeGoals(ctx.d);
+    var goalsBtn = '<button type="button" class="btn sm" data-time-goals>' + icon('settings', 'sm') + 'Metas: preparo ' + G.prep + ' min · rua ' + G.road + ' min · total ' + G.total + ' min</button>';
+    if (!c || (!c.data && !c.error)) return '<div class="skel" style="height:120px"></div>';
+    if (c.error === 'sql' && !c.data) {
+      return '<section class="card"><div class="card-title">Falta ligar os tempos no banco</div><p class="card-meta">A Cardápio Web não informa quando o pedido ficou pronto ou foi entregue. Com este passo, o app passa a anotar a hora de cada etapa (ele já confere os pedidos a cada minuto).</p>' +
+        (UI.isAdmin() ? '<div data-sqlhelp-times></div>' : '<p class="card-meta">Peça ao administrador para atualizar o banco (arquivo 012_tempos.sql).</p>') + '</section>';
+    }
+    if (c.error && !c.data) return '<div class="banner">' + icon('wifiOff', 'sm') + '<div class="grow">Não deu para buscar os tempos agora. Confira a internet.</div><button type="button" class="btn sm" data-times-retry>Tentar de novo</button></div>';
+    var how = '<details class="card rel-how"><summary class="card-title">Como os tempos são medidos</summary>' +
+      '<p class="card-meta">O app confere os pedidos da Cardápio Web a cada minuto e anota a hora em que cada um muda de etapa no painel. <b>Aceite</b>: do pedido até alguém aceitar. <b>Preparo</b>: de aceito até "Pronto". <b>Espera</b>: de "Pronto" até "Saiu para entrega". <b>Rua</b>: de "Saiu" até "Entregue". Os números são do <b>pedido típico</b> (metade dos pedidos leva menos que isso, metade leva mais), para um pedido esquecido aberto não distorcer a conta.</p>' +
+      '<p class="card-meta">Para funcionar, a equipe precisa mudar a etapa no painel <b>na hora</b>: "Pronto" quando a pizza sai do forno, "Saiu para entrega" quando o entregador pega e "Entregue" quando ele confirma.</p></details>';
+    if (!t || !t.cur.length) {
+      var since = c.data && c.data.since ? ' Primeiro registro: ' + Rel.wdm(c.data.since.slice(0, 10)) + '.' : '';
+      return '<section class="card">' + UI.empty('clock', c.data && c.data.since ? 'Sem tempos neste período' : 'Os tempos começam a contar agora',
+        (c.data && c.data.since ? 'Nenhum pedido do período tem as etapas marcadas no painel da Cardápio Web.' + since + ' Tente um período mais recente.'
+          : 'A partir de agora o app anota a hora de cada etapa dos pedidos. Em uma noite de movimento já aparecem os primeiros números.')) + '</section>' + how +
+        '<div style="display:flex">' + goalsBtn + '</div>';
+    }
+    function delta(a, b) { return a != null && b != null && b > 0 ? (a - b) / b * 100 : null; }
+    function m(v) { return v == null ? '–' : fmt(Math.round(v)) + ' min'; }
+    var k = [
+      C.kpi({ label: 'Preparo na cozinha', value: m(t.prepMed), delta: delta(t.prepMed, t.prepPrev), good: false, sub: t.prepPrev != null ? 'antes ' + m(t.prepPrev) : 'meta ' + G.prep + ' min' }),
+      C.kpi({ label: 'Pronta esperando entregador', value: m(t.waitMed), sub: t.wait.length ? 'depois de marcar "Pronto"' : 'marque "Pronto" no painel' }),
+      C.kpi({ label: 'Entregador na rua', value: m(t.roadMed), delta: delta(t.roadMed, t.roadPrev), good: false, sub: t.roadPrev != null ? 'antes ' + m(t.roadPrev) : 'meta ' + G.road + ' min' }),
+      C.kpi({ label: 'Cliente espera no total', value: m(t.totalMed), delta: delta(t.totalMed, t.totalPrev), good: false, sub: t.totalPrev != null ? 'antes ' + m(t.totalPrev) : 'meta ' + G.total + ' min' })
+    ];
+    var cov = t.orders ? Math.round(t.cur.length / t.orders * 100) : 100;
+    return '<div class="rel-kpis">' + k.join('') + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' + goalsBtn + '<span class="card-meta num">' + fmt(t.cur.length) + ' de ' + Rel.plural(t.orders, 'pedido', 'pedidos') + ' do período com as etapas marcadas (' + cov + '%)</span></div>' + how;
+  }
+
+  // Metas de tempo (valem para a equipe toda).
+  function goalsSheet() {
+    var G = Rel.timeGoals(DB.get());
+    function field(id, label, v, hint) {
+      return '<div class="field" id="f-' + id + '"><label for="' + id + '">' + label + '</label><div class="qty-unit"><input id="' + id + '" class="input num" inputmode="numeric" value="' + v + '"><span>min</span></div><span class="hint">' + hint + '</span><span class="err" hidden>Use um número entre 5 e 180.</span></div>';
+    }
+    UI.sheet('<h2>Metas de tempo</h2><p class="muted">O relatório compara os tempos com estas metas e avisa no plano de ação quando passam.</p><div class="section">' +
+      field('g-prep', 'Preparo na cozinha', G.prep, 'De aceito até marcar "Pronto".') +
+      field('g-road', 'Entregador na rua', G.road, 'De "Saiu para entrega" até "Entregue".') +
+      field('g-total', 'Cliente espera no total', G.total, 'Do pedido até a porta do cliente.') +
+      '<button type="button" class="btn primary block" data-ok>Salvar</button><button type="button" class="btn block" data-close>Voltar</button></div>',
+      function (sh, close) {
+        sh.querySelector('[data-ok]').addEventListener('click', function () {
+          var v = {}, bad = false;
+          [['prep', 'g-prep'], ['road', 'g-road'], ['total', 'g-total']].forEach(function (p) {
+            var n = parseInt(sh.querySelector('#' + p[1]).value, 10), ok = n >= 5 && n <= 180;
+            sh.querySelector('#f-' + p[1]).classList.toggle('error', !ok); sh.querySelector('#f-' + p[1] + ' .err').hidden = ok;
+            if (!ok) bad = true; v[p[0]] = n;
+          });
+          if (bad) return;
+          DB.update(function (x) { x.settings = x.settings || {}; x.settings.timeGoals = v; });
+          close(); UI.toast('Metas salvas'); refresh();
+        });
+      });
+  }
+
   // ---------- Mapa de calor das entregas (cw_mapa, supabase/011_mapa_calor.sql) ----------
   var MAP_SQL = 'supabase/011_mapa_calor.sql';
   var mapCache = {}, mapLoading = {}, mapMode = 'n'; // n = pedidos, v = faturamento
@@ -197,6 +278,7 @@
     var s = span(), e = cache[key()];
     return {
       r: e && e.data ? e.data : null, d: DB.get(), admin: UI.isAdmin(),
+      times: timesCache[key()] && timesCache[key()].data ? timesCache[key()] : null,
       fin: UI.isAdmin() && window.FinReport ? FinReport.summary() : null,
       google: { live: google.data && google.data.connected ? google.data : null, log: gmbLog() },
       from: s.from, to: s.to, days: s.days, label: s.label, cmp: s.cmp, live: s.live
@@ -391,6 +473,8 @@
       k.push(C.kpi({ label: 'Clientes que pediram', value: fmt(cur.customers), delta: cmp && prev.customers ? Rel.pct(cur.customers, prev.customers) : null, sub: c['new'] != null ? fmt(c['new']) + ' novos' : '', href: '#relatorios/clientes' }));
       k.push(C.kpi({ label: 'Nota na Cardápio Web', value: +rv.n ? Rel.nota2(rv.avg) : '—', sub: +rv.n ? fmt(+rv.n) + ' avaliações' + (rv.pavg != null ? ' · antes ' + Rel.nota2(rv.pavg) : '') : 'sem avaliações no período', href: '#relatorios/avaliacoes' }));
     }
+    if (built.times && built.times.prepMed != null) k.push(C.kpi({ label: 'Preparo na cozinha', value: fmt(Math.round(built.times.prepMed)) + ' min', delta: built.times.prepPrev ? Rel.pct(built.times.prepMed, built.times.prepPrev) : null, good: false,
+      sub: 'pedido típico · meta ' + built.times.goals.prep + ' min', href: '#relatorios/tempos' }));
     var g = built.google;
     k.push(C.kpi({ label: 'Nota no Google', value: g ? Rel.nota(g.rating) : '—', sub: g ? fmt(g.count) + ' avaliações' + (g.src === 'log' ? ' · registro de ' + Rel.dm(g.d) : '') : 'ligar ou lançar a nota', href: '#relatorios/google' }));
     if (r && hasCw(e)) {
@@ -400,7 +484,7 @@
     }
     if (built.team.worked > 0 && k.length < 8) k.push(C.kpi({ label: 'Horas trabalhadas', value: fmt(Math.round(built.team.worked / 60)) + ' h', sub: 'pelo ponto, no período', href: '#relatorios/equipe' }));
     body += cwNotice(e, ctx);
-    body += '<div class="rel-kpis">' + k.join('') + '</div>';
+    body += '<div class="rel-kpis">' + k.slice(0, 8).join('') + '</div>'; // no máximo 8: duas linhas cheias de 4
     if (built.charts.vendas && built.charts.vendas[0]) body += chartsHtml([built.charts.vendas[0]]);
     body += decisions(built, 40, 8);
 
@@ -424,10 +508,11 @@
   // ---------- Uma área ----------
 
   function sectionBody(sec, ctx, built, e) {
-    var body = '', cwArea = ['vendas', 'entrega', 'clientes', 'produtos', 'avaliacoes'].indexOf(sec.id) >= 0;
+    var body = '', cwArea = ['vendas', 'entrega', 'tempos', 'clientes', 'produtos', 'avaliacoes'].indexOf(sec.id) >= 0;
     if (cwArea) { body += cwNotice(e, ctx); if (!hasCw(e)) return body; }
     if (sec.id === 'google') body += googleBlock(ctx, built);
     if (sec.id === 'entrega') body += '<div class="rel-charts">' + mapBlock() + '</div>';
+    if (sec.id === 'tempos') body += timesBlock(ctx, built);
     if (sec.id === 'financeiro') body += financeNote(ctx);
     if (sec.id === 'avaliacoes') body += reviewsHero(ctx);
     body += chartsHtml(built.charts[sec.id]);
@@ -438,7 +523,7 @@
       any = true;
       body += '<section class="section">' + (sec.groups.length > 1 ? '<div class="rel-sub">' + esc(g) + '</div>' : '') + '<div class="card-grid">' + items.map(card).join('') + '</div></section>';
     });
-    if (!any && !(built.charts[sec.id] || []).length && sec.id !== 'google') {
+    if (!any && !(built.charts[sec.id] || []).length && sec.id !== 'google' && sec.id !== 'tempos') {
       var why = { equipe: 'As leituras aparecem quando a equipe estiver cadastrada e batendo o ponto pelo app.',
         operacao: 'As leituras aparecem conforme o app é usado: checklists, chamados de manutenção, fechamento de estoque, notas fiscais, fichas técnicas e reservas.',
         financeiro: 'Abra o Financeiro e cadastre os custos e as metas.' }[sec.id] || 'Ainda não há dados suficientes neste período. Tente um período maior.';
@@ -672,6 +757,8 @@
         var offCharts = Charts.mount(root), offMap = active === 'entrega' ? mountMap(root) : null;
         var mb = root.querySelector('[data-sqlhelp-map]');
         if (mb) UI.sqlHelp(mb, MAP_SQL, 'Volte aqui e abra <b>Relatórios › Entrega e bairros</b> de novo.');
+        var tb = root.querySelector('[data-sqlhelp-times]');
+        if (tb) UI.sqlHelp(tb, TIMES_SQL, 'Volte aqui e abra <b>Relatórios › Tempos</b> de novo.');
         root.addEventListener('click', function (ev) {
           var t = ev.target, b;
           if ((b = t.closest('[data-map-mode] [data-v]'))) { mapMode = b.dataset.v; return refresh(); }
@@ -682,6 +769,8 @@
           }
           if (t.closest('[data-ch-all]')) { DB.update(function (x) { x.settings.cwExclude = []; delete x.prefs.cwExclude; }); load(); return refresh(); }
           if ((b = t.closest('[data-plan-mode] [data-v]'))) { planMode = b.dataset.v; return refresh(); }
+          if (t.closest('[data-time-goals]')) return goalsSheet();
+          if (t.closest('[data-times-retry]')) { delete timesCache[key()]; loadTimes(); return refresh(); }
           if ((b = t.closest('[data-done]'))) return toggleDone(b.dataset.done);
           if ((b = t.closest('[data-period]'))) { setPeriod(b.dataset.period); if (stale(120000)) load(); return refresh(); }
           if (t.closest('[data-pick-day]')) return pickDay();
@@ -700,6 +789,8 @@
         // Os números mudam devagar: recalcula no máximo a cada 2 minutos (ou quando o banco acabou de ser atualizado).
         if (ready() && (stale(120000) || (noSql && stale(15000)))) load();
         if (ready() && !noSql && (!active || active === 'google')) loadGoogle(false);
+        // Tempos: também alimentam a visão geral e o plano de ação.
+        if (ready() && !noSql && (!active || active === 'plano' || active === 'tempos') && timesStale()) loadTimes();
         if (ready() && active === 'entrega') { var mc = mapCache[key()]; if (!mc || Date.now() - mc.at > (mc.error === 'sql' ? 15000 : 120000)) loadMap(); }
         if (UI.isAdmin() && window.FinReport && (!active || active === 'financeiro')) FinReport.ensure(redraw);
         return function () { offCharts(); if (offMap) offMap(); };

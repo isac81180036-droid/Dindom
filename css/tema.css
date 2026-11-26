@@ -228,3 +228,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing:
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero-chip { background: rgba(255,255,255,.14); color: var(--ink); } }
 :root[data-theme="dark"] .home-hero .icon-btn { background: rgba(255,255,255,.14); color: var(--ink); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-hero .icon-btn { background: rgba(255,255,255,.14); color: var(--ink); } }
+/* Números grandes dos cartões sempre numa linha */
+.rel-kpis .ch-kpi-value { font-size: clamp(1.4rem, 2.1vw, 2rem); white-space: nowrap; }
+.rel-kpis .ch-spark { display: none; } /* o gráfico por dia logo abaixo já mostra isso */

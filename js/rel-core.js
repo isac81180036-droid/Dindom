@@ -19,6 +19,7 @@
   var SECTIONS = [
     { id: 'vendas', label: 'Vendas', icon: 'receipt', groups: ['Vendas', 'Ritmo e ticket', 'Horários e dias', 'Canais e pagamento'] },
     { id: 'entrega', label: 'Entrega e bairros', icon: 'truck', groups: ['Entrega', 'Bairros'] },
+    { id: 'tempos', label: 'Tempos', icon: 'flame', groups: ['Cozinha', 'Entrega no tempo'] },
     { id: 'clientes', label: 'Clientes', icon: 'users', groups: ['Clientes', 'Base de clientes', 'Cadastros e cardápio'] },
     { id: 'produtos', label: 'Produtos', icon: 'pizza', groups: ['Sabores', 'Produtos'] },
     { id: 'avaliacoes', label: 'Avaliações', icon: 'message', groups: ['Satisfação', 'Avaliações em detalhe'] },
@@ -792,6 +793,205 @@
     }
   }
 
+
+  // ---------- Tempos: preparo e entrega (cw_tempos, supabase/012_tempos.sql) ----------
+  // Cada linha do banco: [número, criado em, tipo, canal, bairro, itens, aceite, preparo, marcou pronto?, espera, rua, total], em minutos.
+  // Tempos acima de 3 horas são esquecimento de mudar a etapa no painel: ficam de fora.
+  function timeGoals(d) {
+    var g = (d && d.settings && d.settings.timeGoals) || {};
+    return { prep: +g.prep || 25, road: +g.road || 25, total: +g.total || 50 };
+  }
+  function okMin(v) { return v != null && isFinite(v) && v >= 0 && v <= 180 ? +v : null; }
+  function quant(list, q) {
+    var a = list.filter(function (v) { return v != null; }).sort(function (x, y) { return x - y; });
+    if (!a.length) return null;
+    var i = (a.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i);
+    return a[lo] + (a[hi] - a[lo]) * (i - lo);
+  }
+  function med(list) { return quant(list, 0.5); }
+  function mins(v) { return v == null ? '–' : fmt(Math.round(v)) + ' min'; }
+  function hhmm(dt) { return String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0'); }
+
+  function timesData(x) {
+    var D = x.times && x.times.data;
+    if (!D) return null;
+    // Bairro escrito de jeitos diferentes ("Infraero 1" e "infraero 1") conta como um só.
+    var nbName = {};
+    var cut = x.times.cut, rows = (D.rows || []).map(function (r) {
+      var dt = new Date(r[1]), nk = r[4] ? String(r[4]).trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") : null;
+      if (nk && !nbName[nk]) nbName[nk] = String(r[4]).trim();
+      return { id: r[0], dt: dt, day: DB.iso(new Date(dt.getTime() - DB.DAY_START_HOUR * 3600000)), h: dt.getHours(), ty: r[2], ch: r[3], nb: nk ? nbName[nk] : null, q: +r[5] || 0,
+        acc: okMin(r[6]), prep: okMin(r[7]), ready: !!r[8], wait: okMin(r[9]), road: okMin(r[10]), total: okMin(r[11]) };
+    });
+    var cur = rows.filter(function (r) { return r.dt.getTime() >= cut; }), prev = rows.filter(function (r) { return r.dt.getTime() < cut; });
+    function pick(list, k, f) { return list.filter(function (r) { return r[k] != null && (!f || f(r)); }).map(function (r) { return r[k]; }); }
+    var dlv = function (r) { return r.ty === 'delivery'; };
+    var s = {
+      since: D.since, orders: +D.orders || 0, cur: cur, prev: prev, goals: timeGoals(x.d),
+      prep: pick(cur, 'prep'), pprep: pick(prev, 'prep'),
+      acc: pick(cur, 'acc'), wait: pick(cur, 'wait', function (r) { return r.ready; }), road: pick(cur, 'road'), proad: pick(prev, 'road'),
+      total: pick(cur, 'total', dlv), ptotal: pick(prev, 'total', dlv),
+      delivs: cur.filter(dlv)
+    };
+    s.prepMed = med(s.prep); s.prepPrev = med(s.pprep); s.prep90 = quant(s.prep, 0.9);
+    s.roadMed = med(s.road); s.roadPrev = med(s.proad);
+    s.totalMed = med(s.total); s.totalPrev = med(s.ptotal); s.total90 = quant(s.total, 0.9);
+    s.waitMed = med(s.wait); s.accMed = med(s.acc);
+    s.readyShare = s.delivs.length ? s.delivs.filter(function (r) { return r.ready; }).length / s.delivs.length : 1;
+    return s;
+  }
+
+  // Mediana por chave (hora, dia da semana, bairro...), só com grupos de pelo menos "min" pedidos.
+  function medBy(rows, keyFn, valKey, min) {
+    var g = {};
+    rows.forEach(function (r) { var v = r[valKey]; if (v == null) return; var k = keyFn(r); if (k == null) return; (g[k] = g[k] || []).push(v); });
+    return Object.keys(g).filter(function (k) { return g[k].length >= (min || 1); }).map(function (k) { return { k: k, m: med(g[k]), n: g[k].length }; });
+  }
+
+  function timesInsights(add, x) {
+    var t = x.timesInfo;
+    if (!t || t.prep.length < 5) return;
+    var G = t.goals, d;
+    // Preparo
+    var pt = t.prepMed <= G.prep ? 'ok' : t.prepMed <= G.prep + 5 ? 'warn' : 'crit';
+    add({ g: 'Cozinha', ic: 'flame', tone: pt, title: 'Tempo de preparo (pedido típico)', value: mins(t.prepMed),
+      text: 'Metade dos pedidos ficou pronta em até ' + mins(t.prepMed) + ' depois de aceita; 9 em cada 10, em até ' + mins(t.prep90) + '. Meta: ' + mins(G.prep) + '.' +
+        (t.prepPrev != null ? ' Período anterior: ' + mins(t.prepPrev) + '.' : ''),
+      action: pt === 'ok' ? 'Cozinha dentro da meta. Mantenha a rotina e acompanhe os horários de pico.'
+        : 'A cozinha está passando da meta. Veja em "Preparo por horário" quando atrasa mais e reforce forno e montagem nesse horário; deixe massas abertas e ingredientes porcionados antes do pico.',
+      prio: pt === 'crit' ? 72 : pt === 'warn' ? 50 : 10 });
+    // Pedidos acima da meta
+    var late = t.cur.filter(function (r) { return r.prep != null && r.prep > G.prep; }), lp = share(late.length, t.prep.length);
+    var lt = lp > 35 ? 'crit' : lp > 20 ? 'warn' : 'ok';
+    add({ g: 'Cozinha', ic: 'alert', tone: lt, title: 'Pedidos com preparo acima da meta', value: lp + '%',
+      text: plural(late.length, 'pedido passou', 'pedidos passaram') + ' de ' + mins(G.prep) + ' na cozinha, de ' + plural(t.prep.length, 'pedido medido', 'pedidos medidos') + '.',
+      action: lt === 'ok' ? 'Poucos atrasos. Abra a lista para ver se os demorados têm algo em comum (sabor, tamanho, horário).'
+        : 'Abra a lista dos mais demorados e veja o que se repete: horário, pedidos grandes, algum sabor que segura o forno.',
+      prio: lt === 'crit' ? 60 : lt === 'warn' ? 40 : 8,
+      list: { title: 'Pedidos mais demorados na cozinha', rows: late.sort(function (a, b) { return b.prep - a.prep; }).slice(0, 30).map(function (r) {
+        return { name: (r.id ? 'Pedido ' + r.id : 'Pedido') + ' · ' + (TYPES[r.ty] || 'Pedido') + (r.nb ? ' · ' + r.nb : ''), meta: wdm(r.day) + ' às ' + hhmm(r.dt) + ' · ' + plural(r.q, 'item', 'itens') + (r.ready ? '' : ' · sem "pronto" marcado'), value: mins(r.prep) };
+      }) } });
+    // Horário mais lento
+    var byH = medBy(t.cur, function (r) { return r.h; }, 'prep', 5), slowH = maxBy(byH, function (h) { return h.m; });
+    if (slowH && byH.length > 1 && slowH.m - t.prepMed >= 3) {
+      d = slowH.m - t.prepMed;
+      add({ g: 'Cozinha', ic: 'clock', tone: slowH.m > G.prep ? 'warn' : '', title: 'Horário em que a cozinha mais demora', value: slowH.k + 'h',
+        text: 'Pedidos feitos às ' + slowH.k + 'h levam ' + mins(slowH.m) + ' de preparo, ' + mins(d) + ' a mais que o normal do período (' + plural(slowH.n, 'pedido', 'pedidos') + ').',
+        action: 'É o pico apertando a cozinha. Coloque mais uma pessoa a partir de ' + Math.max(0, +slowH.k - 1) + 'h, ligue o forno antes e deixe tudo pré-montado para esse horário.',
+        prio: slowH.m > G.prep ? 48 : 16 });
+    }
+    // Dia da semana mais lento
+    var byW = medBy(t.cur, function (r) { return day(r.day).getDay(); }, 'prep', 5), slowW = maxBy(byW, function (w) { return w.m; });
+    if (slowW && byW.length > 2 && slowW.m - t.prepMed >= 3) {
+      add({ g: 'Cozinha', ic: 'calendar', tone: slowW.m > G.prep ? 'warn' : '', title: 'Dia em que a cozinha mais demora', value: DB.WEEK[slowW.k],
+        text: 'Às ' + DB.WEEK[slowW.k].toLowerCase() + 's o preparo leva ' + mins(slowW.m) + ', contra ' + mins(t.prepMed) + ' no período todo.',
+        action: 'Reforce a escala de ' + DB.WEEK[slowW.k].toLowerCase() + ' na cozinha e confira se falta algum insumo pré-preparado nesse dia.', prio: slowW.m > G.prep ? 38 : 12 });
+    }
+    // Pedidos grandes
+    var big = t.cur.filter(function (r) { return r.q >= 3 && r.prep != null; }).map(function (r) { return r.prep; }),
+      small = t.cur.filter(function (r) { return r.q <= 1 && r.q > 0 && r.prep != null; }).map(function (r) { return r.prep; });
+    if (big.length >= 5 && small.length >= 5) {
+      var mb = med(big), ms = med(small);
+      add({ g: 'Cozinha', ic: 'pizza', tone: mb - ms > 10 ? 'warn' : '', title: 'Pedidos grandes demoram quanto?', value: '+' + mins(Math.max(0, mb - ms)),
+        text: 'Pedidos com 3 ou mais itens levam ' + mins(mb) + '; com 1 item, ' + mins(ms) + '.',
+        action: mb - ms > 10 ? 'Pedido grande trava a fila. Divida entre dois pizzaiolos e comece pelas pizzas do pedido grande assim que ele entrar.'
+          : 'A cozinha absorve bem os pedidos grandes.', prio: mb - ms > 10 ? 30 : 6 });
+    }
+    // Aceite
+    if (t.acc.length >= 5 && t.accMed != null) {
+      var at = t.accMed > 5 ? 'warn' : t.accMed > 3 ? '' : 'ok';
+      add({ g: 'Cozinha', ic: 'bell', tone: at, title: 'Tempo até aceitar o pedido', value: mins(t.accMed),
+        text: 'Do cliente pedir até alguém aceitar no painel da Cardápio Web.',
+        action: t.accMed > 3 ? 'Pedido parado esperando aceite é tempo perdido. Deixe alguém responsável pelo painel no pico ou ligue o aceite automático.' : 'Aceite rápido. Bom.',
+        prio: at === 'warn' ? 34 : 6 });
+    }
+    // Espera pelo entregador
+    if (t.wait.length >= 5) {
+      var wt = t.waitMed > 15 ? 'crit' : t.waitMed > 8 ? 'warn' : 'ok';
+      add({ g: 'Entrega no tempo', ic: 'truck', tone: wt, title: 'Pizza pronta esperando o entregador', value: mins(t.waitMed),
+        text: 'Depois de marcada como pronta, a pizza espera ' + mins(t.waitMed) + ' (no pedido típico) até o entregador sair.',
+        action: wt === 'ok' ? 'Entregador pega rápido. Mantenha.' : 'Pizza parada esfria e derruba a nota. Tenha um entregador de sobreaviso no pico e junte entregas de bairros vizinhos.',
+        prio: wt === 'crit' ? 62 : wt === 'warn' ? 44 : 8 });
+    }
+    // Rua
+    if (t.road.length >= 5) {
+      var rt = t.roadMed <= G.road ? 'ok' : t.roadMed <= G.road + 5 ? 'warn' : 'crit';
+      var byNb = medBy(t.delivs, function (r) { return r.nb; }, 'road', 3).sort(function (a, b) { return b.m - a.m; });
+      add({ g: 'Entrega no tempo', ic: 'mapPin', tone: rt, title: 'Tempo do entregador na rua', value: mins(t.roadMed),
+        text: 'Da saída até a entrega, no pedido típico. Meta: ' + mins(G.road) + '.' + (t.roadPrev != null ? ' Período anterior: ' + mins(t.roadPrev) + '.' : ''),
+        action: rt === 'ok' ? 'Entregas rápidas.' : 'Veja os bairros mais demorados: talvez valha cobrar mais, aumentar o prazo informado ou não atender os mais longe no pico.',
+        prio: rt === 'crit' ? 52 : rt === 'warn' ? 36 : 8,
+        list: byNb.length ? { title: 'Tempo na rua por bairro', rows: byNb.map(function (b) { return { name: b.k, meta: plural(b.n, 'entrega', 'entregas'), value: mins(b.m) }; }) } : null });
+    }
+    // Total
+    if (t.total.length >= 5) {
+      var tt = t.totalMed <= G.total ? 'ok' : t.totalMed <= G.total + 10 ? 'warn' : 'crit';
+      var over = share(t.total.filter(function (v) { return v > G.total; }).length, t.total.length);
+      add({ g: 'Entrega no tempo', ic: 'clock', tone: tt, title: 'Quanto o cliente espera (entrega)', value: mins(t.totalMed),
+        text: 'Do pedido até a porta do cliente, no pedido típico; 9 em cada 10 chegam em até ' + mins(t.total90) + '. ' + over + '% passaram de ' + mins(G.total) + '.' +
+          (t.totalPrev != null ? ' Período anterior: ' + mins(t.totalPrev) + '.' : ''),
+        action: tt === 'ok' ? 'Dentro da meta. Confira se o prazo informado na Cardápio Web bate com isso (prometer menos e entregar antes gera nota alta).'
+          : 'O cliente está esperando demais. Veja abaixo qual etapa pesa mais (cozinha, espera ou rua) e ataque essa primeiro; ajuste o prazo informado na Cardápio Web para não prometer o que não cumpre.',
+        prio: tt === 'crit' ? 70 : tt === 'warn' ? 46 : 10 });
+    }
+    // Nota do tempo de entrega nas avaliações
+    var asp = ((x.r && x.r.reviews && x.r.reviews.aspects) || []).filter(function (q) { return /tempo/i.test(q.q || '') && q.avg != null; })[0];
+    if (asp) {
+      add({ g: 'Entrega no tempo', ic: 'star', tone: +asp.avg >= 4.5 ? 'ok' : +asp.avg >= 4 ? 'warn' : 'crit', title: 'Nota dos clientes para o tempo de entrega', value: nota2(asp.avg),
+        text: 'Nas avaliações da Cardápio Web do período' + (asp.pavg != null ? ' (antes: ' + nota2(asp.pavg) + ')' : '') + '.',
+        action: +asp.avg >= 4.5 ? 'Clientes satisfeitos com o tempo.' : 'O tempo está pesando na nota. Comece pelo que este relatório mostra como mais lento.', prio: +asp.avg < 4 ? 40 : 8 });
+    }
+    // Marcação das etapas
+    var cov = t.orders ? share(t.cur.length, t.orders) : 100, rs = Math.round(t.readyShare * 100);
+    if (cov < 80 || rs < 70) {
+      add({ g: 'Cozinha', ic: 'checklist', tone: cov < 50 || rs < 50 ? 'warn' : '', title: 'Etapas marcadas no painel', value: cov + '%',
+        text: cov + '% dos pedidos têm os horários das etapas.' + (rs < 70 ? ' Em ' + (100 - rs) + '% das entregas ninguém marcou "Pronto": nelas o preparo foi contado até o entregador sair, e fica maior do que foi.' : ''),
+        action: 'Combine com a equipe: no painel da Cardápio Web, marcar "Pronto" quando a pizza sai do forno e "Saiu para entrega" quando o entregador pega. Sem isso os tempos ficam incompletos.',
+        prio: cov < 50 || rs < 50 ? 42 : 14 });
+    }
+  }
+
+  function timesCharts(x) {
+    var t = x.timesInfo, out = [], C = Charts;
+    if (!t || t.prep.length < 3) return out;
+    var G = t.goals, mfmt = function (v) { return mins(v); }, afmt = function (v) { return fmt(Math.round(v)); };
+    // Onde vai o tempo do cliente
+    var stages = [{ name: 'Aceitar o pedido', value: t.accMed }, { name: 'Preparo na cozinha', value: t.prepMed },
+      { name: 'Pronta, esperando o entregador', value: t.waitMed }, { name: 'Entregador na rua', value: t.roadMed }].filter(function (s) { return s.value != null; });
+    var bigS = maxBy(stages, function (s) { return s.value; });
+    if (stages.length >= 2) out.push({ wide: true, html: C.card('Para onde vai o tempo do cliente', (t.totalMed != null ? 'Numa entrega típica, o cliente espera ' + mins(t.totalMed) + '. ' : '') + 'A etapa que mais pesa: ' + bigS.name.toLowerCase() + ' (' + mins(bigS.value) + ').',
+      C.bars({ rows: stages.map(function (s) { return { name: s.name, value: Math.round(s.value * 10) / 10 }; }), fmt: mfmt, xName: 'Etapa', valueName: 'Tempo típico' })) });
+    // Preparo por dia
+    var byD = medBy(t.cur, function (r) { return r.day; }, 'prep', 1).sort(function (a, b) { return a.k < b.k ? -1 : 1; });
+    if (byD.length >= 2) {
+      var slowD = maxBy(byD, function (d) { return d.m; }), overD = byD.filter(function (d) { return d.m > G.prep; }).length;
+      out.push({ wide: true, html: C.card('Tempo de preparo por dia', 'Dia mais lento: ' + wdm(slowD.k) + ', ' + mins(slowD.m) + '. ' + (overD ? plural(overD, 'dia passou', 'dias passaram') + ' da meta.' : 'Todos os dias dentro da meta.'),
+        C.cols({ labels: byD.map(function (d) { return dm(d.k); }), tipLabels: byD.map(function (d) { return wdm(d.k); }), values: byD.map(function (d) { return Math.round(d.m * 10) / 10; }),
+          tips: byD.map(function (d) { return plural(d.n, 'pedido medido', 'pedidos medidos'); }), avg: G.prep, avgLabel: 'Meta: ' + mins(G.prep),
+          fmt: mfmt, axisFmt: afmt, name: 'Preparo', xName: 'Dia', xMax: 7 })) });
+    }
+    // Preparo por horário
+    var byH = medBy(t.cur, function (r) { return r.h; }, 'prep', 3).sort(function (a, b) { return ((+a.k + 19) % 24) - ((+b.k + 19) % 24); });
+    if (byH.length >= 2) {
+      var slowH = maxBy(byH, function (h) { return h.m; });
+      out.push({ html: C.card('Preparo por horário do pedido', 'Mais lento: pedidos das ' + slowH.k + 'h, com ' + mins(slowH.m) + ' de preparo.',
+        C.cols({ labels: byH.map(function (h) { return h.k + 'h'; }), tipLabels: byH.map(function (h) { return 'Pedidos das ' + h.k + 'h'; }), values: byH.map(function (h) { return Math.round(h.m * 10) / 10; }),
+          tips: byH.map(function (h) { return plural(h.n, 'pedido', 'pedidos'); }), avg: G.prep, avgLabel: 'Meta: ' + mins(G.prep), fmt: mfmt, axisFmt: afmt, name: 'Preparo', xName: 'Hora' })) });
+    }
+    // Faixas de tempo de preparo
+    var bands = [[0, 15, 'até 15'], [15, 20, '15–20'], [20, 25, '20–25'], [25, 30, '25–30'], [30, 40, '30–40'], [40, 999, '40+']];
+    var bn = bands.map(function (b) { return t.prep.filter(function (v) { return v >= b[0] && v < b[1]; }).length; });
+    var inGoal = share(t.prep.filter(function (v) { return v <= G.prep; }).length, t.prep.length);
+    out.push({ html: C.card('Pedidos por tempo de preparo', inGoal + '% dos pedidos ficaram prontos dentro da meta de ' + mins(G.prep) + '.',
+      C.cols({ labels: bands.map(function (b) { return b[2]; }), tipLabels: bands.map(function (b) { return b[1] > 900 ? '40 min ou mais' : b[0] + ' a ' + b[1] + ' min'; }), values: bn,
+        fmt: function (v) { return plural(v, 'pedido', 'pedidos'); }, axisFmt: fmt, name: 'Pedidos', xName: 'Minutos' })) });
+    // Rua por bairro
+    var byNb = medBy(t.delivs, function (r) { return r.nb; }, 'road', 3).sort(function (a, b) { return b.m - a.m; }).slice(0, 10);
+    if (byNb.length >= 2) out.push({ html: C.card('Bairros com entrega mais demorada', 'Mais demorado: ' + byNb[0].k + ', ' + mins(byNb[0].m) + ' na rua.',
+      C.bars({ rows: byNb.map(function (b) { return { name: b.k, value: Math.round(b.m * 10) / 10, meta: plural(b.n, 'entrega', 'entregas') }; }), fmt: mfmt, xName: 'Bairro', valueName: 'Tempo na rua' })) });
+    return out;
+  }
+
   // ---------- Gráficos de cada área ----------
 
   function salesCharts(x) {
@@ -1062,6 +1262,9 @@
       safe(function () { charts.produtos = productCharts(x); });
       safe(function () { charts.avaliacoes = reviewCharts(x); });
     }
+    safe(function () { x.timesInfo = timesData(x); });
+    safe(function () { timesInsights(add, x); });
+    safe(function () { charts.tempos = timesCharts(x); });
     safe(function () { googleInsights(add, x); });
     safe(function () { charts.google = googleCharts(x); });
     if (x.admin) {
@@ -1073,8 +1276,8 @@
     safe(function () { opsInsights(add, x); });
     safe(function () { charts.operacao = opsCharts(x); });
     list.forEach(function (o, i) { o.i = i; });
-    return { list: list, charts: charts, daily: x.daily, team: x.team, google: googleNow(x.google) };
+    return { list: list, charts: charts, daily: x.daily, team: x.team, google: googleNow(x.google), times: x.timesInfo };
   }
 
-  window.Rel = { SECTIONS: SECTIONS, TYPES: TYPES, build: build, googleNow: googleNow, nota: nota, nota2: nota2, dm: dm, wdm: wdm, addDays: addDays, pct: pct, share: share, sum: sum, plural: plural, monthName: monthName };
+  window.Rel = { SECTIONS: SECTIONS, TYPES: TYPES, build: build, timeGoals: timeGoals, googleNow: googleNow, nota: nota, nota2: nota2, dm: dm, wdm: wdm, addDays: addDays, pct: pct, share: share, sum: sum, plural: plural, monthName: monthName };
 })();

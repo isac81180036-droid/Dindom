@@ -111,6 +111,7 @@
     for (var i = 0; i < n; i++) totals.push(series.reduce(function (s, x) { return s + (+x.values[i] || 0); }, 0));
     var max = Math.max.apply(null, totals.concat([0]));
     if (!n || !max) return nothing(o.empty);
+    if (o.avg > max) max = o.avg * 1.08;
     var sc = scale(max, 3), top = totals.indexOf(max), focus = series.length === 1 && o.focus !== false;
     var xs = pick(n, o.xMax || (n <= 12 ? n : 6)), show = {};
     xs.forEach(function (i) { show[i] = true; });
