@@ -1,0 +1,230 @@
+/* Visual do app (carregado por último, por cima dos outros estilos). Inspirado em apps de gestão limpos:
+   fundo creme, cartões claros e planos, lilás da marca no cartão de boas-vindas, preto no que está ativo,
+   títulos de seção em maiúsculas pequenas, números grandes em faixa e muito espaço.
+   As cores ficam em css/tokens.css. */
+
+html { -webkit-text-size-adjust: 100%; }
+body { font-family: var(--font-body); font-size: var(--fs-md); letter-spacing: -.005em; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.02em; }
+:focus-visible { outline-color: var(--ink); }
+.screen { gap: var(--sp-6); }
+
+/* ---------- Títulos ---------- */
+.topbar { min-height: 56px; }
+.topbar h1 { font-size: var(--fs-title); line-height: 1.1; font-weight: 800; }
+.topbar .sub { font-size: var(--fs-md); margin-top: 2px; color: var(--ink-2); }
+/* Seções: rótulo em maiúsculas pequenas e espaçadas, como "AULAS DE HOJE". */
+.section-head { align-items: center; }
+.section-head h2 { font: 700 .82rem/1.2 var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.section-head h2 .ico { width: 16px; height: 16px; vertical-align: -3px; }
+.section-head > .card-meta, .section-head > span.card-meta { font-size: var(--fs-sm); }
+.eyebrow { font: 700 .78rem var(--font-body); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.stat { font-family: var(--font-display); font-weight: 800; letter-spacing: -.03em; }
+
+/* ---------- Cartões e listas (planos, sem sombra) ---------- */
+.card { border-radius: var(--r-lg); padding: 20px; box-shadow: none; }
+.list { border-radius: var(--r-lg); box-shadow: none; }
+.list > * + * { border-top-color: var(--line); }
+.row { min-height: 64px; padding: 14px 20px; gap: 14px; }
+.card-title { font-size: 1.02rem; font-weight: 700; }
+.card-meta { font-size: var(--fs-sm); color: var(--ink-2); }
+.tile { border-radius: 14px; background: var(--surface-2); color: var(--ink); }
+.tile.accent { background: var(--brand-soft); color: var(--brand-ink); }
+.pill { padding: 4px 10px; font-weight: 700; }
+.pill.accent { background: var(--brand-soft); color: var(--brand-ink); }
+.banner { border-radius: var(--r-md); padding: 14px 16px; }
+.avatar { background: var(--brand-soft); color: var(--brand-ink); font-family: var(--font-display); font-weight: 800; }
+.unread-dot { background: var(--info); }
+.icon-btn { background: var(--surface); box-shadow: none; }
+.icon-btn.plain { background: transparent; }
+.icon-btn .dot { background: var(--crit); border-color: var(--surface); }
+.timeline li.now::before { background: var(--ink); border-color: var(--ink); }
+.cw-ins { gap: var(--sp-3); }
+.cw-ins-do { border-radius: 14px; background: var(--brand-soft); color: var(--ink); }
+.cw-ins-do .ico { color: var(--brand-ink); }
+.empty h3 { font-size: 1.2rem; font-weight: 800; }
+.empty .tile { background: var(--brand-soft); color: var(--brand-ink); }
+
+/* Números em faixa, separados por divisórias (como "Alunos ativos · Presença · FO+"). */
+/* Faixa de números unida: linhas finas entre os cartões (sem bloco cinza quando a última linha não enche). */
+.stat-grid, .rel-kpis, .fin-kpis, .cmv-kpis, .fin-split { gap: 0 !important; background: var(--surface); border-radius: var(--r-lg); overflow: hidden; }
+.stat-grid > *, .rel-kpis > *, .fin-kpis > *, .cmv-kpis > *, .fin-split > * { box-shadow: 1px 0 0 var(--line), 0 1px 0 var(--line) !important; }
+.stat-grid > .card, .rel-kpis > .card, .fin-kpis > .card, .cmv-kpis > .card, .fin-split > .card,
+.stat-grid > a.card, .rel-kpis > a.card { border-radius: 0; }
+.stat-grid .stat, .ch-kpi-value, .cmv-kpi .stat, .fin-kpis .stat, .fin-split .stat { font-size: 2.1rem; line-height: 1.05; }
+.stat-grid .card, .ch-kpi { padding: 18px 20px; gap: 6px; }
+
+/* Cartão de destaque: lilás com círculos, como o "Oss, Isac." */
+.card.hero { background: var(--brand); color: var(--hero-ink); border-radius: 28px; padding: 26px 26px 24px; position: relative; overflow: hidden; isolation: isolate; }
+.card.hero::before, .card.hero::after { content: ""; position: absolute; z-index: -1; border-radius: 50%; background: var(--brand-2); pointer-events: none; }
+.card.hero::before { width: 340px; height: 340px; right: -110px; top: -170px; }
+.card.hero::after { width: 260px; height: 260px; left: -90px; bottom: -200px; }
+.card.hero .muted, .card.hero .card-meta { color: color-mix(in srgb, var(--hero-ink) 72%, transparent); }
+.card.hero .eyebrow { color: color-mix(in srgb, var(--hero-ink) 62%, transparent) !important; }
+.card.hero h2 { color: var(--hero-ink); }
+.card.hero .btn.primary { background: var(--accent); color: var(--accent-ink); }
+.card.hero .btn:not(.primary) { background: color-mix(in srgb, #fff 55%, transparent); color: var(--ink); }
+.card.hero .btn.ghost-inv { background: transparent; color: var(--hero-ink); border: 1.5px solid color-mix(in srgb, var(--hero-ink) 30%, transparent); }
+.card.hero .bar { background: color-mix(in srgb, #fff 50%, transparent); }
+.card.hero .bar > i { background: var(--ink); }
+.card.hero .ring { background: conic-gradient(var(--ink) calc(var(--p) * 1%), color-mix(in srgb, #fff 55%, transparent) 0); }
+.card.hero .ring > span { background: var(--brand); color: var(--hero-ink); }
+.hero-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px; border: 0; border-radius: var(--r-pill);
+  background: color-mix(in srgb, #fff 62%, transparent); color: var(--ink); font: 700 var(--fs-sm) var(--font-body); }
+.hero-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--info); }
+.hero-chip .ico { width: 15px; height: 15px; }
+
+/* Progresso */
+.bar { background: var(--surface-2); }
+.bar > i { background: var(--ink); }
+.bar.ok > i { background: var(--ok); }
+.ring { background: conic-gradient(var(--ink) calc(var(--p) * 1%), var(--surface-2) 0); }
+.ring > span { background: var(--surface); color: var(--ink); }
+
+/* ---------- Botões ---------- */
+.btn { min-height: 50px; border-radius: 14px; font-weight: 700; background: var(--surface); color: var(--ink); }
+.card .btn, .sheet .btn, .list .btn, .dock .btn { background: var(--surface-2); }
+.btn.primary, .card .btn.primary, .sheet .btn.primary, .dock .btn.primary { background: var(--accent); color: var(--accent-ink); }
+.btn.dark { background: var(--ink); color: var(--bg); }
+.btn.ghost, .card .btn.ghost, .sheet .btn.ghost, .list .btn.ghost { background: transparent; color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.btn.sm { min-height: 42px; border-radius: 12px; }
+.btn:active, .chip:active, .icon-btn:active, .quick a:active { transform: scale(.97); }
+
+/* ---------- Filtros (chips) e opções (seg) ---------- */
+.chip { min-height: 42px; padding: 0 18px; border: 0; background: var(--surface); color: var(--ink); font-weight: 600; font-size: var(--fs-md); box-shadow: none; }
+.chip[aria-pressed="true"], .cmv-tabs .chip[aria-current="page"], .rel-tabs .chip[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.chip .count { opacity: .6; }
+.rel-tabs .chip .count { background: var(--crit-soft); color: var(--crit); opacity: 1; }
+.rel-tabs .chip[aria-current="page"] .count { background: color-mix(in srgb, var(--accent-ink) 22%, transparent); color: inherit; }
+.seg button { border: 0; border-radius: 14px; background: var(--surface); color: var(--ink-2); font-size: var(--fs-sm); }
+.card .seg button, .sheet .seg button { background: var(--surface-2); }
+.seg button[aria-pressed="true"], .card .seg button[aria-pressed="true"], .sheet .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button[data-tone="crit"][aria-pressed="true"] { background: var(--crit); color: #fff; }
+.seg button[data-tone="warn"][aria-pressed="true"] { background: var(--warn); color: #fff; }
+
+/* ---------- Campos ---------- */
+.input, .textarea, .select { border: 1.5px solid var(--line); background: var(--surface); border-radius: 14px; font-size: var(--fs-md); }
+.card .input, .sheet .input, .card .select, .sheet .select, .card .textarea, .sheet .textarea { background: var(--surface-2); border-color: transparent; }
+.input:focus, .textarea:focus, .select:focus { border-color: var(--ink); background: var(--surface); box-shadow: 0 0 0 4px var(--brand-soft); }
+.field.error .input, .field.error .textarea { border-color: var(--crit); }
+.field > label, .field > .label { font-size: var(--fs-sm); font-weight: 700; }
+.switch { width: 50px; height: 30px; background: var(--line); }
+.switch::after { width: 26px; height: 26px; top: 2px; left: 2px; }
+.switch:checked { background: var(--ink); }
+.switch:checked::after { transform: translateX(20px); background: var(--bg); }
+
+/* ---------- Painéis, avisos e toasts ---------- */
+.sheet { border-radius: 28px 28px 0 0; background: var(--surface); }
+.sheet .grabber { width: 40px; background: var(--ink-3); opacity: .4; }
+.sheet h2 { font-size: 1.5rem; }
+.toast { border-radius: 16px; padding: 14px 18px; background: var(--ink); color: var(--bg); box-shadow: var(--shadow-pop); }
+.toast button { color: var(--brand); }
+
+/* ---------- Abertura e marca ---------- */
+#splash { background: var(--brand); }
+
+/* ---------- Agenda: "hoje" em preto ---------- */
+.fab { background: var(--accent); color: var(--accent-ink); border-radius: 18px; box-shadow: var(--shadow-pop); }
+.tg-day.today .dow, .ag-day.today .ag-date .dow { color: var(--ink); }
+.tg-day.today .dnum, .mg-cell.today .mg-num, .ag-day.today .ag-date .dnum, .mini-grid button.today { background: var(--accent); color: var(--accent-ink); }
+.mini-grid button.today::after { background: var(--accent-ink); }
+.mini-grid button.sel { background: var(--brand-soft); color: var(--brand-ink); }
+
+/* ---------- Início: cartão de boas-vindas e atalhos ---------- */
+.home-hero { gap: 10px; min-height: 190px; justify-content: flex-end; }
+.home-hero .hello { font: 800 clamp(2.2rem, 9vw, 3.2rem)/1 var(--font-display); letter-spacing: -.035em; margin: 6px 0 2px; }
+.home-hero .date { font-size: var(--fs-md); color: color-mix(in srgb, var(--hero-ink) 78%, transparent); }
+.home-hero .acts { position: absolute; top: 18px; right: 18px; display: flex; gap: 8px; }
+.home-hero .acts .icon-btn { background: color-mix(in srgb, #fff 62%, transparent); color: var(--ink); width: 44px; height: 44px; }
+.nbadge { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--crit); color: #fff;
+  font: 700 10.5px/18px var(--font-body); text-align: center; }
+.quick { display: flex; gap: var(--sp-3); overflow-x: auto; scrollbar-width: none; padding: 2px max(var(--gutter), var(--safe-r)) 4px max(var(--gutter), var(--safe-l));
+  margin-inline: calc(-1 * max(var(--gutter), var(--safe-l))) calc(-1 * max(var(--gutter), var(--safe-r))); }
+.quick::-webkit-scrollbar { display: none; }
+.quick a { flex: none; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-decoration: none; color: var(--ink);
+  font-size: 13px; font-weight: 600; text-align: center; line-height: 1.2; transition: transform .12s var(--ease); }
+.quick a > span:first-child { width: 62px; height: 62px; border-radius: 20px; display: grid; place-items: center; background: var(--surface); position: relative; }
+.quick a.main > span:first-child { background: var(--brand-soft); color: var(--brand-ink); }
+.quick .nbadge { top: -4px; right: -4px; }
+@media (min-width: 900px) { .quick { margin-inline: 0; padding-inline: 0; flex-wrap: wrap; } .quick a { width: 88px; } }
+
+/* ---------- Ponto mais claro ---------- */
+.ponto-hero { text-align: left; align-items: flex-start; }
+.ponto-hero .ponto-clock { font-size: clamp(3.6rem, 16vw, 5rem); }
+.ponto-hero .ponto-status { justify-content: flex-start; align-items: baseline; flex-wrap: nowrap; text-align: left; font-size: var(--fs-md); }
+.ponto-hero .ponto-status [class^="dot-"] { background: color-mix(in srgb, var(--hero-ink) 35%, transparent); }
+.today-marks { gap: 1px; background: var(--line); border-radius: var(--r-lg); overflow: hidden; }
+.tm { border-radius: 0; box-shadow: none; padding: 16px 8px; gap: 6px; }
+.tm .eyebrow { font-size: 11px; letter-spacing: .08em; }
+.tm b { font-size: 1.35rem; font-weight: 800; }
+.tm.done { background: var(--surface); }
+.tm.next { background: var(--brand-soft); }
+.tm.next .eyebrow { color: var(--brand-ink); }
+.tm small { font-size: 11px; color: var(--ink-3); }
+.stat-grid.three .stat { font-size: 1.7rem; }
+.stat-grid.three .card { padding: 16px; }
+
+/* ---------- Celular: barra de abas flutuante clara ---------- */
+@media (max-width: 899.98px) {
+  .nav {
+    left: 50%; right: auto; bottom: calc(10px + var(--safe-b)); transform: translateX(-50%);
+    width: min(460px, calc(100% - 20px)); padding: 6px; border: 1px solid var(--line); border-radius: 22px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: var(--shadow-pop);
+  }
+  .nav ul { height: 60px; gap: 2px; max-width: none; }
+  .nav a { border-radius: 16px; color: var(--ink-2); font-size: 11px; gap: 3px; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+  .nav a[aria-current="page"]::before { display: none; }
+  .nav .badge { top: 5px; left: calc(50% + 4px); background: var(--crit); color: #fff; }
+  .screen { padding-bottom: calc(var(--nav-h) + var(--safe-b) + var(--sp-6)); }
+  .dock { bottom: calc(var(--nav-h) + var(--safe-b) + 6px); left: 10px; right: 10px; border-radius: 22px; border: 1px solid var(--line); box-shadow: var(--shadow-pop); }
+  .dock.no-nav { bottom: calc(10px + var(--safe-b)); padding-bottom: var(--sp-3); }
+  .fab { bottom: calc(var(--nav-h) + var(--safe-b) + 14px); }
+}
+
+/* ---------- Computador: menu lateral limpo ---------- */
+@media (min-width: 900px) {
+  .nav { top: 0; bottom: 0; left: 0; width: var(--side-w); border: 0; border-right: 1px solid var(--line); border-radius: 0; background: var(--bg);
+    padding: 30px 20px 20px; box-shadow: none; gap: 22px; }
+  .nav .brand { padding: 0 6px 6px; }
+  .nav .brand .logo-ink { width: 120px; }
+  .nav ul { gap: 2px; }
+  .nav a { height: 46px; padding: 0 18px; border-radius: 14px; font-size: 1.02rem; font-weight: 500; color: var(--ink); gap: 16px; }
+  .nav a .ico { width: 22px; height: 22px; }
+  .nav a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .nav .nav-label { padding: 14px 20px 4px; font: 700 .74rem var(--font-body); letter-spacing: .14em; color: var(--ink-3); }
+  .nav .nav-foot { border-radius: 16px; background: var(--surface); padding: 12px 14px; }
+  .nav .nav-foot .avatar { width: 40px; height: 40px; }
+  .nav .badge { background: var(--crit); color: #fff; }
+  .nav-theme { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 46px; padding: 0 18px; border: 0; background: transparent; color: var(--ink);
+    font: 500 1.05rem var(--font-body); cursor: pointer; border-radius: 14px; }
+  .nav-theme .grow { flex: 1; text-align: left; }
+  .nav-theme .switch { pointer-events: none; }
+  .sheet { border-radius: 28px; }
+  .topbar { text-align: center; }
+  .topbar > div[style*="flex:1"] { text-align: center; }
+  .topbar h1 { font-size: 2.1rem; }
+  .card.hero { padding: 30px 32px 28px; }
+}
+@media (max-width: 899.98px) { .nav-theme { display: none; } }
+
+/* ---------- Entrada (login): lilás com a logo preta ---------- */
+.login { --login-green: #1b1814; --login-green-hi: #3a342d; background: var(--brand); }
+.login-brand { background: var(--brand); color: #1b1814; }
+.login-hello h2 { color: #1b1814; font-weight: 800; }
+.login-hello p:last-child { color: rgba(27, 24, 20, .72); }
+.login-tag { color: rgba(27, 24, 20, .6); }
+.login-card { border-radius: 30px 30px 0 0; background: var(--surface); }
+.login .input:focus { border-color: var(--ink); box-shadow: 0 0 0 4px var(--brand-soft); }
+.login .switch:checked { background: var(--ink); }
+:root[data-theme="dark"] .login-brand, :root[data-theme="dark"] .login { background: #d9bde7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .login, :root:not([data-theme="light"]) .login-brand { background: #d9bde7; } }
+:root[data-theme="dark"] .login .btn.primary { background: var(--accent); color: var(--accent-ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .login .btn.primary { background: var(--accent); color: var(--accent-ink); } }
+
+/* Etiqueta da unidade no cartão lilás, tema escuro */
+:root[data-theme="dark"] .hero-chip { background: rgba(255,255,255,.14); color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero-chip { background: rgba(255,255,255,.14); color: var(--ink); } }
+:root[data-theme="dark"] .home-hero .icon-btn { background: rgba(255,255,255,.14); color: var(--ink); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .home-hero .icon-btn { background: rgba(255,255,255,.14); color: var(--ink); } }

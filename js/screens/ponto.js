@@ -199,15 +199,15 @@
         return '<button type="button" class="btn ' + (i ? 'ghost-inv' : 'primary') + ' block" data-punch="' + t + '" style="min-height:60px;font-size:var(--fs-lg)">' + esc(P.TYPES[t].verb) + '</button>';
       }).join('') + '</div></section>' +
 
-      '<section class="section"><div class="section-head"><h2>Hoje</h2></div><div class="today-marks">' + P.ORDER.map(function (t) {
-        var p = st.today && st.today.marks[t];
-        return '<div class="tm' + (p ? ' done' : '') + '"><span class="eyebrow">' + esc(P.TYPES[t].label.replace('Saída para intervalo', 'Intervalo').replace('Volta do intervalo', 'Volta')) + '</span><b class="num">' + (p ? P.hhmm(p.ts) : '--:--') + '</b></div>';
+      '<section class="section"><div class="section-head"><h2>Seus registros de hoje</h2></div><div class="today-marks">' + P.ORDER.map(function (t) {
+        var p = st.today && st.today.marks[t], nx = !p && st.next[0] === t;
+        return '<div class="tm' + (p ? ' done' : '') + (nx ? ' next' : '') + '"><span class="eyebrow">' + esc(P.TYPES[t].label.replace('Saída para intervalo', 'Intervalo').replace('Volta do intervalo', 'Volta')) + '</span><b class="num">' + (p ? P.hhmm(p.ts) : '--:--') + '</b></div>';
       }).join('') + '</div></section>' +
 
       '<section class="section"><div class="section-head"><h2>Este mês</h2></div><div class="stat-grid three">' +
-      '<div class="card"><div class="stat num">' + P.dur(sum.worked) + '</div><div class="card-meta">trabalhadas em ' + sum.days + ' dias</div></div>' +
-      '<div class="card"><div class="stat num ' + (sum.balance >= 0 ? 'pos' : 'neg') + '">' + P.signed(sum.balance) + '</div><div class="card-meta">banco de horas</div></div>' +
-      '<div class="card"><div class="stat num">' + sum.lateCount + '</div><div class="card-meta">' + (sum.lateCount === 1 ? 'atraso' : 'atrasos') + (sum.late ? ' · ' + P.dur(sum.late) : '') + '</div></div>' +
+      '<div class="card"><div class="card-meta">Horas trabalhadas</div><div class="stat num">' + P.dur(sum.worked) + '</div><div class="card-meta">em ' + sum.days + (sum.days === 1 ? ' dia' : ' dias') + '</div></div>' +
+      '<div class="card"><div class="card-meta">Banco de horas</div><div class="stat num ' + (sum.balance >= 0 ? 'pos' : 'neg') + '">' + P.signed(sum.balance) + '</div><div class="card-meta">' + (sum.balance > 0 ? 'a mais que o combinado' : sum.balance < 0 ? 'a menos que o combinado' : 'em dia') + '</div></div>' +
+      '<div class="card"><div class="card-meta">Atrasos</div><div class="stat num' + (sum.lateCount ? ' neg' : '') + '">' + sum.lateCount + '</div><div class="card-meta">' + (sum.late ? 'somando ' + P.dur(sum.late) : 'nenhum no mês') + '</div></div>' +
       '</div></section>' +
 
       (pend.length ? '<div class="banner" style="background:var(--info-soft);color:var(--info)">' + icon('clock', 'sm') + '<div class="grow">' + pend.length + (pend.length === 1 ? ' pedido de ajuste aguardando' : ' pedidos de ajuste aguardando') + ' o gerente.</div></div>' : '') +

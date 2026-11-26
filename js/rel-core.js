@@ -803,21 +803,25 @@
     if (hrs.length) {
       var hs = hrs.map(function (h) { return +h.h; }).sort(function (a, b) { return (a + 19) % 24 - (b + 19) % 24; }), lo = (hs[0] + 19) % 24, hi = (hs[hs.length - 1] + 19) % 24, cols = [];
       for (var k = lo; k <= hi; k++) { var hh = (k + 5) % 24, q = hrs.filter(function (h) { return +h.h === hh; })[0]; cols.push({ h: hh, n: q ? +q.n : 0, v: q ? +q.v : 0 }); }
-      hourChart = { wide: x.days <= 2, html: C.card('Pedidos por hora', x.days === 1 ? 'Quantos pedidos entraram em cada hora do dia.' : 'Pedidos de todo o período, somados por hora do dia.',
+      var pk = maxBy(cols, function (c) { return c.n; });
+      hourChart = { wide: x.days <= 2, html: C.card('Pedidos por hora', 'Mais pedidos às ' + pk.h + 'h: ' + plural(pk.n, 'pedido', 'pedidos') + (x.days === 1 ? ' nessa hora.' : ' somando o período.'),
         C.cols({ labels: cols.map(function (c) { return c.h + 'h'; }), tipLabels: cols.map(function (c) { return c.h + 'h às ' + ((c.h + 1) % 24) + 'h'; }), values: cols.map(function (c) { return c.n; }),
           tips: cols.map(function (c) { return money(c.v); }), fmt: function (v) { return plural(v, 'pedido', 'pedidos'); }, axisFmt: fmt, name: 'Pedidos', xName: 'Hora' })) };
     }
     if (x.days <= 2 && hourChart) { out.push(hourChart); hourChart = null; }
-    if (cur.length >= 2) out.push({ wide: true, html: C.card('Faturamento por dia', (x.live ? 'Até ontem' : 'Dia a dia do período') + (hasPrev ? ', com o período anterior em cinza para comparar' : '') + '.',
+    var openD = cur.filter(function (d) { return d.v > 0; }), bestD = maxBy(openD, function (d) { return d.v; });
+    if (cur.length >= 2) out.push({ wide: true, html: C.card('Faturamento por dia', (openD.length ? 'Média de ' + money(sum(openD, 'v') / openD.length) + ' por dia aberto. Melhor dia: ' + wdm(bestD.d) + ', ' + money(bestD.v) + '.' : 'Nenhuma venda no período.') + (hasPrev ? ' A linha cinza é o período anterior.' : ''),
       C.line({ labels: cur.map(function (d) { return wdm(d.d); }), xLabels: cur.map(function (d) { return dm(d.d); }), area: true, fmt: money, axisFmt: C.moneyK,
         series: (hasPrev ? [{ name: 'Período anterior', slot: 0, values: prev.map(function (d) { return d.v; }) }] : []).concat([{ name: 'Este período', slot: 1, values: cur.map(function (d) { return d.v; }) }]) })) });
     if (hourChart) out.push(hourChart);
     var wk = (r.weeks || []).filter(function (w) { return addDays(w.w, 6) < DB.businessDay(); });
-    if (wk.length >= 3) out.push({ html: C.card('Faturamento por semana', 'Semanas completas de todo o histórico guardado (segunda a domingo).',
+    var lw = wk[wk.length - 1], pw = wk[wk.length - 2], gw = lw && pw ? pct(+lw.v, +pw.v) : null;
+    if (wk.length >= 3) out.push({ html: C.card('Faturamento por semana', 'Última semana: ' + money(lw.v) + (gw != null ? ', ' + (gw >= 0 ? fmt(Math.round(gw)) + '% acima' : fmt(Math.round(-gw)) + '% abaixo') + ' da anterior.' : '.'),
       C.cols({ labels: wk.map(function (w) { return dm(w.w); }), tipLabels: wk.map(function (w) { return 'Semana de ' + dm(w.w); }), values: wk.map(function (w) { return +w.v; }),
         tips: wk.map(function (w) { return w.n + ' pedidos'; }), fmt: money, axisFmt: C.moneyK, name: 'Faturamento', xName: 'Semana', xMax: 5 })) });
     var mo = r.months || [];
-    if (mo.length >= 2) out.push({ html: C.card('Faturamento por mês', 'O primeiro mês do histórico e o mês atual podem estar incompletos.',
+    var bestM = maxBy(mo.slice(0, -1).length ? mo.slice(0, -1) : mo, function (m) { return +m.v; });
+    if (mo.length >= 2) out.push({ html: C.card('Faturamento por mês', 'Melhor mês: ' + monthName(bestM.m) + ', com ' + money(bestM.v) + '. O mês atual ainda está em andamento.',
       C.cols({ labels: mo.map(function (m) { return monthShort(m.m); }), values: mo.map(function (m) { return +m.v; }), tips: mo.map(function (m) { return m.n + ' pedidos em ' + m.days + ' dias'; }),
         fmt: money, axisFmt: C.moneyK, name: 'Faturamento', xName: 'Mês' })) });
     // Mapa de dia x hora: semana começa na segunda; horas na ordem do dia de trabalho (que vira às 5h).
@@ -830,14 +834,16 @@
       for (var k = lo; k <= hi2; k++) colsH.push((k + 5) % 24);
       var dows = [1, 2, 3, 4, 5, 6, 0], grid = dows.map(function () { return colsH.map(function () { return 0; }); }), gv = dows.map(function () { return colsH.map(function () { return 0; }); });
       heat.forEach(function (h) { var ri = dows.indexOf(h.d), ci = colsH.indexOf(h.h); if (ri >= 0 && ci >= 0) { grid[ri][ci] = +h.n; gv[ri][ci] = +h.v; } });
-      out.push({ html: C.card('Quando os pedidos chegam', 'Pedidos por dia da semana e hora, no período.',
+      var hot = maxBy(heat, function (h) { return +h.n; });
+      out.push({ html: C.card('Quando os pedidos chegam', 'Mais movimento: ' + DB.WEEK[hot.d].toLowerCase() + ' às ' + hot.h + 'h. Quanto mais forte a cor, mais pedidos.',
         C.heat({ rows: dows.map(function (d) { return WD[d]; }), cols: colsH.map(function (h) { return h + 'h'; }), values: grid, xName: 'Dia',
           tip: function (ri, ci, v) { return plural(v, 'pedido', 'pedidos') + ' · ' + money(gv[ri][ci]); } })) });
     }
     var wds = ins.weekdays || [];
     if (wds.length >= 3) {
       var ord = [1, 2, 3, 4, 5, 6, 0].map(function (d) { return wds.filter(function (w) { return w.d === d; })[0] || { d: d, v: 0, days: 0, n: 0 }; });
-      out.push({ html: C.card('Média por dia da semana', 'Faturamento médio de cada dia, no período.',
+      var withD = ord.filter(function (w) { return w.days; }), bW = maxBy(withD, function (w) { return +w.v / +w.days; }), wW = minBy(withD, function (w) { return +w.v / +w.days; });
+      out.push({ html: C.card('Média por dia da semana', bW ? 'Dia mais forte: ' + DB.WEEK[bW.d].toLowerCase() + '. Mais fraco: ' + DB.WEEK[wW.d].toLowerCase() + '.' : 'Faturamento médio de cada dia.',
         C.cols({ labels: ord.map(function (w) { return WD[w.d]; }), values: ord.map(function (w) { return w.days ? +w.v / +w.days : 0; }),
           tips: ord.map(function (w) { return w.days ? fmt(Math.round(+w.n / +w.days)) + ' pedidos por dia' : ''; }), fmt: money, axisFmt: C.moneyK, name: 'Média por dia', xName: 'Dia' })) });
     }
@@ -845,15 +851,17 @@
     if (tk.length) {
       var all = [];
       for (var b = 0; b <= 200; b += 20) { var q = tk.filter(function (t) { return +t.b === b; })[0]; all.push({ b: b, n: q ? +q.n : 0 }); }
-      out.push({ html: C.card('Pedidos por faixa de valor', 'Quantos pedidos caem em cada faixa de R$ 20.',
+      var modeT = maxBy(all, function (t) { return t.n; });
+      out.push({ html: C.card('Pedidos por faixa de valor', modeT.b >= 200 ? 'A maioria dos pedidos passa de R$ 200.' : 'A maioria dos pedidos fica entre R$ ' + modeT.b + ' e R$ ' + (modeT.b + 20) + '.',
         C.cols({ labels: all.map(function (t) { return t.b >= 200 ? '200+' : String(t.b); }), tipLabels: all.map(function (t) { return t.b >= 200 ? 'R$ 200 ou mais' : 'R$ ' + t.b + ' a R$ ' + (t.b + 20); }),
           values: all.map(function (t) { return t.n; }), fmt: function (v) { return plural(v, 'pedido', 'pedidos'); }, axisFmt: fmt, name: 'Pedidos', xName: 'Faixa', xMax: 6 })) });
     }
     var ch = (ins.channels || []).slice().sort(function (a, b) { return +b.v - +a.v; });
-    if (ch.length) out.push({ html: C.card('Canais de venda', 'Faturamento por canal, no período.',
+    var chT = sum(ch, 'v');
+    if (ch.length) out.push({ html: C.card('Canais de venda', 'Maior canal: ' + chName(ch[0].k) + ', com ' + share(+ch[0].v, chT) + '% do faturamento.',
       C.bars({ rows: ch.map(function (c) { return { name: chName(c.k), value: +c.v, meta: plural(+c.n, 'pedido', 'pedidos') + ' · ticket ' + money(+c.v / +c.n) }; }), fmt: money, xName: 'Canal', valueName: 'Faturamento' })) });
     var pay = (ins.payments || []).slice().sort(function (a, b) { return +b.v - +a.v; });
-    if (pay.length) out.push({ html: C.card('Formas de pagamento', 'Quanto entrou por cada forma.',
+    if (pay.length) out.push({ html: C.card('Formas de pagamento', 'Mais usada: ' + (PAY[pay[0].k] || pay[0].k || 'Outros') + ', ' + share(+pay[0].v, sum(pay, 'v')) + '% do que entrou.',
       C.bars({ rows: pay.map(function (p) { return { name: PAY[p.k] || p.k || 'Outros', value: +p.v, meta: plural(+p.n, 'pagamento', 'pagamentos') + (+p.fee ? ' · ' + money(p.fee) + ' em taxas' : '') }; }), fmt: money, xName: 'Forma', valueName: 'Valor' })) });
     return out;
   }

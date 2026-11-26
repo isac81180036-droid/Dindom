@@ -42,12 +42,14 @@
     var bell = '<a class="icon-btn" href="#notificacoes" aria-label="Notificações">' + icon('bell') + (unread ? '<span class="dot"></span>' : '') + '</a>';
     var rv = Reservas.pendingCount();
     var party = '<a class="icon-btn" href="#reservas" aria-label="Reservas' + (rv ? ': ' + rv + ' pendentes' : '') + '">' + icon('party') + (rv ? '<span class="nbadge num">' + rv + '</span>' : '') + '</a>';
-    return '<header class="home-top">' +
-      '<a class="avatar" href="#perfil" aria-label="Perfil" style="text-decoration:none">' + esc(d.user.name.charAt(0)) + '</a>' +
-      '<div class="grow"><span class="hello">' + UI.greeting() + ',</span><h1>' + esc(d.user.name.split(' ')[0]) + ' 👋</h1></div>' +
+    // Cartão de boas-vindas: unidade, saudação grande e a data; avisos, agenda e reservas no canto.
+    var hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return '<section class="card hero home-hero">' +
       '<div class="acts">' + party + '<a class="icon-btn mobile-only" href="#agenda" aria-label="Agenda">' + icon('calendar') + '</a>' + bell + '</div>' +
-      '</header>' +
-      (d.units.length > 1 || unit.name ? '<button type="button" class="home-unit" data-unit>' + icon('mapPin', 'sm') + esc(unit.name) + icon('chevronDown', 'sm') + '</button>' : '');
+      '<button type="button" class="hero-chip" data-unit>' + esc(unit.name || 'Dindom') + icon('chevronDown', 'sm') + '</button>' +
+      '<h1 class="hello">' + UI.greeting() + ', ' + esc(d.user.name.split(' ')[0]) + '.</h1>' +
+      '<div class="date">' + esc(hoje.charAt(0).toUpperCase() + hoje.slice(1)) + '</div>' +
+      '</section>';
   }
 
   // Atalhos redondos para o que a equipe mais faz (como "Enviar", "Pagar" no app do banco).

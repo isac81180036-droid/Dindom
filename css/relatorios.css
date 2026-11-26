@@ -3,26 +3,26 @@
 /* Cores dos gráficos: uma por série, na mesma ordem em toda a tela (verde, azul, laranja…), validadas para daltonismo.
    O cinza (s0) é sempre "período anterior" ou referência. Tema escuro tem os próprios tons. */
 :root {
-  --ch-1: #4f7d09; --ch-2: #2a78d6; --ch-3: #eb6834; --ch-4: #eda100; --ch-5: #e87ba4; --ch-6: #6250d6;
+  --ch-1: #2b2622; --ch-2: #9b62c2; --ch-3: #d9622b; --ch-4: #e0a200; --ch-5: #e87ba4; --ch-6: #3b5bdb;
   --ch-0: #a3a39f;
-  --ch-grid: #e8e8e6; --ch-axis: #c9c9c5;
-  --ch-h1: #eaf5cf; --ch-h2: #cfe8a0; --ch-h3: #a9d468; --ch-h4: #7cb342; --ch-h5: #4f7d09; --ch-h6: #2f4d05;
+  --ch-grid: #e6e1d8; --ch-axis: #d0c9bd;
+  --ch-h1: #f1e6f7; --ch-h2: #e0caee; --ch-h3: #c8a5df; --ch-h4: #a77ac8; --ch-h5: #7d4ca3; --ch-h6: #52296e;
   --ch-good: #006300; --ch-bad: #c62a2a;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ch-1: #6fa524; --ch-2: #3987e5; --ch-3: #d95926; --ch-4: #c98500; --ch-5: #d55181; --ch-6: #9085e9;
+    --ch-1: #e9e3da; --ch-2: #c49be0; --ch-3: #ff8a5c; --ch-4: #e0b030; --ch-5: #ff8fb8; --ch-6: #8fa6ff;
     --ch-0: #6f6f6c;
     --ch-grid: #262626; --ch-axis: #3a3a38;
-    --ch-h1: #1f2a0e; --ch-h2: #2f4d05; --ch-h3: #4f7d09; --ch-h4: #6fa524; --ch-h5: #9bd32f; --ch-h6: #cdee8a;
+    --ch-h1: #2a2030; --ch-h2: #3d2a4a; --ch-h3: #5a3d70; --ch-h4: #7f58a0; --ch-h5: #a985c9; --ch-h6: #d3b9e8;
     --ch-good: #3ccf87; --ch-bad: #ff6b6b;
   }
 }
 :root[data-theme="dark"] {
-  --ch-1: #6fa524; --ch-2: #3987e5; --ch-3: #d95926; --ch-4: #c98500; --ch-5: #d55181; --ch-6: #9085e9;
+  --ch-1: #e9e3da; --ch-2: #c49be0; --ch-3: #ff8a5c; --ch-4: #e0b030; --ch-5: #ff8fb8; --ch-6: #8fa6ff;
   --ch-0: #6f6f6c;
   --ch-grid: #262626; --ch-axis: #3a3a38;
-  --ch-h1: #1f2a0e; --ch-h2: #2f4d05; --ch-h3: #4f7d09; --ch-h4: #6fa524; --ch-h5: #9bd32f; --ch-h6: #cdee8a;
+  --ch-h1: #2a2030; --ch-h2: #3d2a4a; --ch-h3: #5a3d70; --ch-h4: #7f58a0; --ch-h5: #a985c9; --ch-h6: #d3b9e8;
   --ch-good: #3ccf87; --ch-bad: #ff6b6b;
 }
 .s0 { --c: var(--ch-0); } .s1 { --c: var(--ch-1); } .s2 { --c: var(--ch-2); } .s3 { --c: var(--ch-3); }
@@ -222,3 +222,31 @@
   .rel { max-width: none; padding: 0; }
   .card, .list { box-shadow: none; border: 1px solid #ddd; break-inside: avoid; }
 }
+
+/* ---------- Gráficos mais fáceis de ler (visual novo) ---------- */
+.ch { gap: 14px; }
+.ch-head h3 { font-size: 1.12rem; font-weight: 800; letter-spacing: -.01em; }
+.ch-head p { font-size: var(--fs-md); color: var(--ink); margin-top: 4px; line-height: 1.4; }
+.ch-plot { grid-template-rows: 210px auto; }
+.ch-y, .ch-x, .ch-rule-axis, .ch-heat-x, .ch-heat-y, .ch-heat-scale, .ch-legend { font-size: 12.5px; }
+.ch-x { height: 18px; line-height: 18px; }
+.ch-stack { max-width: 34px; gap: 2px; }
+.ch-stack i:first-child { border-radius: 7px 7px 0 0; }
+.ch-cap { font-size: 12.5px; }
+.ch-bars { gap: 16px; }
+.ch-bar-head { font-size: var(--fs-md); }
+.ch-bar-meta { font-size: var(--fs-sm); }
+.ch-track { height: 10px; border-radius: 6px; }
+.ch-track i { border-radius: 6px; }
+.ch-dot { width: 12px; height: 12px; margin: 0 0 -6px -6px; }
+.ch-rule .ch-dot { margin-left: -6px; top: 1px; }
+.ch-line { stroke-width: 2.5; }
+.ch-heat i { border-radius: 6px; }
+.ch-data summary { font-size: var(--fs-sm); }
+.ch-seg { height: 34px; }
+.ch-seg i { border-radius: 8px; }
+.ch-seg .s1 b { color: var(--bg); }
+.ch-kpi { min-height: 118px; }
+.ch-kpi-label { font-size: var(--fs-sm); }
+.ch-tip { background: var(--ink); color: var(--bg); border-radius: 12px; font-size: 13px; }
+.rel-filter .card-meta { font-size: var(--fs-sm); }

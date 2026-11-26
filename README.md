@@ -38,7 +38,7 @@ Arquivos em `icons/`, gerados a partir da logo oficial:
 - `wordmark-black.png` / `wordmark-white.png` — só o letreiro "Dindom", fundo transparente.
 - `icon-*.png` — ícones do app (fundo preto, letreiro branco).
 
-A identidade fica em `css/tokens.css` (cores, fontes, cantos), `css/brand.css` (logo) e `css/ios.css` (visual padrão iPhone, carregado por último: título grande, cartões brancos bem arredondados, cartão de destaque preto, verde-limão `--lime` no que está selecionado, barra de abas flutuante no celular e menu lateral em cartão no computador). A fonte é a do sistema (SF Pro no iPhone), com Inter e Nunito nos outros aparelhos. O verde-limão é só fundo; texto e ícones fortes usam `--accent` (preto, ou branco no tema escuro).
+A identidade fica em `css/tokens.css` (cores, fontes, cantos), `css/brand.css` (logo) e `css/tema.css` (visual limpo inspirado no Dojo Fácil, carregado por último): fundo creme, cartões claros sem sombra, lilás da marca (`--brand`) no cartão de boas-vindas e nos ícones, preto (`--accent`) no que está ativo — menu, filtros e botão principal —, títulos de seção em maiúsculas cinza e números em faixas unidas. Fonte Figtree. No computador, o menu lateral tem o botão "Modo escuro". Nos Relatórios, o subtítulo de cada gráfico já diz a conclusão (ex.: "Mais movimento: sábado às 19h").
 
 **Celular x computador:** abaixo de 900 px de largura o app usa a barra inferior (5 destinos; a Agenda abre pelo ícone de calendário no Início). A partir de 900 px vira layout de computador: menu lateral com a Agenda, telas mais largas com grade de cards e painéis em janela centralizada. O limite está em `css/desktop.css` e em `isDesktop()` no `js/app.js`.
 

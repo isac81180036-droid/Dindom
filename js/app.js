@@ -60,8 +60,15 @@
         : '<ul>' + TABS.map(function (t) { return item(t, t.desk ? 'desk-only' : ''); }).join('')) +
       (UI.isManager() ? '<li class="desk-only nav-label">Gestão</li>' + ADMIN_TABS.filter(function (t) { return !t.admin || UI.isAdmin(); }).map(function (t) { return item(t, 'desk-only'); }).join('') : '') +
       '</ul>' +
+      '<button type="button" class="nav-theme" data-theme-toggle>' + icon('moon') + '<span class="grow">Modo escuro</span><input type="checkbox" class="switch" tabindex="-1" aria-hidden="true"' + (isDark() ? ' checked' : '') + '></button>' +
       '<a class="nav-foot" href="#perfil"><span class="avatar">' + UI.esc(d.user.name.charAt(0)) + '</span>' +
       '<span class="grow"><b>' + UI.esc(d.user.name) + '</b><span class="muted">' + UI.esc(unit.name) + '</span></span></a>';
+  }
+
+  // Tema escuro ligado agora (escolhido no app, ou o do aparelho quando está em automático).
+  function isDark() {
+    var t = DB.get().prefs.theme;
+    return t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
   }
 
   var unmount = null; // limpeza da tela anterior (ex.: desligar a câmera)
@@ -131,6 +138,14 @@
     root = document.getElementById('app');
     nav = document.getElementById('nav');
     applyTheme();
+
+    // Botão "Modo escuro" do menu lateral.
+    nav.addEventListener('click', function (e) {
+      if (!e.target.closest('[data-theme-toggle]')) return;
+      var dark = !isDark();
+      DB.update(function (x) { x.prefs.theme = dark ? 'dark' : 'light'; });
+      applyTheme(); refresh();
+    });
 
     // Links internos navegam pelo roteador, sem depender da barra de endereço.
     document.addEventListener('click', function (e) {
