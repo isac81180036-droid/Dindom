@@ -220,6 +220,13 @@
       var d = load(); var s = d.stock[unit || d.user.unit] || {};
       return s[pid] != null ? s[pid] : null;
     },
+    // Estoque ideal do produto: um número fixo, igual todos os dias.
+    idealOf: function (p) {
+      var v = p && p.ideal;
+      if (typeof v === 'number') return v;
+      if (v && typeof v === 'object') { var m = 0; Object.keys(v).forEach(function (k) { if (+v[k] > m) m = +v[k]; }); return m; }
+      return +v || 0;
+    },
     product: function (id) {
       var ps = load().products;
       for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i];

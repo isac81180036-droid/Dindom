@@ -12,8 +12,9 @@
   }
 
   // Situação de um produto a partir da quantidade encontrada.
-  window.stockState = function (p, q, delivery) {
-    var ideal = p.ideal[delivery];
+  // O ideal é fixo por produto (DB.idealOf): compra-se só o que falta para chegar nele.
+  window.stockState = function (p, q) {
+    var ideal = DB.idealOf(p);
     if (q == null) return { key: 'pend', label: 'Pendente', need: null };
     var need = Math.max(0, Math.round((ideal - q) * 100) / 100);
     if (q <= p.crit) return { key: 'crit', label: 'Crítico', need: need };
@@ -56,7 +57,7 @@
     return '<div class="count-row" data-pid="' + p.id + '" data-state="' + st.key + '">' +
       '<div class="count-info">' +
       '<div class="card-title">' + esc(p.name) + '</div>' +
-      '<div class="card-meta">Ideal <span class="num">' + fmt(p.ideal[d.closing.delivery]) + '</span> ' + esc(p.unit) +
+      '<div class="card-meta">Ideal <span class="num">' + fmt(DB.idealOf(p)) + '</span> ' + esc(p.unit) +
       (s ? ' · ' + esc(s.name) : '') + (rec && rec.by && !mine ? ' · contado por ' + esc(firstName(rec.by)) + ' às ' + hm(rec.at) : '') + '</div>' +
       '<div class="count-need"><span class="st-dot" aria-hidden="true"></span><span data-need>' + needText(p, st) + '</span>' +
       '<span class="sr-only" data-srstate>' + st.label + '</span></div>' +
@@ -105,12 +106,12 @@
   }
 
   function finalize(d, buy, close) {
-    var dl = d.deliveries.filter(function (x) { return x.id === d.closing.delivery; })[0];
+    var hoje = new Date(), quando = String(hoje.getDate()).padStart(2, '0') + '/' + String(hoje.getMonth() + 1).padStart(2, '0');
     var counts = {};
     d.counts.forEach(function (c) { counts[c.id] = c.q; });
     DB.update(function (x) {
       x.shopping = {
-        fromClosing: 'hoje, para ' + dl.label.toLowerCase() + ' ' + dl.date,
+        fromClosing: quando,
         items: buy.map(function (b) { return { pid: b.p.id, need: b.st.need, received: null }; })
       };
       x.lastCounts = counts;
@@ -203,10 +204,7 @@
 
     var html = '<main class="screen has-dock">' +
       UI.topbar('Fechamento', { back: '#estoque', sub: savedLabel(d) }) +
-      '<div class="field"><span class="label">Reposição para</span><div class="seg" data-delivery>' +
-      d.deliveries.map(function (x) {
-        return '<button type="button" data-d="' + x.id + '" aria-pressed="' + (x.id === d.closing.delivery) + '"><span>' + esc(x.label) + '</span><span class="faint num" style="font-weight:500">' + esc(x.date) + '</span></button>';
-      }).join('') + '</div></div>' +
+      '<p class="card-meta" style="margin:0">Conte o que tem na loja. A lista de compras pede só o que falta para chegar ao estoque ideal de cada produto.</p>' +
       (mine ? '<div class="seg" style="max-width:420px"><button type="button" data-scope="mine" aria-pressed="' + (scope === 'mine') + '">Minha parte</button>' +
         '<button type="button" data-scope="all" aria-pressed="' + (scope !== 'mine') + '">Loja toda</button></div>' +
         (scope === 'mine' ? '<p class="card-meta" style="margin:0">' + icon('users', 'sm') + ' Você conta: <b>' + esc(myNames) + '</b>. O resto fica com os colegas de cada estação.</p>' : '') : '') +

@@ -254,3 +254,7 @@ As contas ficam na linha `contas` da tabela `financeiro` (`supabase/007_financei
 ## Excluir colaborador
 
 Em **Colaboradores › (pessoa) › Excluir colaborador** (só o administrador; não dá para excluir a si mesmo nem o único administrador). Com servidor, o vínculo de login (`members`) é apagado na hora e a pessoa perde o acesso. Quem **nunca bateu ponto** tem o cadastro apagado de vez. Quem **já tem ponto ou ajuste registrado** some de todas as listas, estações e escala, mas o cadastro fica guardado marcado como excluído (`deleted`), sem e-mail, código do ponto nem senha: as marcações continuam no espelho, na tabela do Ponto da equipe e nos arquivos da contabilidade, como exige a Portaria 671. O e-mail e o celular ficam livres para um cadastro novo.
+
+## Estoque ideal fixo
+
+Cada produto tem **um** estoque ideal (Produtos › produto › **Ter sempre na loja**), igual todos os dias. No fechamento, a lista de compras pede só o que falta: ideal − contado (ex.: ideal 4, tem 3 → compra 1). Não existe mais a escolha de dia de reposição no fechamento. Cadastros antigos, com um ideal por dia de reposição, passam a usar o **maior** deles até serem salvos de novo (`DB.idealOf` em `js/data.js`). Os dias de reposição da primeira configuração continuam guardados, mas não mudam mais a quantidade.

@@ -89,7 +89,7 @@
       '<div class="card-row"><div class="grow">' +
       '<div class="eyebrow" style="color:inherit;opacity:.6">' + (mine ? 'Sua parte do fechamento' : 'Fechamento de estoque') + '</div>' +
       '<h2 style="font-size:var(--fs-xl);margin-top:4px">' + (started ? 'Contagem em andamento' : 'Contagem não iniciada') + '</h2>' +
-      '<p class="muted" style="margin-top:2px">Reposição de ' + esc(dl.label.toLowerCase()) + ', ' + esc(dl.date) + '</p>' +
+      '<p class="muted" style="margin-top:2px">Compra só o que falta para o estoque ideal</p>' +
       '</div><div class="ring" style="--p:' + s.pct + '"><span class="num">' + Math.round(s.pct) + '%</span></div></div>' +
       '<p class="muted num">' + s.counted + ' de ' + s.total + ' produtos contados</p>' +
       '<a class="btn primary block" href="#estoque/fechamento">' + (started ? 'Continuar fechamento' : 'Iniciar fechamento') + icon('chevronRight', 'sm') + '</a>' +

@@ -1,4 +1,4 @@
-// Produtos do estoque (gerente e admin): cadastro, estoque ideal por dia de reposição, mínimo e estoque inicial.
+// Produtos do estoque (gerente e admin): cadastro, estoque ideal (fixo), mínimo e estoque inicial.
 (function () {
   var esc = UI.esc, fmt = UI.fmt;
   var UNITS = ['kg', 'un', 'pct', 'cx', 'lata', 'fardo', 'saco', 'L', 'maço', 'pote', 'balde', 'bisn.'];
@@ -28,7 +28,7 @@
           var items = ofKind.filter(function (p) { return p.cat === c; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'pt-BR'); });
           if (!items.length) return '';
           return '<div class="count-sub"><div class="eyebrow">' + esc(c) + '</div><div class="list">' + items.map(function (p) {
-            var ideal = d.deliveries.map(function (dl) { return dl.label.slice(0, 3) + ' ' + fmt(p.ideal[dl.id] || 0); }).join(' · ');
+            var ideal = fmt(DB.idealOf(p));
             var st = DB.station(p.station);
             return '<a class="row" href="#produtos/' + p.id + '" style="text-decoration:none;color:inherit"><div class="grow"><div class="card-title">' + esc(p.name) + '</div>' +
               '<div class="card-meta">Ideal: ' + esc(ideal) + ' ' + esc(p.unit) + ' · mínimo ' + fmt(p.crit) + (st ? ' · ' + icon('users', 'sm') + ' ' + esc(st.name) : '') + '</div></div>' + icon('chevronRight', 'sm') + '</a>';
@@ -82,11 +82,10 @@
       }).join('') + '<button type="button" class="chip" data-v="__outra" aria-pressed="' + otherUnit + '">Outra</button></div>' +
       '<input id="p-unit" class="input" placeholder="Ex.: garrafa" value="' + (otherUnit ? esc(v.unit) : '') + '"' + (otherUnit ? '' : ' hidden') + '></div>' +
 
-      '<section class="section"><div class="eyebrow">Estoque ideal</div><p class="card-meta">Quanto precisa ter na loja para aguentar até cada reposição. O fechamento compra a diferença.</p>' +
-      '<div class="ideal-grid">' + d.deliveries.map(function (dl) {
-        return '<div class="field" id="f-i-' + dl.id + '"><label for="i-' + dl.id + '">Para ' + esc(dl.label.toLowerCase()) + '</label>' +
-          '<div class="qty-unit"><input id="i-' + dl.id + '" class="input num" inputmode="decimal" placeholder="0" value="' + (v.ideal[dl.id] != null ? String(v.ideal[dl.id]).replace('.', ',') : '') + '"><span data-u-label>' + esc(v.unit) + '</span></div></div>';
-      }).join('') + '</div>' +
+      '<section class="section"><div class="eyebrow">Estoque ideal</div><p class="card-meta">Quanto precisa ter sempre na loja. É o mesmo todos os dias: no fechamento, a lista de compras pede só o que falta (ex.: ideal 4, tem 3 → compra 1).</p>' +
+      '<div class="field" id="f-i-ideal"><label for="i-ideal">Ter sempre na loja</label>' +
+        '<div class="qty-unit"><input id="i-ideal" class="input num" inputmode="decimal" placeholder="0" value="' + (p ? String(DB.idealOf(v)).replace('.', ',') : '') + '"><span data-u-label>' + esc(v.unit) + '</span></div>' +
+        '<span class="err" hidden>Informe um número.</span></div>' +
       '<div class="field" id="f-p-crit"><label for="p-crit">Estoque mínimo (alerta de crítico)</label><div class="qty-unit"><input id="p-crit" class="input num" inputmode="decimal" placeholder="0" value="' + (v.crit != null ? String(v.crit).replace('.', ',') : '') + '"><span data-u-label>' + esc(v.unit) + '</span></div>' +
       '<span class="hint">Abaixo disso o produto aparece em vermelho no Início.</span><span class="err" hidden>Informe um número.</span></div></section>' +
 
@@ -150,9 +149,11 @@
           var crit = num($('#p-crit').value);
           var badCrit = crit == null || crit < 0;
           $('#f-p-crit').classList.toggle('error', badCrit); $('#f-p-crit .err').hidden = !badCrit;
-          var ideal = {};
-          var badIdeal = DB.get().deliveries.some(function (dl) { var n = num($('#i-' + dl.id).value); ideal[dl.id] = n == null ? 0 : n; return n != null && n < 0; });
-          if (msg || badCrit || badIdeal) { (msg ? f : $('#f-p-crit')).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+          var ideal = num($('#i-ideal').value);
+          var badIdeal = ideal != null && ideal < 0;
+          if (ideal == null) ideal = 0;
+          $('#f-i-ideal').classList.toggle('error', badIdeal); $('#f-i-ideal .err').hidden = !badIdeal;
+          if (msg || badCrit || badIdeal) { (msg ? f : badIdeal ? $('#f-i-ideal') : $('#f-p-crit')).scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
 
           var pid = p ? p.id : 'p' + Date.now();
           DB.update(function (x) {

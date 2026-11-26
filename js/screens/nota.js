@@ -66,7 +66,7 @@
       DB.update(function (x) {
         if (x.categories.indexOf(cat) < 0) x.categories.push(cat);
         x.products.push({ id: pid, name: name, kind: ['preparo', 'montagem', 'apoio'].indexOf(s.kind) >= 0 ? s.kind : 'apoio', cat: cat,
-          unit: s.unit || unitFromNote(r.unit), ideal: {}, crit: 0, station: null });
+          unit: s.unit || unitFromNote(r.unit), ideal: 0, crit: 0, station: null });
       });
     }
     var p = DB.product(pid);

@@ -18,7 +18,7 @@
       var st = stockState(p, q, d.closing.delivery);
       var pill = STATE_PILL[st.key];
       return '<div class="row"><div class="grow"><div class="card-title">' + esc(p.name) + '</div>' +
-        '<div class="card-meta">' + esc(p.cat) + ' · ' + (q == null ? 'sem contagem' : '<span class="num">' + fmt(q) + '</span> de ' + fmt(p.ideal[d.closing.delivery]) + ' ' + esc(p.unit)) + '</div></div>' +
+        '<div class="card-meta">' + esc(p.cat) + ' · ' + (q == null ? 'sem contagem' : '<span class="num">' + fmt(q) + '</span> de ' + fmt(DB.idealOf(p)) + ' ' + esc(p.unit)) + '</div></div>' +
         '<span class="pill ' + pill[0] + '">' + pill[1] + '</span></div>';
     }).join('') + '</div>';
   }
